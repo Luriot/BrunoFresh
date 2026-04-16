@@ -22,3 +22,17 @@ export type CartResponse = {
   grouped: Record<string, CartGroupItem[]>;
   needs_review: string[];
 };
+
+export type ScrapeResponse = {
+  message: string;
+  url: string;
+  job_id?: number;
+  status: "pending" | "running" | "completed" | "failed";
+};
+
+export type JobStatusResponse = {
+  id: number;
+  url: string;
+  status: "pending" | "running" | "completed" | "failed";
+  error_message?: string | null;
+};

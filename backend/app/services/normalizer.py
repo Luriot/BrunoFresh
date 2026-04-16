@@ -14,6 +14,13 @@ class NormalizedIngredient:
     category: str
 
 
+def _sanitize_raw_ingredient(value: str) -> str:
+    # Keep only short, plain text snippets to reduce prompt-injection surface.
+    cleaned = (value or "").replace("`", " ").replace("\n", " ").replace("\r", " ")
+    cleaned = " ".join(cleaned.split())
+    return cleaned[:200]
+
+
 def _coerce_category(value: str) -> str:
     value = (value or "Other").strip()
     if value in settings.categories:
@@ -37,6 +44,7 @@ def _coerce_unit(value: str) -> str:
 
 
 def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
+    safe_raw = _sanitize_raw_ingredient(raw_string)
     categories = ", ".join(settings.categories)
     prompt = (
         "You are an ingredient parser. Return strict JSON only with keys: "
@@ -45,7 +53,7 @@ def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> Normal
         f"Allowed categories: {categories}. "
         "Translate ingredient names to English. "
         "Do not return markdown. "
-        f"Input ingredient: {raw_string}. "
+        f"Input ingredient: {safe_raw}. "
         f"Hint quantity={quantity}, unit={unit}."
     )
 

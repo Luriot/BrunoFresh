@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchRecipes, generateCart, queueScrape } from "./api/client";
+import { fetchRecipes, fetchScrapeJob, generateCart, queueScrape } from "./api/client";
 import { RecipeCard } from "./components/RecipeCard";
 import { ShoppingList } from "./components/ShoppingList";
 import type { CartInput, CartResponse, RecipeListItem } from "./types";
 import { useTranslation } from "react-i18next";
+
+const CART_STORAGE_KEY = "mealcart.cart.v1";
 
 type CartEntry = {
   recipe: RecipeListItem;
@@ -17,10 +19,24 @@ function App() {
   const [list, setList] = useState<CartResponse | null>(null);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [scrapeState, setScrapeState] = useState<string | null>(null);
 
   useEffect(() => {
     void loadRecipes();
+
+    const raw = window.localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as CartEntry[];
+      setCart(parsed);
+    } catch {
+      window.localStorage.removeItem(CART_STORAGE_KEY);
+    }
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  }, [cart]);
 
   async function loadRecipes() {
     const data = await fetchRecipes();
@@ -30,11 +46,38 @@ function App() {
   async function onScrape() {
     if (!url.trim()) return;
     setLoading(true);
+    setScrapeState(null);
     try {
-      await queueScrape(url.trim());
+      const response = await queueScrape(url.trim());
       setUrl("");
-      // Basic wait-free UX: user can click refresh once scraping background task has run.
-      await loadRecipes();
+
+      if (response.status === "completed") {
+        setScrapeState(response.message);
+        await loadRecipes();
+        return;
+      }
+
+      if (!response.job_id) {
+        setScrapeState("Scrape job started but no job id returned.");
+        return;
+      }
+
+      setScrapeState("Scraping in progress...");
+      const deadline = Date.now() + 90_000;
+      while (Date.now() < deadline) {
+        const job = await fetchScrapeJob(response.job_id);
+        if (job.status === "completed") {
+          setScrapeState("Scrape completed.");
+          await loadRecipes();
+          return;
+        }
+        if (job.status === "failed") {
+          setScrapeState(job.error_message || "Scrape failed.");
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      setScrapeState("Scrape still running. Refresh recipes in a moment.");
     } finally {
       setLoading(false);
     }
@@ -122,6 +165,7 @@ function App() {
               </button>
             </div>
             <p className="mt-2 text-xs text-gray-500">{t("app.recipesLoaded", { count: recipeCount })}</p>
+            {scrapeState && <p className="mt-1 text-xs text-gray-600">{scrapeState}</p>}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

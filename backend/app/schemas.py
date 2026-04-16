@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class RecipeListItem(BaseModel):
@@ -42,12 +44,24 @@ class RecipeDetail(BaseModel):
 
 
 class ScrapeRequest(BaseModel):
-    url: str
+    url: HttpUrl
+
+
+JobStatus = Literal["pending", "running", "completed", "failed"]
 
 
 class ScrapeResponse(BaseModel):
     message: str
     url: str
+    job_id: int | None = None
+    status: JobStatus
+
+
+class JobStatusResponse(BaseModel):
+    id: int
+    url: str
+    status: JobStatus
+    error_message: str | None = None
 
 
 class CartRecipeIn(BaseModel):

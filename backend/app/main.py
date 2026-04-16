@@ -1,18 +1,25 @@
+import asyncio
+import ipaddress
+import socket
 from collections import defaultdict
+from urllib.parse import urlparse
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from .database import Base, engine, get_db
-from .models import Ingredient, Recipe, RecipeIngredient
+from .config import settings
+from .database import Base, SessionLocal, engine, get_db
+from .models import Ingredient, Recipe, RecipeIngredient, ScrapeJob
 from .schemas import (
     CartGroupItem,
     CartRequest,
     CartResponse,
     IngredientPatch,
+    JobStatusResponse,
     RecipeDetail,
     RecipeIngredientOut,
     RecipeListItem,
@@ -25,19 +32,26 @@ from .services.normalizer import normalize_ingredient
 from .services.scraper import scrape_recipe_url
 
 
-Base.metadata.create_all(bind=engine)
+SUPPORTED_SCRAPE_DOMAINS = ("hellofresh", "cuisineaz", "allrecipes", "jow", "750g")
+scrape_semaphore = asyncio.Semaphore(max(1, settings.scrape_concurrency_limit))
 
 app = FastAPI(title="MealCart API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(settings.allowed_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/images", StaticFiles(directory="data/images"), name="images")
+app.mount("/images", StaticFiles(directory=str(settings.images_dir)), name="images")
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 def _ing_to_out(link: RecipeIngredient) -> RecipeIngredientOut:
@@ -52,30 +66,70 @@ def _ing_to_out(link: RecipeIngredient) -> RecipeIngredientOut:
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _is_public_host(hostname: str) -> bool:
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return False
+
+    for info in infos:
+        ip_str = info[4][0]
+        ip = ipaddress.ip_address(ip_str)
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
+            return False
+    return True
+
+
+async def _validate_scrape_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise HTTPException(status_code=400, detail="Only http/https URLs are allowed")
+
+    hostname = parsed.hostname or ""
+    if not hostname:
+        raise HTTPException(status_code=400, detail="Invalid URL host")
+
+    if not any(domain in hostname for domain in SUPPORTED_SCRAPE_DOMAINS):
+        raise HTTPException(status_code=400, detail="Unsupported recipe domain")
+
+    is_public = await asyncio.to_thread(_is_public_host, hostname)
+    if not is_public:
+        raise HTTPException(status_code=400, detail="Private or invalid network target rejected")
+
+    return url
+
+
 @app.get("/api/recipes", response_model=list[RecipeListItem])
-def list_recipes(
+async def list_recipes(
     q: str | None = Query(default=None),
     source: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Recipe)
     if q:
         stmt = stmt.where(Recipe.title.ilike(f"%{q}%"))
     if source:
         stmt = stmt.where(Recipe.source_domain == source)
-    recipes = db.scalars(stmt.offset(offset).limit(limit)).all()
+    recipes = (await db.scalars(stmt.offset(offset).limit(limit))).all()
     return recipes
 
 
 @app.get("/api/recipes/{recipe_id}", response_model=RecipeDetail)
-def get_recipe(recipe_id: int, db: Session = Depends(get_db)):
-    recipe = db.scalar(
+async def get_recipe(recipe_id: int, db: AsyncSession = Depends(get_db)):
+    recipe = await db.scalar(
         select(Recipe)
         .options(selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient))
         .where(Recipe.id == recipe_id)
@@ -97,21 +151,23 @@ def get_recipe(recipe_id: int, db: Session = Depends(get_db)):
     )
 
 
-def _persist_scraped_recipe(url: str, db: Session):
-    existing = db.scalar(select(Recipe).where(Recipe.url == url))
+async def _persist_scraped_recipe(url: str, db: AsyncSession):
+    existing = await db.scalar(select(Recipe).where(Recipe.url == url))
     if existing:
         return
 
-    scraped = scrape_recipe_url(url)
+    scraped = await asyncio.to_thread(scrape_recipe_url, url)
 
     incoming_names: list[str] = []
     for ing in scraped.ingredients:
-        normalized_probe = normalize_ingredient(ing.raw, ing.quantity, ing.unit)
+        normalized_probe = await asyncio.to_thread(normalize_ingredient, ing.raw, ing.quantity, ing.unit)
         incoming_names.append(normalized_probe.name_en if normalized_probe else ing.raw)
 
-    existing_recipes = db.scalars(
-        select(Recipe).options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
+    existing_recipes = (
+        await db.scalars(
+            select(Recipe).options(
+                selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
+            )
         )
     ).all()
     for candidate in existing_recipes:
@@ -133,22 +189,22 @@ def _persist_scraped_recipe(url: str, db: Session):
         prep_time_minutes=scraped.prep_time_minutes,
     )
     db.add(recipe)
-    db.flush()
+    await db.flush()
 
-    local_image_path = download_image(scraped.image_url, recipe.id)
+    local_image_path = await asyncio.to_thread(download_image, scraped.image_url, recipe.id)
     if local_image_path:
         recipe.image_local_path = local_image_path
-    db.flush()
+    await db.flush()
 
     for ing in scraped.ingredients:
-        normalized = normalize_ingredient(ing.raw, ing.quantity, ing.unit)
+        normalized = await asyncio.to_thread(normalize_ingredient, ing.raw, ing.quantity, ing.unit)
         ingredient = None
         needs_review = False
         quantity = ing.quantity
         unit = ing.unit
 
         if normalized:
-            ingredient = db.scalar(select(Ingredient).where(Ingredient.name_en == normalized.name_en))
+            ingredient = await db.scalar(select(Ingredient).where(Ingredient.name_en == normalized.name_en))
             if not ingredient:
                 ingredient = Ingredient(
                     name_en=normalized.name_en,
@@ -156,7 +212,7 @@ def _persist_scraped_recipe(url: str, db: Session):
                     is_normalized=True,
                 )
                 db.add(ingredient)
-                db.flush()
+                await db.flush()
             quantity = normalized.quantity
             unit = normalized.unit
         else:
@@ -173,58 +229,93 @@ def _persist_scraped_recipe(url: str, db: Session):
             )
         )
 
-    db.commit()
+    await db.commit()
+
+
+async def _run_scrape_job(job_id: int) -> None:
+    async with SessionLocal() as db:
+        job = await db.get(ScrapeJob, job_id)
+        if not job:
+            return
+
+        job.status = "running"
+        await db.commit()
+
+        async with scrape_semaphore:
+            try:
+                await _persist_scraped_recipe(job.url, db)
+                job.status = "completed"
+                job.error_message = None
+            except Exception as exc:
+                job.status = "failed"
+                job.error_message = str(exc)[:700]
+            await db.commit()
 
 
 @app.post("/api/scrape", response_model=ScrapeResponse)
-def enqueue_scrape(
+async def enqueue_scrape(
     payload: ScrapeRequest,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    # Do immediate dedupe check for cleaner UX.
-    existing = db.scalar(select(Recipe).where(Recipe.url == payload.url))
+    safe_url = await _validate_scrape_url(str(payload.url))
+
+    existing = await db.scalar(select(Recipe).where(Recipe.url == safe_url))
     if existing:
-        return ScrapeResponse(message="Recipe already exists", url=payload.url)
+        return ScrapeResponse(message="Recipe already exists", url=safe_url, status="completed")
 
-    # SQLAlchemy session is not thread-safe; open a fresh session in worker.
-    def _worker(target_url: str):
-        from .database import SessionLocal
+    job = ScrapeJob(url=safe_url, status="pending")
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
 
-        worker_db = SessionLocal()
-        try:
-            _persist_scraped_recipe(target_url, worker_db)
-        finally:
-            worker_db.close()
+    asyncio.create_task(_run_scrape_job(job.id))
+    return ScrapeResponse(message="Scrape job queued", url=safe_url, job_id=job.id, status="pending")
 
-    background_tasks.add_task(_worker, payload.url)
-    return ScrapeResponse(message="Scrape job queued", url=payload.url)
+
+@app.get("/api/jobs/{job_id}", response_model=JobStatusResponse)
+async def get_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
+    job = await db.get(ScrapeJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return JobStatusResponse(id=job.id, url=job.url, status=job.status, error_message=job.error_message)
 
 
 @app.patch("/api/ingredients/{ingredient_id}")
-def patch_ingredient(ingredient_id: int, payload: IngredientPatch, db: Session = Depends(get_db)):
-    ingredient = db.get(Ingredient, ingredient_id)
+async def patch_ingredient(
+    ingredient_id: int, payload: IngredientPatch, db: AsyncSession = Depends(get_db)
+):
+    ingredient = await db.get(Ingredient, ingredient_id)
     if not ingredient:
         raise HTTPException(status_code=404, detail="Ingredient not found")
 
     ingredient.name_en = payload.name_en
     ingredient.category = payload.category
     ingredient.is_normalized = True
-    db.commit()
+    await db.commit()
     return {"status": "updated"}
 
 
 @app.post("/api/cart/generate", response_model=CartResponse)
-def generate_cart(payload: CartRequest, db: Session = Depends(get_db)):
+async def generate_cart(payload: CartRequest, db: AsyncSession = Depends(get_db)):
     grouped: dict[str, dict[tuple[str, str], float]] = defaultdict(lambda: defaultdict(float))
     needs_review: list[str] = []
 
-    for item in payload.items:
-        recipe = db.scalar(
+    if not payload.items:
+        return CartResponse(grouped={}, needs_review=[])
+
+    recipe_ids = list({item.recipe_id for item in payload.items})
+    recipes = (
+        await db.scalars(
             select(Recipe)
             .options(selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient))
-            .where(Recipe.id == item.recipe_id)
+            .where(Recipe.id.in_(recipe_ids))
         )
+    ).all()
+    recipes_by_id = {recipe.id: recipe for recipe in recipes}
+
+    for item in payload.items:
+        recipe = recipes_by_id.get(item.recipe_id)
         if not recipe:
             raise HTTPException(status_code=404, detail=f"Recipe {item.recipe_id} not found")
 
