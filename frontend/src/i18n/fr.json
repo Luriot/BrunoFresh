@@ -1,0 +1,43 @@
+{
+  "app": {
+    "title": "MealCart",
+    "subtitle": "Scrapez des recettes et construisez une liste de courses intelligente.",
+    "urlPlaceholder": "Collez une URL de recette",
+    "scrape": "Scraper",
+    "scraping": "Scraping...",
+    "refresh": "Rafraichir",
+    "recipesLoaded": "Recettes chargees : {{count}}"
+  },
+  "recipe": {
+    "noImage": "Pas encore d'image",
+    "addToCart": "Ajouter au panier"
+  },
+  "cart": {
+    "title": "Panier",
+    "empty": "Aucune recette selectionnee.",
+    "servings": "Portions",
+    "generate": "Generer la liste de courses"
+  },
+  "shopping": {
+    "title": "Liste de courses",
+    "empty": "Generez la liste pour voir les ingredients consolides.",
+    "needsReview": "A verifier"
+  },
+  "category": {
+    "Produce": "Fruits et legumes",
+    "Meat": "Viandes",
+    "Fish": "Poissons",
+    "Dairy": "Produits laitiers",
+    "Pantry": "Epicerie",
+    "Spices": "Epices",
+    "Bakery": "Boulangerie",
+    "Frozen": "Surgeles",
+    "Beverages": "Boissons",
+    "Condiments": "Condiments",
+    "Other": "Autres"
+  },
+  "lang": {
+    "switchToEn": "EN",
+    "switchToFr": "FR"
+  }
+}

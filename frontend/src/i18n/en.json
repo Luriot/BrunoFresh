@@ -1,0 +1,43 @@
+{
+  "app": {
+    "title": "MealCart",
+    "subtitle": "Scrape recipes, build a smart grocery list.",
+    "urlPlaceholder": "Paste recipe URL",
+    "scrape": "Scrape",
+    "scraping": "Scraping...",
+    "refresh": "Refresh",
+    "recipesLoaded": "Recipes loaded: {{count}}"
+  },
+  "recipe": {
+    "noImage": "No image yet",
+    "addToCart": "Add to cart"
+  },
+  "cart": {
+    "title": "Cart",
+    "empty": "No recipes selected yet.",
+    "servings": "Servings",
+    "generate": "Generate Shopping List"
+  },
+  "shopping": {
+    "title": "Shopping List",
+    "empty": "Generate list to see aggregated groceries.",
+    "needsReview": "Needs Review"
+  },
+  "category": {
+    "Produce": "Produce",
+    "Meat": "Meat",
+    "Fish": "Fish",
+    "Dairy": "Dairy",
+    "Pantry": "Pantry",
+    "Spices": "Spices",
+    "Bakery": "Bakery",
+    "Frozen": "Frozen",
+    "Beverages": "Beverages",
+    "Condiments": "Condiments",
+    "Other": "Other"
+  },
+  "lang": {
+    "switchToEn": "EN",
+    "switchToFr": "FR"
+  }
+}

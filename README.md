@@ -5,9 +5,11 @@ This first implementation provides:
 
 - A FastAPI backend with SQLite storage
 - Recipe ingestion via a scrape queue endpoint
-- Ingredient normalization fallback logic
+- Domain-aware scraper routing for HelloFresh, CuisineAZ, AllRecipes, and Jow
+- Ingredient normalization with Ollama first, then deterministic fallback
 - Cart aggregation with serving-based scaling
 - A React + Vite + Tailwind frontend to scrape URLs, browse recipes, and generate shopping lists
+- EN/FR frontend internationalization with category translations
 
 ## Repository Layout
 
@@ -56,9 +58,10 @@ Frontend will run at `http://127.0.0.1:5173`.
 
 ## Current Notes
 
-- `/api/scrape` currently uses a deterministic placeholder scraper service. This is intentional for step 1.
-- Site-specific scrapers (HelloFresh Playwright auth flow, CuisineAZ, 750g, etc.) should replace the placeholder service in the next phase.
-- LLM normalization is currently represented by a fallback normalizer. Ollama integration is next.
+- `/api/scrape` now routes scrapers by domain (`hellofresh`, `cuisineaz`, `allrecipes`, `jow`).
+- HelloFresh uses Playwright auth via `.env` credentials and persistent state in `backend/data/hf_state.json`.
+- Set `OLLAMA_MODEL=qwen2.5:14b-instruct` for best parsing quality on 16GB VRAM.
+- Deduplication now checks title similarity + ingredient overlap, not only URL equality.
 
 ## Next Implementation Milestones
 

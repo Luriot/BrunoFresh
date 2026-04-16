@@ -19,7 +19,9 @@ from .schemas import (
     ScrapeRequest,
     ScrapeResponse,
 )
-from .services.normalizer import normalize_fallback
+from .services.dedupe import looks_like_duplicate
+from .services.images import download_image
+from .services.normalizer import normalize_ingredient
 from .services.scraper import scrape_recipe_url
 
 
@@ -101,6 +103,25 @@ def _persist_scraped_recipe(url: str, db: Session):
         return
 
     scraped = scrape_recipe_url(url)
+
+    incoming_names: list[str] = []
+    for ing in scraped.ingredients:
+        normalized_probe = normalize_ingredient(ing.raw, ing.quantity, ing.unit)
+        incoming_names.append(normalized_probe.name_en if normalized_probe else ing.raw)
+
+    existing_recipes = db.scalars(
+        select(Recipe).options(
+            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
+        )
+    ).all()
+    for candidate in existing_recipes:
+        candidate_names = [
+            link.ingredient.name_en if link.ingredient else link.raw_string
+            for link in candidate.recipe_ingredients
+        ]
+        if looks_like_duplicate(candidate.title, candidate_names, scraped.title, incoming_names):
+            return
+
     recipe = Recipe(
         title=scraped.title,
         url=url,
@@ -114,8 +135,13 @@ def _persist_scraped_recipe(url: str, db: Session):
     db.add(recipe)
     db.flush()
 
+    local_image_path = download_image(scraped.image_url, recipe.id)
+    if local_image_path:
+        recipe.image_local_path = local_image_path
+    db.flush()
+
     for ing in scraped.ingredients:
-        normalized = normalize_fallback(ing.raw, ing.quantity, ing.unit)
+        normalized = normalize_ingredient(ing.raw, ing.quantity, ing.unit)
         ingredient = None
         needs_review = False
         quantity = ing.quantity
