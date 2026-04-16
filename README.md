@@ -1,6 +1,6 @@
-# MealCart
+# BrunoFresh
 
-MealCart is a self-hosted recipe and shopping list app.
+BrunoFresh is a self-hosted recipe and shopping list app.
 This first implementation provides:
 
 - A FastAPI backend with SQLite storage

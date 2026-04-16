@@ -5,7 +5,7 @@ import { ShoppingList } from "./components/ShoppingList";
 import type { CartInput, CartResponse, RecipeListItem } from "./types";
 import { useTranslation } from "react-i18next";
 
-const CART_STORAGE_KEY = "mealcart.cart.v1";
+const CART_STORAGE_KEY = "brunofresh.cart.v1";
 
 type CartEntry = {
   recipe: RecipeListItem;

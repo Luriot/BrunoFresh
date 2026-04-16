@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "MealCart",
+    "title": "BrunoFresh",
     "subtitle": "Scrapez des recettes et construisez une liste de courses intelligente.",
     "urlPlaceholder": "Collez une URL de recette",
     "scrape": "Scraper",

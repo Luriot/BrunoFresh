@@ -8,7 +8,7 @@ load_dotenv()
 
 
 class Settings(BaseModel):
-    app_name: str = "MealCart API"
+    app_name: str = "BrunoFresh API"
     db_file: Path = Path(__file__).resolve().parent.parent / "database.db"
     images_dir: Path = Path(__file__).resolve().parent.parent / "data" / "images"
     hf_state_file: Path = Path(__file__).resolve().parent.parent / "data" / "hf_state.json"

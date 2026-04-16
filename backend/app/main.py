@@ -35,7 +35,7 @@ from .services.scraper import scrape_recipe_url
 SUPPORTED_SCRAPE_DOMAINS = ("hellofresh", "cuisineaz", "allrecipes", "jow", "750g")
 scrape_semaphore = asyncio.Semaphore(max(1, settings.scrape_concurrency_limit))
 
-app = FastAPI(title="MealCart API", version="0.1.0")
+app = FastAPI(title="BrunoFresh API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,

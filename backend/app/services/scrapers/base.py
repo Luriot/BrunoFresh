@@ -18,7 +18,7 @@ class BaseScraper(ABC):
 
     def _get_html(self) -> str:
         with httpx.Client(timeout=30, follow_redirects=True) as client:
-            response = client.get(self.url, headers={"User-Agent": "MealCartBot/1.0"})
+            response = client.get(self.url, headers={"User-Agent": "BrunoFreshBot/1.0"})
             response.raise_for_status()
             return response.text
 
