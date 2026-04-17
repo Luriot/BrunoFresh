@@ -2,6 +2,7 @@ from pathlib import Path
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
+import secrets
 
 
 load_dotenv()
@@ -9,7 +10,7 @@ load_dotenv()
 
 class Settings(BaseModel):
     app_name: str = "BrunoFresh API"
-    db_file: Path = Path(__file__).resolve().parent.parent / "database.db"
+    db_file: Path = Path(__file__).resolve().parent.parent / "data" / "database.db"
     images_dir: Path = Path(__file__).resolve().parent.parent / "data" / "images"
     hf_state_file: Path = Path(__file__).resolve().parent.parent / "data" / "hf_state.json"
     hf_email: str | None = os.getenv("HF_EMAIL")
@@ -21,7 +22,23 @@ class Settings(BaseModel):
         for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
         if origin.strip()
     )
+    allowed_methods: tuple[str, ...] = tuple(
+        method.strip().upper()
+        for method in os.getenv("ALLOWED_METHODS", "GET,POST,PATCH,OPTIONS").split(",")
+        if method.strip()
+    )
+    allowed_headers: tuple[str, ...] = tuple(
+        header.strip()
+        for header in os.getenv("ALLOWED_HEADERS", "Authorization,Content-Type").split(",")
+        if header.strip()
+    )
     scrape_concurrency_limit: int = int(os.getenv("SCRAPE_CONCURRENCY_LIMIT", "1"))
+    app_passcode: str = os.getenv("APP_PASSCODE", "change-me-before-deploy")
+    auth_secret: str = os.getenv("AUTH_SECRET", secrets.token_urlsafe(48))
+    auth_token_ttl_minutes: int = int(os.getenv("AUTH_TOKEN_TTL_MINUTES", "10080"))
+    auth_cookie_name: str = os.getenv("AUTH_COOKIE_NAME", "brunofresh_access_token")
+    auth_cookie_secure: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
+    auth_cookie_samesite: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").strip().lower()
     categories: tuple[str, ...] = (
         "Produce",
         "Meat",

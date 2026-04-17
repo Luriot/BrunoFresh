@@ -1,55 +1,90 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { fetchScrapeJob, queueScrape } from "../api/client";
+import { buildJobStreamUrl, queueScrape } from "../api/client";
 
 type RefreshRecipes = () => Promise<void>;
 
-async function wait(ms: number): Promise<void> {
-  await new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
+type JobStreamStatus = "pending" | "running" | "completed" | "failed";
+
+type JobStreamEvent = {
+  job_id: number;
+  status: JobStreamStatus;
+  error_message?: string | null;
+};
 
 export function useScrape() {
   const [loading, setLoading] = useState(false);
   const [scrapeState, setScrapeState] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
     };
   }, []);
 
-  const pollJob = useCallback(async (jobId: number, deadline: number, onRefresh: RefreshRecipes) => {
-    if (!isMountedRef.current) {
-      return;
-    }
-
-    if (Date.now() >= deadline) {
-      setScrapeState("Scrape still running. Refresh recipes in a moment.");
-      return;
-    }
-
-    const job = await fetchScrapeJob(jobId);
-    if (!isMountedRef.current) {
-      return;
-    }
-
-    if (job.status === "completed") {
-      setScrapeState("Scrape completed.");
-      await onRefresh();
-      return;
-    }
-
-    if (job.status === "failed") {
-      setScrapeState(job.error_message || "Scrape failed.");
-      return;
-    }
-
-    await wait(1500);
-    await pollJob(jobId, deadline, onRefresh);
+  const closeActiveStream = useCallback(() => {
+    eventSourceRef.current?.close();
+    eventSourceRef.current = null;
   }, []);
+
+  const watchScrapeJob = useCallback(async (jobId: number, onRefresh: RefreshRecipes): Promise<void> => {
+    closeActiveStream();
+
+    await new Promise<void>((resolve) => {
+      const stream = new EventSource(buildJobStreamUrl(jobId), { withCredentials: true });
+      eventSourceRef.current = stream;
+
+      stream.addEventListener("status", (rawEvent) => {
+        const evt = rawEvent as MessageEvent<string>;
+        let payload: JobStreamEvent;
+
+        try {
+          payload = JSON.parse(evt.data) as JobStreamEvent;
+        } catch {
+          return;
+        }
+
+        if (!isMountedRef.current) {
+          closeActiveStream();
+          resolve();
+          return;
+        }
+
+        if (payload.status === "completed") {
+          setScrapeState("Scrape completed.");
+          closeActiveStream();
+          void onRefresh();
+          resolve();
+          return;
+        }
+
+        if (payload.status === "failed") {
+          setScrapeState(payload.error_message || "Scrape failed.");
+          closeActiveStream();
+          resolve();
+          return;
+        }
+
+        setScrapeState("Scraping in progress...");
+      });
+
+      stream.onerror = () => {
+        if (!isMountedRef.current) {
+          closeActiveStream();
+          resolve();
+          return;
+        }
+
+        setScrapeState("Lost live job updates. Please try again.");
+        closeActiveStream();
+        resolve();
+      };
+    });
+  }, [closeActiveStream]);
 
   const startScrape = useCallback(
     async (rawUrl: string, onRefresh: RefreshRecipes): Promise<boolean> => {
@@ -76,7 +111,7 @@ export function useScrape() {
         }
 
         setScrapeState("Scraping in progress...");
-        await pollJob(response.job_id, Date.now() + 90_000, onRefresh);
+        await watchScrapeJob(response.job_id, onRefresh);
         return true;
       } finally {
         if (isMountedRef.current) {
@@ -84,7 +119,7 @@ export function useScrape() {
         }
       }
     },
-    [pollJob]
+    [watchScrapeJob]
   );
 
   return {

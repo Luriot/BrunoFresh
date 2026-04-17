@@ -17,7 +17,7 @@ class BaseScraper(ABC):
         self.domain = urlparse(url).netloc.replace("www.", "")
 
     async def _get_html(self) -> str:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
             response = await client.get(self.url, headers={"User-Agent": "BrunoFreshBot/1.0"})
             response.raise_for_status()
             return response.text

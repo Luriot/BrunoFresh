@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchRecipes, generateCart } from "./api/client";
+import {
+  fetchRecipes,
+  generateCart,
+  loginWithPasscode,
+  logout,
+  setUnauthorizedHandler,
+  verifySession,
+} from "./api/client";
+import { Login } from "./components/Login";
 import { RecipeCard } from "./components/RecipeCard";
 import { ShoppingList } from "./components/ShoppingList";
 import { useCart } from "./hooks/useCart";
@@ -9,6 +17,8 @@ import { useTranslation } from "react-i18next";
 
 function App() {
   const { t, i18n } = useTranslation();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const { cart, addToCart, updateServings, toCartInput } = useCart();
   const { loading, scrapeState, startScrape } = useScrape();
@@ -16,15 +26,86 @@ function App() {
   const [url, setUrl] = useState("");
 
   useEffect(() => {
-    void loadRecipes();
+    setUnauthorizedHandler(() => {
+      setIsAuthenticated(false);
+      setRecipes([]);
+      setList(null);
+      setAuthError("Session expired. Sign in again.");
+    });
+
+    return () => setUnauthorizedHandler(null);
   }, []);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRecipes([]);
+      setList(null);
+      return;
+    }
+    void loadRecipes();
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    let canceled = false;
+
+    async function bootstrapSession() {
+      try {
+        const authenticated = await verifySession();
+        if (!canceled) {
+          setIsAuthenticated(authenticated);
+        }
+      } catch {
+        if (!canceled) {
+          setIsAuthenticated(false);
+        }
+      }
+    }
+
+    void bootstrapSession();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
+
+  async function onLogin(passcode: string) {
+    try {
+      await loginWithPasscode(passcode);
+      setIsAuthenticated(true);
+      setAuthError(null);
+      await loadRecipes();
+    } catch {
+      setAuthError("Invalid passcode.");
+    }
+  }
+
+  async function onLogout() {
+    try {
+      await logout();
+    } catch {
+      // Treat client-side logout as complete even if the request fails.
+    }
+    setIsAuthenticated(false);
+    setAuthError(null);
+    setRecipes([]);
+    setList(null);
+    setUrl("");
+  }
+
   async function loadRecipes() {
-    const data = await fetchRecipes();
-    setRecipes(data);
+    try {
+      const data = await fetchRecipes();
+      setRecipes(data);
+    } catch {
+      setRecipes([]);
+    }
   }
 
   async function onScrape() {
+    if (!isAuthenticated) {
+      return;
+    }
+
     const started = await startScrape(url, loadRecipes);
     if (started) {
       setUrl("");
@@ -38,6 +119,18 @@ function App() {
 
   const recipeCount = useMemo(() => recipes.length, [recipes.length]);
 
+  if (isAuthenticated === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <p className="text-sm text-gray-600">Checking session...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login onLogin={onLogin} error={authError} />;
+  }
+
   return (
     <div className="min-h-screen text-ink">
       <header className="mx-auto max-w-7xl px-4 pb-4 pt-8 sm:px-6 lg:px-8">
@@ -47,6 +140,9 @@ function App() {
             <p className="mt-2 text-sm text-gray-600">{t("app.subtitle")}</p>
           </div>
           <div className="flex rounded-xl border border-orange-200 bg-white p-1">
+            <button className="rounded-lg px-3 py-1 text-sm text-gray-700" onClick={onLogout}>
+              Logout
+            </button>
             <button
               className={`rounded-lg px-3 py-1 text-sm ${
                 i18n.language === "en" ? "bg-accent text-white" : "text-gray-700"

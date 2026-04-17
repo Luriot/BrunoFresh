@@ -30,7 +30,7 @@ htmlcov/
 !.env.example
 
 # Database & Local Data (BrunoFresh specific)
-backend/database.db
+backend/data/database.db
 backend/data/images/*
 !backend/data/images/.gitkeep
 backend/data/hf_state.json
