@@ -34,7 +34,7 @@ class Settings(BaseModel):
     )
     scrape_concurrency_limit: int = int(os.getenv("SCRAPE_CONCURRENCY_LIMIT", "1"))
     app_passcode: str = os.getenv("APP_PASSCODE", "change-me-before-deploy")
-    auth_secret: str = os.getenv("AUTH_SECRET", secrets.token_urlsafe(48))
+    auth_secret: str = os.getenv("AUTH_SECRET", "local-dev-secret-do-not-use-in-prod-123456789")
     auth_token_ttl_minutes: int = int(os.getenv("AUTH_TOKEN_TTL_MINUTES", "10080"))
     auth_cookie_name: str = os.getenv("AUTH_COOKIE_NAME", "brunofresh_access_token")
     auth_cookie_secure: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"

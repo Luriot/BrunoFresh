@@ -1,7 +1,7 @@
 import axios from "axios";
 import type { CartInput, CartResponse, RecipeListItem, ScrapeResponse } from "../types";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 let unauthorizedHandler: (() => void) | null = null;
 
