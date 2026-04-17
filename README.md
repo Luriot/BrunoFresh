@@ -21,15 +21,19 @@ This first implementation provides:
 1. Open terminal in `backend/`
 2. Create and activate a virtual environment
 3. Install dependencies
-4. Run API server
+4. Run DB migrations
+5. Run API server
 
 ```powershell
 cd backend
 python -m venv venv
 venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+If you already have a local `backend/database.db` created before Alembic was added, run `alembic stamp head` once instead of `alembic upgrade head`.
 
 Backend will run at `http://127.0.0.1:8000`.
 
@@ -42,6 +46,7 @@ Backend will run at `http://127.0.0.1:8000`.
 ```powershell
 cd frontend
 npm install
+copy .env.example .env
 npm run dev
 ```
 
@@ -53,6 +58,7 @@ Frontend will run at `http://127.0.0.1:5173`.
 - `GET /api/recipes`
 - `GET /api/recipes/{recipe_id}`
 - `POST /api/scrape`
+- `GET /api/jobs/{job_id}`
 - `PATCH /api/ingredients/{ingredient_id}`
 - `POST /api/cart/generate`
 

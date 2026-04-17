@@ -1,42 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchRecipes, fetchScrapeJob, generateCart, queueScrape } from "./api/client";
+import { fetchRecipes, generateCart } from "./api/client";
 import { RecipeCard } from "./components/RecipeCard";
 import { ShoppingList } from "./components/ShoppingList";
-import type { CartInput, CartResponse, RecipeListItem } from "./types";
+import { useCart } from "./hooks/useCart";
+import { useScrape } from "./hooks/useScrape";
+import type { CartResponse, RecipeListItem } from "./types";
 import { useTranslation } from "react-i18next";
-
-const CART_STORAGE_KEY = "brunofresh.cart.v1";
-
-type CartEntry = {
-  recipe: RecipeListItem;
-  target_servings: number;
-};
 
 function App() {
   const { t, i18n } = useTranslation();
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
-  const [cart, setCart] = useState<CartEntry[]>([]);
+  const { cart, addToCart, updateServings, toCartInput } = useCart();
+  const { loading, scrapeState, startScrape } = useScrape();
   const [list, setList] = useState<CartResponse | null>(null);
   const [url, setUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [scrapeState, setScrapeState] = useState<string | null>(null);
 
   useEffect(() => {
     void loadRecipes();
-
-    const raw = window.localStorage.getItem(CART_STORAGE_KEY);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as CartEntry[];
-      setCart(parsed);
-    } catch {
-      window.localStorage.removeItem(CART_STORAGE_KEY);
-    }
   }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-  }, [cart]);
 
   async function loadRecipes() {
     const data = await fetchRecipes();
@@ -44,71 +25,14 @@ function App() {
   }
 
   async function onScrape() {
-    if (!url.trim()) return;
-    setLoading(true);
-    setScrapeState(null);
-    try {
-      const response = await queueScrape(url.trim());
+    const started = await startScrape(url, loadRecipes);
+    if (started) {
       setUrl("");
-
-      if (response.status === "completed") {
-        setScrapeState(response.message);
-        await loadRecipes();
-        return;
-      }
-
-      if (!response.job_id) {
-        setScrapeState("Scrape job started but no job id returned.");
-        return;
-      }
-
-      setScrapeState("Scraping in progress...");
-      const deadline = Date.now() + 90_000;
-      while (Date.now() < deadline) {
-        const job = await fetchScrapeJob(response.job_id);
-        if (job.status === "completed") {
-          setScrapeState("Scrape completed.");
-          await loadRecipes();
-          return;
-        }
-        if (job.status === "failed") {
-          setScrapeState(job.error_message || "Scrape failed.");
-          return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      }
-      setScrapeState("Scrape still running. Refresh recipes in a moment.");
-    } finally {
-      setLoading(false);
     }
   }
 
-  function addToCart(recipe: RecipeListItem) {
-    setCart((prev) => {
-      const existing = prev.find((e) => e.recipe.id === recipe.id);
-      if (existing) {
-        return prev.map((e) =>
-          e.recipe.id === recipe.id ? { ...e, target_servings: e.target_servings + 1 } : e
-        );
-      }
-      return [...prev, { recipe, target_servings: recipe.base_servings }];
-    });
-  }
-
-  function updateServings(recipeId: number, servings: number) {
-    setCart((prev) =>
-      prev.map((entry) =>
-        entry.recipe.id === recipeId ? { ...entry, target_servings: Math.max(1, servings) } : entry
-      )
-    );
-  }
-
   async function onGenerateList() {
-    const payload: CartInput[] = cart.map((entry) => ({
-      recipe_id: entry.recipe.id,
-      target_servings: entry.target_servings,
-    }));
-    const data = await generateCart(payload);
+    const data = await generateCart(toCartInput());
     setList(data);
   }
 

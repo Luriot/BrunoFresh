@@ -36,8 +36,8 @@ class StaticRecipeScraper(BaseScraper):
                 return lines
         return []
 
-    def scrape(self) -> ScrapedRecipe:
-        html = self._get_html()
+    async def scrape(self) -> ScrapedRecipe:
+        html = await self._get_html()
         soup = BeautifulSoup(html, "html.parser")
         jsonld = self._extract_jsonld(soup)
 

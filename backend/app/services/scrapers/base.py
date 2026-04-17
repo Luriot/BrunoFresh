@@ -16,9 +16,9 @@ class BaseScraper(ABC):
         self.url = url
         self.domain = urlparse(url).netloc.replace("www.", "")
 
-    def _get_html(self) -> str:
-        with httpx.Client(timeout=30, follow_redirects=True) as client:
-            response = client.get(self.url, headers={"User-Agent": "BrunoFreshBot/1.0"})
+    async def _get_html(self) -> str:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            response = await client.get(self.url, headers={"User-Agent": "BrunoFreshBot/1.0"})
             response.raise_for_status()
             return response.text
 
@@ -95,5 +95,5 @@ class BaseScraper(ABC):
         )
 
     @abstractmethod
-    def scrape(self) -> ScrapedRecipe:
+    async def scrape(self) -> ScrapedRecipe:
         raise NotImplementedError

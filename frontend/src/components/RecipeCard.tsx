@@ -1,5 +1,6 @@
 import type { RecipeListItem } from "../types";
 import { useTranslation } from "react-i18next";
+import { buildImageUrl } from "../api/client";
 
 type Props = {
   recipe: RecipeListItem;
@@ -15,7 +16,7 @@ export function RecipeCard({ recipe, onAdd }: Props) {
         {recipe.image_local_path ? (
           <img
             className="h-full w-full object-cover"
-            src={`http://127.0.0.1:8000/${recipe.image_local_path}`}
+            src={buildImageUrl(recipe.image_local_path)}
             alt={recipe.title}
           />
         ) : (
