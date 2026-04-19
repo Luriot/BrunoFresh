@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from bs4 import BeautifulSoup
@@ -17,8 +20,10 @@ class BaseScraper(ABC):
         self.domain = urlparse(url).netloc.replace("www.", "")
 
     async def _get_html(self) -> str:
+        logger.debug(f"[_get_html] Lancement du Web Scraping de la page web sur: {self.url}")
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             response = await client.get(self.url, headers={"User-Agent": "BrunoFreshBot/1.0"})
+            logger.debug(f"[{response.status_code}] Récupération de la page HTML terminée.")
             response.raise_for_status()
             return response.text
 

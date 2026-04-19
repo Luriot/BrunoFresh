@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 import json
+import logging
 
 import httpx
 
 from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -58,6 +61,7 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
     )
 
     try:
+        logger.debug(f"Demande de normalisation Ollama pour: '{safe_raw}'")
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=1.0)) as client:
             response = await client.post(
                 f"{settings.ollama_base_url}/api/generate",
@@ -79,13 +83,17 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
         parsed_category = _coerce_category(str(parsed.get("category", "Other")))
 
         if not name:
+            logger.warning(f"Ollama a retourné un nom vide pour l'ingrédient '{safe_raw}'")
             return None
 
         if parsed_qty < 0:
             parsed_qty = abs(parsed_qty)
 
-        return NormalizedIngredient(name, parsed_qty, parsed_unit, parsed_category)
-    except Exception:
+        result = NormalizedIngredient(name, parsed_qty, parsed_unit, parsed_category)
+        logger.debug(f"Succès Ollama: '{safe_raw}' -> {result}")
+        return result
+    except Exception as exc:
+        logger.error(f"Erreur Ollama lors de la normalisation de '{safe_raw}': {exc}", exc_info=True)
         return None
 
 

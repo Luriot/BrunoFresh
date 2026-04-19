@@ -1,5 +1,14 @@
+import logging
+import sys
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:\t  %(name)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 from .api.dependencies import require_auth
 from .api.routers import auth_router, cart_router, health_router, images_router, recipes_router, scrape_router

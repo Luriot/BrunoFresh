@@ -1,6 +1,9 @@
 import asyncio
 import json
+import logging
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -38,8 +41,10 @@ async def _run_scrape_job(job_id: int) -> None:
     async with SessionLocal() as db:
         job = await db.get(ScrapeJob, job_id)
         if not job:
+            logger.warning(f"Job {job_id} introuvable en base.")
             return
 
+        logger.info(f"Démarrage du job de scraping {job_id}: {job.url}")
         job.status = "running"
         await db.commit()
         await job_event_bus.publish(job_id, JobEvent(status="running"))
@@ -49,10 +54,12 @@ async def _run_scrape_job(job_id: int) -> None:
                 await persist_scraped_recipe(job.url, db)
                 job.status = "completed"
                 job.error_message = None
+                logger.info(f"Job {job_id} terminé avec succès.")
                 await job_event_bus.publish(job_id, JobEvent(status="completed"))
             except Exception as exc:
                 job.status = "failed"
                 job.error_message = str(exc)[:700]
+                logger.error(f"Échec du job {job_id}: {exc}", exc_info=True)
                 await job_event_bus.publish(
                     job_id,
                     JobEvent(status="failed", message=job.error_message),

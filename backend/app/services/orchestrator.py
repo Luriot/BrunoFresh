@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,13 +13,20 @@ from .images import download_image
 from .normalizer import normalize_ingredient
 from .scraper import scrape_recipe_url
 
+logger = logging.getLogger(__name__)
 
 async def persist_scraped_recipe(url: str, db: AsyncSession) -> None:
+    logger.info(f"Démarrage de la persistance pour l'URL: {url}")
     existing = await db.scalar(select(Recipe).where(Recipe.url == url))
     if existing:
+        logger.info(f"La recette existe déjà avec l'ID {existing.id}. Action annulée.")
         return
 
+    logger.debug("Extraction des données de la recette...")
     scraped = await scrape_recipe_url(url)
+    logger.debug(f"Données extraites: {scraped.title} avec {len(scraped.ingredients)} ingrédients.")
+
+    logger.debug("Normalisation asynchrone des ingrédients...")
 
     normalized_ingredients = await asyncio.gather(
         *[
@@ -39,14 +47,17 @@ async def persist_scraped_recipe(url: str, db: AsyncSession) -> None:
             )
         )
     ).all()
+    logger.debug(f"Détection de doublons face à {len(existing_recipes)} recettes existantes...")
     for candidate in existing_recipes:
         candidate_names = [
             link.ingredient.name_en if link.ingredient else link.raw_string
             for link in candidate.recipe_ingredients
         ]
         if looks_like_duplicate(candidate.title, candidate_names, scraped.title, incoming_names):
+            logger.info(f"Doublon exact ou similaire trouvé: {candidate.id} - {candidate.title}. Scraping annulé.")
             return
 
+    logger.info(f"Création de la recette '{scraped.title}' en base...")
     recipe = Recipe(
         title=scraped.title,
         url=url,
@@ -63,7 +74,12 @@ async def persist_scraped_recipe(url: str, db: AsyncSession) -> None:
     local_image_path = await download_image(scraped.image_url, recipe.id)
     if local_image_path:
         recipe.image_local_path = local_image_path
+        logger.debug(f"Image téléchargée et sauvegardée vers : {local_image_path}")
+    else:
+        logger.warning(f"Échec ou absence d'image à télécharger pour la recette {recipe.id}")
     await db.flush()
+
+    logger.debug("Sauvegarde et liaison des ingrédients à la recette...")
 
     for ing, normalized in zip(scraped.ingredients, normalized_ingredients):
         ingredient = None
@@ -80,6 +96,7 @@ async def persist_scraped_recipe(url: str, db: AsyncSession) -> None:
                     is_normalized=True,
                 )
                 db.add(ingredient)
+                logger.debug(f"Nouvel ingrédient normalisé: {ingredient.name_en} ({ingredient.category})")
                 await db.flush()
             quantity = normalized.quantity
             unit = normalized.unit
@@ -97,4 +114,6 @@ async def persist_scraped_recipe(url: str, db: AsyncSession) -> None:
             )
         )
 
+    logger.info("Validation finale en base des modifications pour la recette..")
     await db.commit()
+    logger.info(f"Persistance terminée avec succès pour la recette #{recipe.id}")
