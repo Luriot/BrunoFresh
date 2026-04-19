@@ -18,8 +18,8 @@ async def download_image(image_url: str | None, recipe_id: int) -> str | None:
 
     target = settings.images_dir / f"recipe_{recipe_id}.jpg"
     try:
-        with httpx.Client(timeout=20, follow_redirects=False) as client:
-            response = client.get(image_url)
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.get(image_url)
             response.raise_for_status()
             target.write_bytes(response.content)
         rel = Path("images") / target.name

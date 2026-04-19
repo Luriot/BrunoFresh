@@ -43,7 +43,7 @@ def _coerce_unit(value: str) -> str:
     return "piece"
 
 
-def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
+async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
     safe_raw = _sanitize_raw_ingredient(raw_string)
     categories = ", ".join(settings.categories)
     prompt = (
@@ -58,8 +58,8 @@ def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> Normal
     )
 
     try:
-        with httpx.Client(timeout=30) as client:
-            response = client.post(
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=1.0)) as client:
+            response = await client.post(
                 f"{settings.ollama_base_url}/api/generate",
                 json={
                     "model": settings.ollama_model,
@@ -108,8 +108,8 @@ def normalize_fallback(raw_string: str, quantity: float, unit: str) -> Normalize
     return None
 
 
-def normalize_ingredient(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
-    llm_value = normalize_with_ollama(raw_string, quantity, unit)
+async def normalize_ingredient(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
+    llm_value = await normalize_with_ollama(raw_string, quantity, unit)
     if llm_value:
         return llm_value
     return normalize_fallback(raw_string, quantity, unit)

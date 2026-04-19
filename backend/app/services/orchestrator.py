@@ -20,10 +20,17 @@ async def persist_scraped_recipe(url: str, db: AsyncSession) -> None:
 
     scraped = await scrape_recipe_url(url)
 
-    incoming_names: list[str] = []
-    for ing in scraped.ingredients:
-        normalized_probe = await asyncio.to_thread(normalize_ingredient, ing.raw, ing.quantity, ing.unit)
-        incoming_names.append(normalized_probe.name_en if normalized_probe else ing.raw)
+    normalized_ingredients = await asyncio.gather(
+        *[
+            normalize_ingredient(ing.raw, ing.quantity, ing.unit)
+            for ing in scraped.ingredients
+        ]
+    )
+
+    incoming_names: list[str] = [
+        norm.name_en if norm else ing.raw
+        for norm, ing in zip(normalized_ingredients, scraped.ingredients)
+    ]
 
     existing_recipes = (
         await db.scalars(
@@ -58,8 +65,7 @@ async def persist_scraped_recipe(url: str, db: AsyncSession) -> None:
         recipe.image_local_path = local_image_path
     await db.flush()
 
-    for ing in scraped.ingredients:
-        normalized = await asyncio.to_thread(normalize_ingredient, ing.raw, ing.quantity, ing.unit)
+    for ing, normalized in zip(scraped.ingredients, normalized_ingredients):
         ingredient = None
         needs_review = False
         quantity = ing.quantity
