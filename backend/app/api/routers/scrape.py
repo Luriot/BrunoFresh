@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...config import settings
 from ...database import SessionLocal, get_db
 from ...models import Recipe, ScrapeJob
-from ...schemas import ScrapeRequest, ScrapeResponse
+from ...schemas import JobStatus, JobStatusResponse, ScrapeRequest, ScrapeResponse
 from ...services.events import JobEvent, job_event_bus
 from ...services.network import validate_public_http_url
 from ...services.orchestrator import persist_scraped_recipe
@@ -47,24 +47,27 @@ async def _run_scrape_job(job_id: int) -> None:
         logger.info(f"Démarrage du job de scraping {job_id}: {job.url}")
         job.status = "running"
         await db.commit()
-        await job_event_bus.publish(job_id, JobEvent(status="running"))
+        await job_event_bus.publish(job_id, JobEvent(status="running", message="Démarrage de l'analyse..."))
 
         async with scrape_semaphore:
             try:
-                await persist_scraped_recipe(job.url, db)
+                await persist_scraped_recipe(job.url, db, job_id)
                 job.status = "completed"
                 job.error_message = None
+                await db.commit()
+                
                 logger.info(f"Job {job_id} terminé avec succès.")
-                await job_event_bus.publish(job_id, JobEvent(status="completed"))
+                await job_event_bus.publish(job_id, JobEvent(status="completed", message="Recette ajoutée avec succès !"))
             except Exception as exc:
                 job.status = "failed"
                 job.error_message = str(exc)[:700]
+                await db.commit()
+                
                 logger.error(f"Échec du job {job_id}: {exc}", exc_info=True)
                 await job_event_bus.publish(
                     job_id,
                     JobEvent(status="failed", message=job.error_message),
                 )
-            await db.commit()
 
 
 @router.post("/scrape", response_model=ScrapeResponse)
@@ -87,6 +90,28 @@ async def enqueue_scrape(
     return ScrapeResponse(message="Scrape job queued", url=safe_url, job_id=job.id, status="pending")
 
 
+@router.get("/jobs/{job_id}", response_model=JobStatusResponse)
+async def get_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
+    job = await db.get(ScrapeJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status == "running":
+        status: JobStatus = "running"
+    elif job.status == "completed":
+        status = "completed"
+    elif job.status == "failed":
+        status = "failed"
+    else:
+        status = "pending"
+
+    return JobStatusResponse(
+        job_id=job.id,
+        status=status,
+        error_message=job.error_message,
+    )
+
+
 @router.get("/jobs/{job_id}/stream")
 async def stream_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
     job = await db.get(ScrapeJob, job_id)
@@ -94,31 +119,64 @@ async def stream_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Job not found")
 
     async def event_generator():
-        yield _format_sse(
-            "status",
-            {
-                "job_id": job.id,
-                "status": job.status,
-                "error_message": job.error_message,
-            },
-        )
-
-        if job.status in {"completed", "failed"}:
-            return
-
         async for queue in job_event_bus.subscribe(job_id):
-            while True:
-                event = await queue.get()
+            # Le session de db de FastAPI Dependency se ferme parfois avant que le flux ne finisse, 
+            # on ouvre une session autonome pour lire l'état de la base de données de manière asynchrone sécurisée:
+            async with SessionLocal() as stream_db:
+                stream_job = await stream_db.get(ScrapeJob, job_id)
+                if not stream_job:
+                    return
+                    
                 yield _format_sse(
                     "status",
                     {
-                        "job_id": job_id,
-                        "status": event.status,
-                        "error_message": event.message,
+                        "job_id": stream_job.id,
+                        "status": stream_job.status,
+                        "message": getattr(stream_job, 'message', None) or "Abonnement au flux...",
+                        "error_message": stream_job.error_message,
                     },
                 )
-                if event.status in {"completed", "failed"}:
+
+                if stream_job.status in {"completed", "failed"}:
                     return
+
+            # Écoute en direct
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=2.0)
+                    yield _format_sse(
+                        "status",
+                        {
+                            "job_id": job_id,
+                            "status": event.status,
+                            "message": event.message,
+                            "error_message": event.message if event.status == "failed" else None,
+                        },
+                    )
+                    if event.status in {"completed", "failed"}:
+                        return
+                except TimeoutError:
+                    # Si un événement est raté (race condition), on lit la DB et on force le statut final.
+                    async with SessionLocal() as heartbeat_db:
+                        heartbeat_job = await heartbeat_db.get(ScrapeJob, job_id)
+                        if not heartbeat_job:
+                            return
+
+                        if heartbeat_job.status in {"completed", "failed"}:
+                            yield _format_sse(
+                                "status",
+                                {
+                                    "job_id": heartbeat_job.id,
+                                    "status": heartbeat_job.status,
+                                    "message": (
+                                        "Recette ajoutée avec succès !"
+                                        if heartbeat_job.status == "completed"
+                                        else heartbeat_job.error_message
+                                    ),
+                                    "error_message": heartbeat_job.error_message,
+                                },
+                            )
+                            return
 
     return StreamingResponse(
         event_generator(),

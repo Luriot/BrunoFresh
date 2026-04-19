@@ -29,3 +29,9 @@ export type ScrapeResponse = {
   job_id?: number;
   status: "pending" | "running" | "completed" | "failed";
 };
+
+export type JobStatusResponse = {
+  job_id: number;
+  status: "pending" | "running" | "completed" | "failed";
+  error_message?: string | null;
+};

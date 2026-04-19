@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { buildJobStreamUrl, queueScrape } from "../api/client";
+import { buildJobStreamUrl, fetchRecipes, queueScrape } from "../api/client";
 
 type RefreshRecipes = () => Promise<void>;
 
@@ -9,6 +9,7 @@ type JobStreamStatus = "pending" | "running" | "completed" | "failed";
 type JobStreamEvent = {
   job_id: number;
   status: JobStreamStatus;
+  message?: string | null;
   error_message?: string | null;
 };
 
@@ -19,6 +20,7 @@ export function useScrape() {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       eventSourceRef.current?.close();
@@ -31,12 +33,27 @@ export function useScrape() {
     eventSourceRef.current = null;
   }, []);
 
-  const watchScrapeJob = useCallback(async (jobId: number, onRefresh: RefreshRecipes): Promise<void> => {
+  const watchScrapeJob = useCallback(async (jobId: number, targetUrl: string, onRefresh: RefreshRecipes): Promise<void> => {
     closeActiveStream();
 
     await new Promise<void>((resolve) => {
       const stream = new EventSource(buildJobStreamUrl(jobId), { withCredentials: true });
       eventSourceRef.current = stream;
+
+      const finalize = (nextState: string, shouldRefresh = false) => {
+        if (!isMountedRef.current) {
+          closeActiveStream();
+          resolve();
+          return;
+        }
+
+        setScrapeState(nextState);
+        closeActiveStream();
+        if (shouldRefresh) {
+          void onRefresh();
+        }
+        resolve();
+      };
 
       stream.addEventListener("status", (rawEvent) => {
         const evt = rawEvent as MessageEvent<string>;
@@ -48,40 +65,38 @@ export function useScrape() {
           return;
         }
 
-        if (!isMountedRef.current) {
-          closeActiveStream();
-          resolve();
-          return;
-        }
-
         if (payload.status === "completed") {
-          setScrapeState("Scrape completed.");
-          closeActiveStream();
-          void onRefresh();
-          resolve();
+          finalize(payload.message || "Recette ajoutée avec succès !", true);
           return;
         }
 
         if (payload.status === "failed") {
-          setScrapeState(payload.error_message || "Scrape failed.");
-          closeActiveStream();
-          resolve();
+          finalize(payload.error_message || "Scrape failed.");
           return;
         }
 
-        setScrapeState("Scraping in progress...");
+        setScrapeState(payload.message || "Scraping in progress...");
       });
 
       stream.onerror = () => {
-        if (!isMountedRef.current) {
-          closeActiveStream();
-          resolve();
-          return;
-        }
+        // Fallback ultra léger (une seule requête) si le stream casse.
+        void (async () => {
+          try {
+            const recipes = await fetchRecipes();
+            const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "").toLowerCase();
+            const target = normalizeUrl(targetUrl);
+            const found = recipes.some((recipe) => normalizeUrl(recipe.url) === target);
 
-        setScrapeState("Lost live job updates. Please try again.");
-        closeActiveStream();
-        resolve();
+            if (found) {
+              finalize("Recette ajoutée avec succès !", true);
+              return;
+            }
+          } catch {
+            // ignore and show resilient stream error message below
+          }
+
+          finalize("Connexion temps réel interrompue. Utilise Refresh.");
+        })();
       };
     });
   }, [closeActiveStream]);
@@ -93,6 +108,7 @@ export function useScrape() {
         return false;
       }
 
+      isMountedRef.current = true;
       setLoading(true);
       setScrapeState(null);
 
@@ -110,8 +126,7 @@ export function useScrape() {
           return true;
         }
 
-        setScrapeState("Scraping in progress...");
-        await watchScrapeJob(response.job_id, onRefresh);
+        await watchScrapeJob(response.job_id, trimmedUrl, onRefresh);
         return true;
       } finally {
         if (isMountedRef.current) {

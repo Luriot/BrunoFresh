@@ -57,6 +57,12 @@ class ScrapeResponse(BaseModel):
     status: JobStatus
 
 
+class JobStatusResponse(BaseModel):
+    job_id: int
+    status: JobStatus
+    error_message: str | None = None
+
+
 class CartRecipeIn(BaseModel):
     recipe_id: int
     target_servings: int = Field(ge=1, le=20)

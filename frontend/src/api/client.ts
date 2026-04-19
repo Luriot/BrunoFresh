@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { CartInput, CartResponse, RecipeListItem, ScrapeResponse } from "../types";
+import type { CartInput, CartResponse, JobStatusResponse, RecipeListItem, ScrapeResponse } from "../types";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -56,6 +56,11 @@ export async function fetchRecipes() {
 
 export async function queueScrape(url: string) {
   const { data } = await api.post<ScrapeResponse>("/scrape", { url });
+  return data;
+}
+
+export async function getJobStatus(jobId: number) {
+  const { data } = await api.get<JobStatusResponse>(`/jobs/${jobId}`);
   return data;
 }
 
