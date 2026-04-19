@@ -79,6 +79,9 @@ export function useScrape() {
       });
 
       stream.onerror = () => {
+        // Fermer le flux immédiatement pour éviter que le navigateur n'essaie de reconnecter en boucle (spam resubscribe)
+        closeActiveStream();
+
         // Fallback ultra léger (une seule requête) si le stream casse.
         void (async () => {
           try {

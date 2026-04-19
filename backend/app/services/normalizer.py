@@ -6,6 +6,7 @@ import logging
 import httpx
 
 from ..config import settings
+from .scrapers.types import ScrapedIngredient
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ def _coerce_unit(value: str) -> str:
 
 async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
     safe_raw = _sanitize_raw_ingredient(raw_string)
+    raw = ""
     categories = ", ".join(settings.categories)
     prompt = (
         "You are an ingredient parser. Return strict JSON only with keys: "
@@ -120,7 +122,7 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
         logger.debug(f"Succès Ollama: '{safe_raw}' -> {result}")
         return result
         
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
         logger.error(f"Le JSON renvoyé par Ollama est invalide pour '{safe_raw}' : {raw}")
         return None
     except Exception as exc:
@@ -171,11 +173,11 @@ def normalize_fallback(raw_string: str, quantity: float, unit: str) -> Normalize
     return None
 
 
-async def normalize_ingredients_batch(ingredients) -> list[NormalizedIngredient | None]:
+async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> list[NormalizedIngredient | None]:
     if not ingredients:
         return []
 
-    input_list = []
+    input_list: list[dict[str, float | str | int] | None] = []
     for i, ing in enumerate(ingredients):
         safe_raw = _sanitize_raw_ingredient(ing.raw)
         # On pré-filtre les en-têtes directement ici au lieu de le faire via le LLM
@@ -273,7 +275,7 @@ async def normalize_ingredients_batch(ingredients) -> list[NormalizedIngredient 
                 logger.error(f"Structure inattendue renvoyée par Ollama : {parsed_array}")
                 raise ValueError("Le JSON renvoyé n'est pas un tableau (list) et ne contient pas de tableau.")
 
-        results = [None] * len(ingredients)
+        results: list[NormalizedIngredient | None] = [None] * len(ingredients)
         
         # On replace les en-têtes
         for idx, item in enumerate(input_list):
@@ -281,12 +283,18 @@ async def normalize_ingredients_batch(ingredients) -> list[NormalizedIngredient 
                 results[idx] = NormalizedIngredient("section_header_ignore", 0, "piece", "Other")
 
         for item in parsed_array:
+            if not isinstance(item, dict):
+                continue
+
             idx = item.get("idx")
             if idx is None or not isinstance(idx, int) or idx < 0 or idx >= len(ingredients):
                 continue
                 
             name = str(item.get("name_en", "")).strip().lower()
-            qty = float(item.get("quantity", ingredients[idx].quantity))
+            try:
+                qty = float(item.get("quantity", ingredients[idx].quantity))
+            except (TypeError, ValueError):
+                qty = float(ingredients[idx].quantity)
             parsed_unit = _coerce_unit(str(item.get("unit", ingredients[idx].unit)))
             parsed_category = _coerce_category(str(item.get("category", "Other")))
 

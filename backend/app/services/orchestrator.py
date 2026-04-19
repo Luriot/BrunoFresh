@@ -91,6 +91,18 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
     logger.debug("Sauvegarde et liaison des ingrédients à la recette...")
     await notify_progress("Sauvegarde des ingrédients...")
 
+    # Optimisation: Précharger tous les ingrédients connus pour éviter le problème "N+1 select"
+    normalized_names = [
+        norm.name_en 
+        for norm in normalized_ingredients 
+        if norm and norm.name_en != "section_header_ignore"
+    ]
+    existing_ingredients = {}
+    if normalized_names:
+        result = await db.scalars(select(Ingredient).where(Ingredient.name_en.in_(normalized_names)))
+        for ing_obj in result:
+            existing_ingredients[ing_obj.name_en] = ing_obj
+
     for ing, normalized in zip(scraped.ingredients, normalized_ingredients):
         ingredient = None
         needs_review = False
@@ -102,7 +114,7 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
             if normalized.name_en == "section_header_ignore":
                 continue
                 
-            ingredient = await db.scalar(select(Ingredient).where(Ingredient.name_en == normalized.name_en))
+            ingredient = existing_ingredients.get(normalized.name_en)
             if not ingredient:
                 ingredient = Ingredient(
                     name_en=normalized.name_en,
@@ -110,8 +122,10 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
                     is_normalized=True,
                 )
                 db.add(ingredient)
+                # On met en cache localement au cas où le même ingrédient apparaîtrait deux fois dans la même recette
+                existing_ingredients[normalized.name_en] = ingredient
                 logger.debug(f"Nouvel ingrédient normalisé: {ingredient.name_en} ({ingredient.category})")
-                await db.flush()
+                await db.flush() # Flush requis pour obtenir l'ID si c'est un nouvel ingrédient
             quantity = normalized.quantity
             unit = normalized.unit
         else:
