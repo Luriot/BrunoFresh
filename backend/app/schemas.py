@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -80,6 +81,52 @@ class CartGroupItem(BaseModel):
 
 class CartResponse(BaseModel):
     grouped: dict[str, list[CartGroupItem]]
+    needs_review: list[str]
+
+
+class ShoppingListCustomItemIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    quantity: float = Field(default=1, gt=0, le=9999)
+    unit: str = Field(default="item", min_length=1, max_length=30)
+    category: str = Field(default="Other", min_length=1, max_length=80)
+
+
+class ShoppingListCreateRequest(BaseModel):
+    items: list[CartRecipeIn]
+    label: str | None = Field(default=None, max_length=160)
+    extra_items: list[ShoppingListCustomItemIn] = Field(default_factory=list)
+
+
+class ShoppingListItemPatch(BaseModel):
+    is_already_owned: bool
+
+
+class ShoppingListItemOut(BaseModel):
+    id: int
+    name: str
+    quantity: float
+    unit: str
+    category: str
+    is_custom: bool
+    is_already_owned: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ShoppingListSummaryOut(BaseModel):
+    id: int
+    label: str | None
+    created_at: datetime
+    total_items: int
+    already_owned_items: int
+
+
+class ShoppingListOut(BaseModel):
+    id: int
+    label: str | None
+    created_at: datetime
+    updated_at: datetime
+    items: list[ShoppingListItemOut]
     needs_review: list[str]
 
 

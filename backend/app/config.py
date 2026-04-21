@@ -39,6 +39,7 @@ class Settings(BaseModel):
     auth_cookie_name: str = os.getenv("AUTH_COOKIE_NAME", "brunofresh_access_token")
     auth_cookie_secure: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
     auth_cookie_samesite: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").strip().lower()
+    admin_username: str = os.getenv("ADMIN_USERNAME", "admin")
     categories: tuple[str, ...] = (
         "Produce",
         "Meat",

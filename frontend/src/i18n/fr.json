@@ -21,7 +21,12 @@
   "shopping": {
     "title": "Liste de courses",
     "empty": "Generez la liste pour voir les ingredients consolides.",
-    "needsReview": "A verifier"
+    "needsReview": "A verifier",
+    "toBuy": "A acheter",
+    "alreadyOwned": "Deja possede",
+    "none": "Aucun element dans cette section.",
+    "addManual": "Ajouter un article",
+    "manualPlaceholder": "Ex: sopalin"
   },
   "category": {
     "Produce": "Fruits et legumes",

@@ -37,8 +37,13 @@ def register_spa(app: FastAPI) -> None:
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
-        # Ne pas intercepter les appels d'API non résolus
-        if full_path.startswith("api"):
+        # Redirection automatique pour /admin (sans slash terminal)
+        if full_path == "admin":
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url="/admin/")
+
+        # Ne pas intercepter les appels d'API non résolus ni l'admin SQL
+        if full_path.startswith("api") or full_path.startswith("admin"):
             raise HTTPException(status_code=404, detail="Not Found")
 
         if not frontend_dist_dir:

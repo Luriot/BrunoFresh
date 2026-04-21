@@ -6,7 +6,14 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.database import Base, SQLALCHEMY_DATABASE_URL
-from app.models import Ingredient, Recipe, RecipeIngredient, ScrapeJob  # noqa: F401
+from app.models import (  # noqa: F401
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ScrapeJob,
+    ShoppingList,
+    ShoppingListItem,
+)
 
 config = context.config
 

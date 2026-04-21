@@ -63,3 +63,39 @@ class ScrapeJob(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class ShoppingList(Base):
+    __tablename__ = "shopping_lists"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    label: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    needs_review_blob: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    items: Mapped[list["ShoppingListItem"]] = relationship(
+        "ShoppingListItem", back_populates="shopping_list", cascade="all, delete-orphan"
+    )
+
+
+class ShoppingListItem(Base):
+    __tablename__ = "shopping_list_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    shopping_list_id: Mapped[int] = mapped_column(ForeignKey("shopping_lists.id"), index=True)
+    recipe_id: Mapped[int | None] = mapped_column(ForeignKey("recipes.id"), nullable=True, index=True)
+    ingredient_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ingredients.id"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    quantity: Mapped[float] = mapped_column(Float, default=0)
+    unit: Mapped[str] = mapped_column(String(30), default="item")
+    category: Mapped[str] = mapped_column(String(80), default="Other", index=True)
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_already_owned: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    shopping_list: Mapped[ShoppingList] = relationship("ShoppingList", back_populates="items")

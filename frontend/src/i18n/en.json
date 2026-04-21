@@ -21,7 +21,12 @@
   "shopping": {
     "title": "Shopping List",
     "empty": "Generate list to see aggregated groceries.",
-    "needsReview": "Needs Review"
+    "needsReview": "Needs Review",
+    "toBuy": "To Buy",
+    "alreadyOwned": "Already Owned",
+    "none": "No items in this section.",
+    "addManual": "Add Manual Item",
+    "manualPlaceholder": "Ex: paper towels"
   },
   "category": {
     "Produce": "Produce",

@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  addShoppingListCustomItem,
+  createShoppingList,
   fetchRecipes,
-  generateCart,
+  fetchShoppingList,
+  fetchShoppingLists,
   loginWithPasscode,
+  patchShoppingListItem,
   logout,
   setUnauthorizedHandler,
   verifySession,
@@ -12,7 +16,7 @@ import { RecipeCard } from "./components/RecipeCard";
 import { ShoppingList } from "./components/ShoppingList";
 import { useCart } from "./hooks/useCart";
 import { useScrape } from "./hooks/useScrape";
-import type { CartResponse, RecipeListItem } from "./types";
+import type { RecipeListItem, ShoppingList as ShoppingListType, ShoppingListSummary } from "./types";
 import { useTranslation } from "react-i18next";
 
 function App() {
@@ -22,7 +26,8 @@ function App() {
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const { cart, addToCart, updateServings, toCartInput } = useCart();
   const { loading, scrapeState, startScrape } = useScrape();
-  const [list, setList] = useState<CartResponse | null>(null);
+  const [list, setList] = useState<ShoppingListType | null>(null);
+  const [listHistory, setListHistory] = useState<ShoppingListSummary[]>([]);
   const [url, setUrl] = useState("");
 
   useEffect(() => {
@@ -30,6 +35,7 @@ function App() {
       setIsAuthenticated(false);
       setRecipes([]);
       setList(null);
+      setListHistory([]);
       setAuthError("Session expired. Sign in again.");
     });
 
@@ -40,9 +46,11 @@ function App() {
     if (!isAuthenticated) {
       setRecipes([]);
       setList(null);
+      setListHistory([]);
       return;
     }
     void loadRecipes();
+    void loadShoppingListHistory();
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -89,6 +97,7 @@ function App() {
     setAuthError(null);
     setRecipes([]);
     setList(null);
+    setListHistory([]);
     setUrl("");
   }
 
@@ -113,8 +122,79 @@ function App() {
   }
 
   async function onGenerateList() {
-    const data = await generateCart(toCartInput());
+    const data = await createShoppingList(toCartInput());
     setList(data);
+    await loadShoppingListHistory();
+  }
+
+  async function loadShoppingListHistory() {
+    try {
+      const data = await fetchShoppingLists();
+      setListHistory(data);
+    } catch {
+      setListHistory([]);
+    }
+  }
+
+  async function openShoppingList(listId: number) {
+    try {
+      const data = await fetchShoppingList(listId);
+      setList(data);
+    } catch {
+      setList(null);
+    }
+  }
+
+  async function onToggleOwned(itemId: number, isAlreadyOwned: boolean) {
+    if (!list) {
+      return;
+    }
+
+    setList((previous) => {
+      if (!previous) {
+        return previous;
+      }
+      return {
+        ...previous,
+        items: previous.items.map((item) =>
+          item.id === itemId ? { ...item, is_already_owned: isAlreadyOwned } : item
+        ),
+      };
+    });
+
+    try {
+      await patchShoppingListItem(list.id, itemId, isAlreadyOwned);
+      await loadShoppingListHistory();
+    } catch {
+      await openShoppingList(list.id);
+    }
+  }
+
+  async function onAddCustomItem(name: string) {
+    if (!list) {
+      return;
+    }
+
+    try {
+      const item = await addShoppingListCustomItem(list.id, {
+        name,
+        quantity: 1,
+        unit: "item",
+        category: "Other",
+      });
+      setList((previous) => {
+        if (!previous) {
+          return previous;
+        }
+        return {
+          ...previous,
+          items: [...previous.items, item],
+        };
+      });
+      await loadShoppingListHistory();
+    } catch {
+      await openShoppingList(list.id);
+    }
   }
 
   const recipeCount = useMemo(() => recipes.length, [recipes.length]);
@@ -237,7 +317,21 @@ function App() {
 
           <section className="rounded-2xl border border-orange-200 bg-white p-4">
             <h2 className="mb-2 font-heading text-xl font-semibold">{t("shopping.title")}</h2>
-            <ShoppingList data={list} />
+            {listHistory.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {listHistory.map((entry) => (
+                  <button
+                    key={entry.id}
+                    className="rounded-lg border border-orange-200 px-2 py-1 text-xs text-gray-700"
+                    onClick={() => void openShoppingList(entry.id)}
+                    type="button"
+                  >
+                    #{entry.id} ({entry.total_items})
+                  </button>
+                ))}
+              </div>
+            )}
+            <ShoppingList data={list} onAddCustomItem={onAddCustomItem} onToggleOwned={onToggleOwned} />
           </section>
         </aside>
       </main>

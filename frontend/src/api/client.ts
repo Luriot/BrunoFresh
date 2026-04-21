@@ -1,5 +1,15 @@
 import axios from "axios";
-import type { CartInput, CartResponse, JobStatusResponse, RecipeListItem, ScrapeResponse } from "../types";
+import type {
+  CartInput,
+  CartResponse,
+  JobStatusResponse,
+  RecipeListItem,
+  ScrapeResponse,
+  ShoppingList,
+  ShoppingListCustomItemInput,
+  ShoppingListItem,
+  ShoppingListSummary,
+} from "../types";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -66,5 +76,32 @@ export async function getJobStatus(jobId: number) {
 
 export async function generateCart(items: CartInput[]) {
   const { data } = await api.post<CartResponse>("/cart/generate", { items });
+  return data;
+}
+
+export async function createShoppingList(items: CartInput[]) {
+  const { data } = await api.post<ShoppingList>("/lists", { items });
+  return data;
+}
+
+export async function fetchShoppingLists() {
+  const { data } = await api.get<ShoppingListSummary[]>("/lists");
+  return data;
+}
+
+export async function fetchShoppingList(listId: number) {
+  const { data } = await api.get<ShoppingList>(`/lists/${listId}`);
+  return data;
+}
+
+export async function patchShoppingListItem(listId: number, itemId: number, isAlreadyOwned: boolean) {
+  const { data } = await api.patch<ShoppingListItem>(`/lists/${listId}/items/${itemId}`, {
+    is_already_owned: isAlreadyOwned,
+  });
+  return data;
+}
+
+export async function addShoppingListCustomItem(listId: number, payload: ShoppingListCustomItemInput) {
+  const { data } = await api.post<ShoppingListItem>(`/lists/${listId}/items`, payload);
   return data;
 }
