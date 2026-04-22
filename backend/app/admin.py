@@ -14,6 +14,7 @@ from .models import (
     ScrapeJob,
     ShoppingList,
     ShoppingListItem,
+    ShoppingListRecipe,
 )
 from .services.auth import verify_passcode
 
@@ -49,7 +50,7 @@ class RecipeAdmin(ModelView, model=Recipe):
 
 
 class IngredientAdmin(ModelView, model=Ingredient):
-    column_list = [Ingredient.id, Ingredient.name_en, Ingredient.category, Ingredient.is_normalized]
+    column_list = [Ingredient.id, Ingredient.name_en, Ingredient.name_fr, Ingredient.category, Ingredient.is_normalized]
     column_searchable_list = [Ingredient.name_en]
 
 
@@ -79,11 +80,21 @@ class ShoppingListItemAdmin(ModelView, model=ShoppingListItem):
         ShoppingListItem.id,
         ShoppingListItem.shopping_list_id,
         ShoppingListItem.name,
+        ShoppingListItem.name_fr,
         ShoppingListItem.quantity,
         ShoppingListItem.unit,
         ShoppingListItem.category,
         ShoppingListItem.is_custom,
         ShoppingListItem.is_already_owned,
+    ]
+
+
+class ShoppingListRecipeAdmin(ModelView, model=ShoppingListRecipe):
+    column_list = [
+        ShoppingListRecipe.id,
+        ShoppingListRecipe.shopping_list_id,
+        ShoppingListRecipe.recipe_id,
+        ShoppingListRecipe.target_servings,
     ]
 
 
@@ -96,3 +107,4 @@ def setup_admin(app: FastAPI) -> None:
     admin.add_view(ScrapeJobAdmin)
     admin.add_view(ShoppingListAdmin)
     admin.add_view(ShoppingListItemAdmin)
+    admin.add_view(ShoppingListRecipeAdmin)

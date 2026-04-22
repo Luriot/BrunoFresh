@@ -6,17 +6,21 @@
     "scrape": "Scraper",
     "scraping": "Scraping...",
     "refresh": "Rafraichir",
-    "recipesLoaded": "Recettes chargees : {{count}}"
+    "recipesLoaded": "Recettes chargees : {{count}}",
+    "checkingSession": "Verification de session..."
   },
   "recipe": {
     "noImage": "Pas encore d'image",
-    "addToCart": "Ajouter au panier"
+    "addToCart": "Ajouter au panier",
+    "viewOriginal": "Voir la recette originale"
   },
   "cart": {
     "title": "Panier",
     "empty": "Aucune recette selectionnee.",
     "servings": "Portions",
-    "generate": "Generer la liste de courses"
+    "generate": "Generer la liste de courses",
+    "openMobile": "Ouvrir le panier ({{count}})",
+    "closeMobile": "Fermer"
   },
   "shopping": {
     "title": "Liste de courses",
@@ -26,7 +30,27 @@
     "alreadyOwned": "Deja possede",
     "none": "Aucun element dans cette section.",
     "addManual": "Ajouter un article",
-    "manualPlaceholder": "Ex: sopalin"
+    "manualPlaceholder": "Ex: sopalin",
+    "recipesToCook": "Recettes a cuisiner",
+    "targetServings": "Portions cibles : {{count}}",
+    "listDetail": "Liste de courses #{{id}}",
+    "loading": "Chargement de la liste..."
+  },
+  "history": {
+    "title": "Historique",
+    "count": "{{count}} liste(s)",
+    "empty": "Aucune liste dans l'historique.",
+    "defaultLabel": "Liste sans titre",
+    "items": "Articles : {{count}}",
+    "owned": "Deja possedes : {{count}}",
+    "back": "Retour a l'historique"
+  },
+  "nav": {
+    "dashboard": "Accueil",
+    "history": "Historique"
+  },
+  "auth": {
+    "logout": "Deconnexion"
   },
   "category": {
     "Produce": "Fruits et legumes",

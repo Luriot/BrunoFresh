@@ -118,6 +118,7 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
             if not ingredient:
                 ingredient = Ingredient(
                     name_en=normalized.name_en,
+                    name_fr=normalized.name_fr,
                     category=normalized.category,
                     is_normalized=True,
                 )
@@ -126,6 +127,8 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
                 existing_ingredients[normalized.name_en] = ingredient
                 logger.debug(f"Nouvel ingrédient normalisé: {ingredient.name_en} ({ingredient.category})")
                 await db.flush() # Flush requis pour obtenir l'ID si c'est un nouvel ingrédient
+            elif not ingredient.name_fr and normalized.name_fr:
+                ingredient.name_fr = normalized.name_fr
             quantity = normalized.quantity
             unit = normalized.unit
         else:

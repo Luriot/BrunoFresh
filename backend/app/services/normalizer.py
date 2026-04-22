@@ -17,6 +17,7 @@ ollama_semaphore = asyncio.Semaphore(3)
 @dataclass
 class NormalizedIngredient:
     name_en: str
+    name_fr: str
     quantity: float
     unit: str
     category: str
@@ -51,16 +52,23 @@ def _coerce_unit(value: str) -> str:
     return "piece"
 
 
+def _coerce_name_fr(value: str, fallback_name_en: str) -> str:
+    candidate = (value or "").strip().lower()
+    if candidate:
+        return candidate
+    return fallback_name_en
+
+
 async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
     safe_raw = _sanitize_raw_ingredient(raw_string)
     raw = ""
     categories = ", ".join(settings.categories)
     prompt = (
         "You are an ingredient parser. Return strict JSON only with keys: "
-        "name_en, quantity, unit, category. "
+        "name_en, name_fr, quantity, unit, category. "
         "Allowed units: g, ml, piece. "
         f"Allowed categories: {categories}. "
-        "Translate ingredient names to English. "
+        "Translate ingredient names to both English and French. "
         "Do not return markdown. "
         f"Input ingredient: {safe_raw}. "
         f"Hint quantity={quantity}, unit={unit}."
@@ -107,6 +115,7 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
         parsed = json.loads(raw)
 
         name = str(parsed.get("name_en", "")).strip().lower()
+        name_fr = _coerce_name_fr(str(parsed.get("name_fr", "")), name)
         parsed_qty = float(parsed.get("quantity", quantity))
         parsed_unit = _coerce_unit(str(parsed.get("unit", unit)))
         parsed_category = _coerce_category(str(parsed.get("category", "Other")))
@@ -118,7 +127,7 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
         if parsed_qty < 0:
             parsed_qty = abs(parsed_qty)
 
-        result = NormalizedIngredient(name, parsed_qty, parsed_unit, parsed_category)
+        result = NormalizedIngredient(name, name_fr, parsed_qty, parsed_unit, parsed_category)
         logger.debug(f"Succès Ollama: '{safe_raw}' -> {result}")
         return result
         
@@ -132,43 +141,46 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
 
 def normalize_fallback(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
     text = raw_string.lower()
+
+    def fallback(name_en: str, name_fr: str, qty: float, unit_value: str, category: str) -> NormalizedIngredient:
+        return NormalizedIngredient(name_en, name_fr, qty, unit_value, category)
     
     # Ignorer les en-têtes de sections du type "Pour la sauce..." ou "Pour le gâteau..."
     if text.startswith("pour la ") or text.startswith("pour le ") or text.startswith("pour les "):
-        return NormalizedIngredient("section_header_ignore", 0, "piece", "Other")
+        return fallback("section_header_ignore", "section_header_ignore", 0, "piece", "Other")
 
     if "garlic" in text or "ail" in text:
-        return NormalizedIngredient("garlic", quantity, "piece", "Produce")
+        return fallback("garlic", "ail", quantity, "piece", "Produce")
     if "tomato" in text or "tomate" in text:
-        return NormalizedIngredient("tomato", quantity, "g", "Produce")
+        return fallback("tomato", "tomate", quantity, "g", "Produce")
     if "olive oil" in text or "huile" in text:
-        return NormalizedIngredient("olive oil", quantity, "ml", "Pantry")
+        return fallback("olive oil", "huile d olive", quantity, "ml", "Pantry")
     if "sel" in text or "salt" in text:
-        return NormalizedIngredient("salt", max(1, quantity), "g", "Spices")
+        return fallback("salt", "sel", max(1, quantity), "g", "Spices")
     if "poivre" in text or "pepper" in text:
-        return NormalizedIngredient("black pepper", max(1, quantity), "g", "Spices")
+        return fallback("black pepper", "poivre noir", max(1, quantity), "g", "Spices")
     if "beurre" in text or "butter" in text:
-        return NormalizedIngredient("butter", quantity, "g", "Dairy")
+        return fallback("butter", "beurre", quantity, "g", "Dairy")
     if "oignon" in text or "onion" in text:
-        return NormalizedIngredient("onion", quantity, "piece", "Produce")
+        return fallback("onion", "oignon", quantity, "piece", "Produce")
     if "lait" in text or "milk" in text:
-        return NormalizedIngredient("milk", quantity, "ml", "Dairy")
+        return fallback("milk", "lait", quantity, "ml", "Dairy")
     if "farine" in text or "flour" in text:
-        return NormalizedIngredient("flour", quantity, "g", "Pantry")
+        return fallback("flour", "farine", quantity, "g", "Pantry")
     if "sucre" in text or "sugar" in text:
-        return NormalizedIngredient("sugar", quantity, "g", "Pantry")
+        return fallback("sugar", "sucre", quantity, "g", "Pantry")
     if "boeuf" in text or "bœuf" in text or "beef" in text:
-        return NormalizedIngredient("ground beef", quantity, "g", "Meat")
+        return fallback("ground beef", "boeuf hache", quantity, "g", "Meat")
     if "gruyère" in text or "gruyere" in text:
-        return NormalizedIngredient("gruyere cheese", quantity, "g", "Dairy")
+        return fallback("gruyere cheese", "fromage gruyere", quantity, "g", "Dairy")
     if "parmesan" in text:
-        return NormalizedIngredient("parmesan cheese", quantity, "g", "Dairy")
+        return fallback("parmesan cheese", "parmesan", quantity, "g", "Dairy")
     if "muscade" in text or "nutmeg" in text:
-        return NormalizedIngredient("nutmeg", max(1, quantity), "g", "Spices")
+        return fallback("nutmeg", "muscade", max(1, quantity), "g", "Spices")
     if "herbe" in text or "herb" in text:
-        return NormalizedIngredient("mixed herbs", max(1, quantity), "g", "Spices")
+        return fallback("mixed herbs", "herbes melangees", max(1, quantity), "g", "Spices")
     if "lasagne" in text or "pâte" in text or "pasta" in text:
-        return NormalizedIngredient("lasagna sheets", quantity, "piece", "Pantry")
+        return fallback("lasagna sheets", "feuilles de lasagne", quantity, "piece", "Pantry")
         
     return None
 
@@ -194,7 +206,12 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
 
     # Si tous les blocs étaient des en-têtes, pas besoin d'appeler Ollama
     if not any(input_list):
-        return [NormalizedIngredient("section_header_ignore", 0, "piece", "Other") if item is None else None for item in input_list]
+        return [
+            NormalizedIngredient("section_header_ignore", "section_header_ignore", 0, "piece", "Other")
+            if item is None
+            else None
+            for item in input_list
+        ]
 
     valid_inputs = [item for item in input_list if item is not None]
     
@@ -202,11 +219,11 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
     prompt = (
         "You are an ingredient parser. Return strict JSON ONLY. "
         "The root MUST be a JSON object with a single key 'ingredients' containing an array of all processed objects. "
-        "Each object must have exactly these keys: idx, name_en, quantity, unit, category. "
-        'Example output:\n{"ingredients": [{"idx": 0, "name_en": "tomato", "quantity": 300.0, "unit": "g", "category": "Produce"}]}\n'
+        "Each object must have exactly these keys: idx, name_en, name_fr, quantity, unit, category. "
+        'Example output:\n{"ingredients": [{"idx": 0, "name_en": "tomato", "name_fr": "tomate", "quantity": 300.0, "unit": "g", "category": "Produce"}]}\n'
         "Allowed units: g, ml, piece. "
         f"Allowed categories: {categories_str}. "
-        "Translate ALL ingredient names to English. "
+        "Translate ALL ingredient names to both English and French. "
         "Process ALL items from the input array. Maintain the exact idx passed.\n\n"
         f"Input array to process:\n{json.dumps(valid_inputs, ensure_ascii=False)}"
     )
@@ -280,7 +297,9 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         # On replace les en-têtes
         for idx, item in enumerate(input_list):
             if item is None:
-                results[idx] = NormalizedIngredient("section_header_ignore", 0, "piece", "Other")
+                results[idx] = NormalizedIngredient(
+                    "section_header_ignore", "section_header_ignore", 0, "piece", "Other"
+                )
 
         for item in parsed_array:
             if not isinstance(item, dict):
@@ -291,6 +310,7 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
                 continue
                 
             name = str(item.get("name_en", "")).strip().lower()
+            name_fr = _coerce_name_fr(str(item.get("name_fr", "")), name)
             try:
                 qty = float(item.get("quantity", ingredients[idx].quantity))
             except (TypeError, ValueError):
@@ -299,7 +319,7 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
             parsed_category = _coerce_category(str(item.get("category", "Other")))
 
             if name:
-                results[idx] = NormalizedIngredient(name, abs(qty), parsed_unit, parsed_category)
+                results[idx] = NormalizedIngredient(name, name_fr, abs(qty), parsed_unit, parsed_category)
 
         # Fallback pour ceux qui n'ont pas été traduits (LLM truncating, ou erreur)
         for idx, res in enumerate(results):

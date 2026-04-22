@@ -17,6 +17,7 @@ class RecipeListItem(BaseModel):
 
 class IngredientOut(BaseModel):
     name: str
+    name_fr: str | None = None
     quantity: float
     unit: str
     category: str
@@ -28,6 +29,7 @@ class RecipeIngredientOut(BaseModel):
     unit: str
     needs_review: bool
     ingredient_name: str | None = None
+    ingredient_name_fr: str | None = None
     category: str | None = None
 
 
@@ -86,6 +88,7 @@ class CartResponse(BaseModel):
 
 class ShoppingListCustomItemIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+    name_fr: str | None = Field(default=None, max_length=200)
     quantity: float = Field(default=1, gt=0, le=9999)
     unit: str = Field(default="item", min_length=1, max_length=30)
     category: str = Field(default="Other", min_length=1, max_length=80)
@@ -104,6 +107,7 @@ class ShoppingListItemPatch(BaseModel):
 class ShoppingListItemOut(BaseModel):
     id: int
     name: str
+    name_fr: str | None = None
     quantity: float
     unit: str
     category: str
@@ -121,15 +125,26 @@ class ShoppingListSummaryOut(BaseModel):
     already_owned_items: int
 
 
+class ShoppingListRecipeOut(BaseModel):
+    recipe_id: int
+    title: str
+    url: str
+    source_domain: str
+    image_local_path: str | None
+    target_servings: int
+
+
 class ShoppingListOut(BaseModel):
     id: int
     label: str | None
     created_at: datetime
     updated_at: datetime
     items: list[ShoppingListItemOut]
+    recipes: list[ShoppingListRecipeOut]
     needs_review: list[str]
 
 
 class IngredientPatch(BaseModel):
     name_en: str
+    name_fr: str | None = None
     category: str

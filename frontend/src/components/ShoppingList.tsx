@@ -9,7 +9,7 @@ type Props = {
 };
 
 export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [customName, setCustomName] = useState("");
 
   if (!data) {
@@ -43,7 +43,9 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
               onClick={() => onToggleOwned(item.id, isOwnedTarget)}
               type="button"
             >
-              <span className="font-medium text-ink">{item.name}</span>
+              <span className="font-medium text-ink">
+                {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
+              </span>
               <span className="text-xs text-gray-600">
                 {item.quantity} {item.unit}
               </span>
@@ -82,6 +84,33 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
           </button>
         </form>
       </section>
+
+      {data.recipes.length > 0 && (
+        <section className="rounded-2xl border border-orange-200 bg-white p-4">
+          <h4 className="mb-2 font-heading text-lg font-semibold text-ink">{t("shopping.recipesToCook")}</h4>
+          <ul className="space-y-2">
+            {data.recipes.map((recipe) => (
+              <li
+                key={`${recipe.recipe_id}-${recipe.target_servings}`}
+                className="rounded-lg border border-orange-100 bg-orange-50 px-3 py-2"
+              >
+                <p className="text-sm font-semibold text-ink">{recipe.title}</p>
+                <p className="mt-1 text-xs text-gray-600">
+                  {t("shopping.targetServings", { count: recipe.target_servings })}
+                </p>
+                <a
+                  className="mt-2 inline-flex text-xs font-semibold text-accent underline-offset-2 hover:underline"
+                  href={recipe.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("recipe.viewOriginal")}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {data.needs_review.length > 0 && (
         <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4">

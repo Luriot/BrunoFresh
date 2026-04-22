@@ -25,6 +25,7 @@ export type CartResponse = {
 
 export type ShoppingListCustomItemInput = {
   name: string;
+  name_fr?: string | null;
   quantity: number;
   unit: string;
   category: string;
@@ -33,11 +34,21 @@ export type ShoppingListCustomItemInput = {
 export type ShoppingListItem = {
   id: number;
   name: string;
+  name_fr: string | null;
   quantity: number;
   unit: string;
   category: string;
   is_custom: boolean;
   is_already_owned: boolean;
+};
+
+export type ShoppingListRecipe = {
+  recipe_id: number;
+  title: string;
+  url: string;
+  source_domain: string;
+  image_local_path: string | null;
+  target_servings: number;
 };
 
 export type ShoppingList = {
@@ -46,6 +57,7 @@ export type ShoppingList = {
   created_at: string;
   updated_at: string;
   items: ShoppingListItem[];
+  recipes: ShoppingListRecipe[];
   needs_review: string[];
 };
 

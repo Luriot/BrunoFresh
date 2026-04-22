@@ -6,13 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ...database import get_db
-from ...models import Recipe, RecipeIngredient, ShoppingList, ShoppingListItem
+from ...models import Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe
 from ...schemas import (
+    CartRecipeIn,
     ShoppingListCreateRequest,
     ShoppingListCustomItemIn,
     ShoppingListItemOut,
     ShoppingListItemPatch,
     ShoppingListOut,
+    ShoppingListRecipeOut,
     ShoppingListSummaryOut,
 )
 
@@ -26,10 +28,10 @@ def _parse_needs_review(blob: str | None) -> list[str]:
 
 
 async def _aggregate_recipe_items(
-    payload_items: list,
+    payload_items: list[CartRecipeIn],
     db: AsyncSession,
 ) -> tuple[list[dict], list[str]]:
-    grouped: dict[tuple[str, str, str, int | None], dict] = defaultdict(dict)
+    grouped: dict[tuple[str, str, str | None, str, int | None], dict] = defaultdict(dict)
     needs_review: list[str] = []
 
     if not payload_items:
@@ -60,6 +62,7 @@ async def _aggregate_recipe_items(
             key = (
                 link.ingredient.category,
                 link.ingredient.name_en,
+                link.ingredient.name_fr,
                 link.unit,
                 link.ingredient.id,
             )
@@ -68,10 +71,10 @@ async def _aggregate_recipe_items(
                 grouped[key] = {
                     "category": link.ingredient.category,
                     "name": link.ingredient.name_en,
+                    "name_fr": link.ingredient.name_fr,
                     "unit": link.unit,
                     "quantity": 0.0,
                     "ingredient_id": link.ingredient.id,
-                    "recipe_id": recipe.id,
                 }
                 row = grouped[key]
 
@@ -97,6 +100,18 @@ def _list_to_response(entity: ShoppingList) -> ShoppingListOut:
         created_at=entity.created_at,
         updated_at=entity.updated_at,
         items=[ShoppingListItemOut.model_validate(item) for item in sorted(entity.items, key=lambda i: i.sort_order)],
+        recipes=[
+            ShoppingListRecipeOut(
+                recipe_id=link.recipe.id,
+                title=link.recipe.title,
+                url=link.recipe.url,
+                source_domain=link.recipe.source_domain,
+                image_local_path=link.recipe.image_local_path,
+                target_servings=link.target_servings,
+            )
+            for link in sorted(entity.recipe_links, key=lambda i: i.id)
+            if link.recipe
+        ],
         needs_review=_parse_needs_review(entity.needs_review_blob),
     )
 
@@ -112,14 +127,23 @@ async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSess
     db.add(shopping_list)
     await db.flush()
 
+    for item in payload.items:
+        db.add(
+            ShoppingListRecipe(
+                shopping_list_id=shopping_list.id,
+                recipe_id=item.recipe_id,
+                target_servings=item.target_servings,
+            )
+        )
+
     sort_order = 0
     for row in aggregated_items:
         db.add(
             ShoppingListItem(
                 shopping_list_id=shopping_list.id,
-                recipe_id=row["recipe_id"],
                 ingredient_id=row["ingredient_id"],
                 name=row["name"],
+                name_fr=row["name_fr"],
                 quantity=row["quantity"],
                 unit=row["unit"],
                 category=row["category"],
@@ -135,6 +159,7 @@ async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSess
             ShoppingListItem(
                 shopping_list_id=shopping_list.id,
                 name=extra.name.strip(),
+                name_fr=extra.name_fr.strip() if extra.name_fr else None,
                 quantity=round(extra.quantity, 2),
                 unit=extra.unit.strip(),
                 category=extra.category.strip(),
@@ -149,7 +174,10 @@ async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSess
 
     entity = await db.scalar(
         select(ShoppingList)
-        .options(selectinload(ShoppingList.items))
+        .options(
+            selectinload(ShoppingList.items),
+            selectinload(ShoppingList.recipe_links).selectinload(ShoppingListRecipe.recipe),
+        )
         .where(ShoppingList.id == shopping_list.id)
     )
     if not entity:
@@ -188,7 +216,12 @@ async def list_shopping_lists(
 @router.get("/lists/{list_id}", response_model=ShoppingListOut)
 async def get_shopping_list(list_id: int, db: AsyncSession = Depends(get_db)):
     entity = await db.scalar(
-        select(ShoppingList).options(selectinload(ShoppingList.items)).where(ShoppingList.id == list_id)
+        select(ShoppingList)
+        .options(
+            selectinload(ShoppingList.items),
+            selectinload(ShoppingList.recipe_links).selectinload(ShoppingListRecipe.recipe),
+        )
+        .where(ShoppingList.id == list_id)
     )
     if not entity:
         raise HTTPException(status_code=404, detail="Shopping list not found")
@@ -235,6 +268,7 @@ async def add_custom_shopping_list_item(
     item = ShoppingListItem(
         shopping_list_id=list_id,
         name=payload.name.strip(),
+        name_fr=payload.name_fr.strip() if payload.name_fr else None,
         quantity=round(payload.quantity, 2),
         unit=payload.unit.strip(),
         category=payload.category.strip(),

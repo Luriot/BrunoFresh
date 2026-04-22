@@ -27,6 +27,14 @@ export function RecipeCard({ recipe, onAdd }: Props) {
       </div>
       <h3 className="font-heading text-lg font-semibold text-ink">{recipe.title}</h3>
       <p className="mb-3 text-sm text-gray-600">{recipe.source_domain}</p>
+      <a
+        className="mb-3 inline-flex text-sm font-semibold text-accent underline-offset-2 hover:underline"
+        href={recipe.url}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {t("recipe.viewOriginal")}
+      </a>
       <button
         className="w-full rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-white"
         onClick={() => onAdd(recipe)}

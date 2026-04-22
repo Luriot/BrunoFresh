@@ -17,6 +17,7 @@ def _ing_to_out(link: RecipeIngredient) -> RecipeIngredientOut:
         unit=link.unit,
         needs_review=link.needs_review,
         ingredient_name=link.ingredient.name_en if link.ingredient else None,
+        ingredient_name_fr=link.ingredient.name_fr if link.ingredient else None,
         category=link.ingredient.category if link.ingredient else None,
     )
 
@@ -73,6 +74,7 @@ async def patch_ingredient(
         raise HTTPException(status_code=404, detail="Ingredient not found")
 
     ingredient.name_en = payload.name_en
+    ingredient.name_fr = payload.name_fr
     ingredient.category = payload.category
     ingredient.is_normalized = True
     await db.commit()

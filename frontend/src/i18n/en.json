@@ -6,17 +6,21 @@
     "scrape": "Scrape",
     "scraping": "Scraping...",
     "refresh": "Refresh",
-    "recipesLoaded": "Recipes loaded: {{count}}"
+    "recipesLoaded": "Recipes loaded: {{count}}",
+    "checkingSession": "Checking session..."
   },
   "recipe": {
     "noImage": "No image yet",
-    "addToCart": "Add to cart"
+    "addToCart": "Add to cart",
+    "viewOriginal": "View original recipe"
   },
   "cart": {
     "title": "Cart",
     "empty": "No recipes selected yet.",
     "servings": "Servings",
-    "generate": "Generate Shopping List"
+    "generate": "Generate Shopping List",
+    "openMobile": "Open cart ({{count}})",
+    "closeMobile": "Close"
   },
   "shopping": {
     "title": "Shopping List",
@@ -26,7 +30,27 @@
     "alreadyOwned": "Already Owned",
     "none": "No items in this section.",
     "addManual": "Add Manual Item",
-    "manualPlaceholder": "Ex: paper towels"
+    "manualPlaceholder": "Ex: paper towels",
+    "recipesToCook": "Recipes to cook",
+    "targetServings": "Target servings: {{count}}",
+    "listDetail": "Shopping List #{{id}}",
+    "loading": "Loading shopping list..."
+  },
+  "history": {
+    "title": "History",
+    "count": "{{count}} list(s)",
+    "empty": "No shopping list in history yet.",
+    "defaultLabel": "Untitled list",
+    "items": "Items: {{count}}",
+    "owned": "Already owned: {{count}}",
+    "back": "Back to history"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "history": "History"
+  },
+  "auth": {
+    "logout": "Logout"
   },
   "category": {
     "Produce": "Produce",

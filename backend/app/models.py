@@ -22,6 +22,9 @@ class Recipe(Base):
     recipe_ingredients: Mapped[list["RecipeIngredient"]] = relationship(
         "RecipeIngredient", back_populates="recipe", cascade="all, delete-orphan"
     )
+    shopping_list_links: Mapped[list["ShoppingListRecipe"]] = relationship(
+        "ShoppingListRecipe", back_populates="recipe", cascade="all, delete-orphan"
+    )
 
 
 class Ingredient(Base):
@@ -29,6 +32,7 @@ class Ingredient(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name_en: Mapped[str] = mapped_column(String(200), index=True, unique=True)
+    name_fr: Mapped[str | None] = mapped_column(String(200), nullable=True)
     category: Mapped[str] = mapped_column(String(80), default="Pantry", index=True)
     is_normalized: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -79,6 +83,21 @@ class ShoppingList(Base):
     items: Mapped[list["ShoppingListItem"]] = relationship(
         "ShoppingListItem", back_populates="shopping_list", cascade="all, delete-orphan"
     )
+    recipe_links: Mapped[list["ShoppingListRecipe"]] = relationship(
+        "ShoppingListRecipe", back_populates="shopping_list", cascade="all, delete-orphan"
+    )
+
+
+class ShoppingListRecipe(Base):
+    __tablename__ = "shopping_list_recipes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    shopping_list_id: Mapped[int] = mapped_column(ForeignKey("shopping_lists.id"), index=True)
+    recipe_id: Mapped[int] = mapped_column(ForeignKey("recipes.id"), index=True)
+    target_servings: Mapped[int] = mapped_column(Integer, default=2)
+
+    shopping_list: Mapped[ShoppingList] = relationship("ShoppingList", back_populates="recipe_links")
+    recipe: Mapped[Recipe] = relationship("Recipe", back_populates="shopping_list_links")
 
 
 class ShoppingListItem(Base):
@@ -91,6 +110,7 @@ class ShoppingListItem(Base):
         ForeignKey("ingredients.id"), nullable=True, index=True
     )
     name: Mapped[str] = mapped_column(String(200), index=True)
+    name_fr: Mapped[str | None] = mapped_column(String(200), nullable=True)
     quantity: Mapped[float] = mapped_column(Float, default=0)
     unit: Mapped[str] = mapped_column(String(30), default="item")
     category: Mapped[str] = mapped_column(String(80), default="Other", index=True)
