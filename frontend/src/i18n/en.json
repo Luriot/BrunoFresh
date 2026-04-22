@@ -7,18 +7,28 @@
     "scraping": "Scraping...",
     "refresh": "Refresh",
     "recipesLoaded": "Recipes loaded: {{count}}",
-    "checkingSession": "Checking session..."
+    "checkingSession": "Checking session...",
+    "close": "Close",
+    "customRecipe": "Create Custom Recipe"
   },
   "recipe": {
     "noImage": "No image yet",
     "addToCart": "Add to cart",
-    "viewOriginal": "View original recipe"
+    "viewOriginal": "View original recipe",
+    "servings": "servings",
+    "minutes": "mins",
+    "ingredients": "Ingredients",
+    "instructions": "Instructions",
+    "noIngredients": "No ingredients listed."
   },
   "cart": {
     "title": "Cart",
     "empty": "No recipes selected yet.",
     "servings": "Servings",
     "generate": "Generate Shopping List",
+    "clear": "Clear cart",
+    "decreaseServings": "Decrease servings",
+    "increaseServings": "Increase servings",
     "openMobile": "Open cart ({{count}})",
     "closeMobile": "Close"
   },
@@ -34,7 +44,12 @@
     "recipesToCook": "Recipes to cook",
     "targetServings": "Target servings: {{count}}",
     "listDetail": "Shopping List #{{id}}",
-    "loading": "Loading shopping list..."
+    "loading": "Loading shopping list...",
+    "rename": "Rename list",
+    "renamePlaceholder": "List name",
+    "save": "Save",
+    "cancel": "Cancel",
+    "weekLabel": "Week {{week}}"
   },
   "history": {
     "title": "History",
@@ -43,14 +58,50 @@
     "defaultLabel": "Untitled list",
     "items": "Items: {{count}}",
     "owned": "Already owned: {{count}}",
-    "back": "Back to history"
+    "back": "Back to history",
+    "delete": "Delete list"
   },
   "nav": {
     "dashboard": "Dashboard",
     "history": "History"
   },
   "auth": {
-    "logout": "Logout"
+    "logout": "Logout",
+    "loginPrompt": "Enter passcode to access your recipes.",
+    "passcodePlaceholder": "Passcode",
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "invalidPasscode": "Invalid passcode.",
+    "sessionExpired": "Session expired. Sign in again."
+  },
+  "customRecipe": {
+    "title": "Create Custom Recipe",
+    "fields": {
+      "title": "Title",
+      "servings": "Servings",
+      "prepTime": "Prep Time (min)",
+      "instructions": "Instructions",
+      "ingredients": "Ingredients",
+      "ingredientName": "Ingredient Name",
+      "quantity": "Qty",
+      "unit": "Unit"
+    },
+    "actions": {
+      "add": "Add",
+      "remove": "Remove",
+      "cancel": "Cancel",
+      "create": "Create Recipe",
+      "creating": "Creating..."
+    },
+    "errors": {
+      "titleRequired": "Title is required.",
+      "titleTooLong": "Title cannot exceed {{count}} characters.",
+      "ingredientNameRequired": "Ingredient name is required.",
+      "createFailed": "Failed to create custom recipe."
+    }
+  },
+  "error": {
+    "loadFailed": "Failed to load recipe details."
   },
   "category": {
     "Produce": "Produce",

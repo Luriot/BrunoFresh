@@ -7,6 +7,23 @@ export type RecipeListItem = {
   base_servings: number;
 };
 
+export type RecipeIngredientOut = {
+  raw_string: string | null;
+  quantity: number | null;
+  unit: string | null;
+  needs_review: boolean;
+  ingredient_name: string | null;
+  ingredient_name_fr: string | null;
+  category: string | null;
+};
+
+export type RecipeDetail = RecipeListItem & {
+  image_original_url: string | null;
+  instructions_text: string | null;
+  prep_time_minutes: number | null;
+  ingredients: RecipeIngredientOut[];
+};
+
 export type CartInput = {
   recipe_id: number;
   target_servings: number;
@@ -80,4 +97,21 @@ export type JobStatusResponse = {
   job_id: number;
   status: "pending" | "running" | "completed" | "failed";
   error_message?: string | null;
+};
+
+export type RecipeIngredientCreate = {
+  raw_string: string;
+  quantity: number;
+  unit: string;
+  ingredient_name: string;
+  ingredient_name_fr?: string | null;
+  category?: string;
+};
+
+export type RecipeCreate = {
+  title: string;
+  instructions_text?: string;
+  base_servings?: number;
+  prep_time_minutes?: number | null;
+  ingredients?: RecipeIngredientCreate[];
 };

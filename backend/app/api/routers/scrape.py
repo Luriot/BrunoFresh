@@ -20,6 +20,8 @@ from ...services.orchestrator import persist_scraped_recipe
 
 SUPPORTED_SCRAPE_DOMAINS = ("hellofresh", "cuisineaz", "allrecipes", "jow", "750g")
 scrape_semaphore = asyncio.Semaphore(max(1, settings.scrape_concurrency_limit))
+# Keeps a hard reference to fire-and-forget tasks so they aren't collected mid-execution.
+_background_tasks: set[asyncio.Task] = set()
 
 router = APIRouter(prefix="/api", tags=["scrape"])
 
@@ -86,7 +88,9 @@ async def enqueue_scrape(
     await db.commit()
     await db.refresh(job)
 
-    asyncio.create_task(_run_scrape_job(job.id))
+    task = asyncio.create_task(_run_scrape_job(job.id))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     return ScrapeResponse(message="Scrape job queued", url=safe_url, job_id=job.id, status="pending")
 
 
@@ -96,14 +100,8 @@ async def get_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if job.status == "running":
-        status: JobStatus = "running"
-    elif job.status == "completed":
-        status = "completed"
-    elif job.status == "failed":
-        status = "failed"
-    else:
-        status = "pending"
+    _valid: set[JobStatus] = {"pending", "running", "completed", "failed"}
+    status: JobStatus = job.status if job.status in _valid else "pending"  # type: ignore[assignment]
 
     return JobStatusResponse(
         job_id=job.id,
@@ -132,7 +130,7 @@ async def stream_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
                     {
                         "job_id": stream_job.id,
                         "status": stream_job.status,
-                        "message": getattr(stream_job, 'message', None) or "Abonnement au flux...",
+                        "message": "Abonnement au flux...",
                         "error_message": stream_job.error_message,
                     },
                 )

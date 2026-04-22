@@ -20,6 +20,7 @@ from .api.routers import (
     lists_router,
     recipes_router,
     scrape_router,
+    admin_router,
 )
 from .config import settings
 from .admin import setup_admin
@@ -42,6 +43,7 @@ app.include_router(recipes_router, dependencies=[Depends(require_auth)])
 app.include_router(scrape_router, dependencies=[Depends(require_auth)])
 app.include_router(cart_router, dependencies=[Depends(require_auth)])
 app.include_router(lists_router, dependencies=[Depends(require_auth)])
+app.include_router(admin_router, dependencies=[Depends(require_auth)])
 
 # SQLAdmin DOIT être initialisé AVANT d'enregistrer le catch-all du SPA
 setup_admin(app)

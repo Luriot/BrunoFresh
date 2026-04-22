@@ -3,11 +3,13 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import {
   addShoppingListCustomItem,
   createShoppingList,
+  deleteShoppingList,
   fetchRecipes,
   fetchShoppingList,
   fetchShoppingLists,
   loginWithPasscode,
   logout,
+  patchShoppingList,
   patchShoppingListItem,
   setUnauthorizedHandler,
   verifySession,
@@ -22,12 +24,20 @@ import { ShoppingListViewPage } from "./pages/ShoppingListViewPage";
 import type { RecipeListItem, ShoppingList as ShoppingListType, ShoppingListSummary } from "./types";
 import { useTranslation } from "react-i18next";
 
+function getIsoWeekNumber(date: Date): number {
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNumber = utcDate.getUTCDay() || 7;
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNumber);
+  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+  return Math.ceil(((utcDate.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
 function App() {
   const { t } = useTranslation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
-  const { cart, addToCart, updateServings, toCartInput } = useCart();
+  const { cart, addToCart, updateServings, clearCart, toCartInput } = useCart();
   const { loading, scrapeState, startScrape } = useScrape();
   const [list, setList] = useState<ShoppingListType | null>(null);
   const [listHistory, setListHistory] = useState<ShoppingListSummary[]>([]);
@@ -66,11 +76,11 @@ function App() {
       setRecipes([]);
       setList(null);
       setListHistory([]);
-      setAuthError("Session expired. Sign in again.");
+      setAuthError(t("auth.sessionExpired"));
     });
 
     return () => setUnauthorizedHandler(null);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -114,7 +124,7 @@ function App() {
       await loadRecipes();
       await loadShoppingListHistory();
     } catch {
-      setAuthError("Invalid passcode.");
+      setAuthError(t("auth.invalidPasscode"));
     }
   }
 
@@ -129,6 +139,7 @@ function App() {
     setRecipes([]);
     setList(null);
     setListHistory([]);
+    clearCart();
     setUrl("");
   }
 
@@ -149,9 +160,37 @@ function App() {
       return;
     }
 
-    const data = await createShoppingList(cartInput);
-    setList(data);
-    await loadShoppingListHistory();
+    try {
+      const defaultLabel = t("shopping.weekLabel", { week: getIsoWeekNumber(new Date()) });
+      const data = await createShoppingList(cartInput, defaultLabel);
+      setList(data);
+      await loadShoppingListHistory();
+    } catch {
+      // 401 is handled by the global interceptor; other errors are transient.
+    }
+  }
+
+  async function onRenameList(listId: number, label: string) {
+    try {
+      const updated = await patchShoppingList(listId, label || null);
+      setList((previous) => (previous && previous.id === listId ? updated : previous));
+      await loadShoppingListHistory();
+    } catch {
+      if (list && list.id === listId) {
+        await openShoppingList(list.id);
+      }
+    }
+  }
+
+  async function onDeleteList(listId: number) {
+    try {
+      await deleteShoppingList(listId);
+      setList((previous) => (previous && previous.id === listId ? null : previous));
+      setListHistory((previous) => previous.filter((entry) => entry.id !== listId));
+      await loadShoppingListHistory();
+    } catch {
+      await loadShoppingListHistory();
+    }
   }
 
   async function onToggleOwned(itemId: number, isAlreadyOwned: boolean) {
@@ -237,19 +276,21 @@ function App() {
               onRefreshRecipes={loadRecipes}
               onAddToCart={addToCart}
               onUpdateServings={updateServings}
+              onClearCart={clearCart}
               onGenerateList={onGenerateList}
               onToggleOwned={onToggleOwned}
               onAddCustomItem={onAddCustomItem}
             />
           }
         />
-        <Route path="/history" element={<HistoryPage lists={listHistory} />} />
+        <Route path="/history" element={<HistoryPage lists={listHistory} onDeleteList={onDeleteList} />} />
         <Route
           path="/lists/:listId"
           element={
             <ShoppingListViewPage
               list={list}
               onOpenShoppingList={openShoppingList}
+              onRenameList={onRenameList}
               onToggleOwned={onToggleOwned}
               onAddCustomItem={onAddCustomItem}
             />

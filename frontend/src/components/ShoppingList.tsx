@@ -13,7 +13,7 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
   const [customName, setCustomName] = useState("");
 
   if (!data) {
-    return <p className="text-sm text-gray-600">{t("shopping.empty")}</p>;
+    return <p className="text-sm text-gray-600 dark:text-gray-400">{t("shopping.empty")}</p>;
   }
 
   const toBuy = data.items.filter((item) => !item.is_already_owned);
@@ -31,22 +31,22 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
 
   function renderItems(items: ShoppingListType["items"], isOwnedTarget: boolean) {
     if (items.length === 0) {
-      return <p className="text-sm text-gray-500">{t("shopping.none")}</p>;
+      return <p className="text-sm text-gray-500 dark:text-gray-400">{t("shopping.none")}</p>;
     }
 
     return (
-      <ul className="space-y-2 text-sm text-gray-700">
+      <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
         {items.map((item) => (
           <li key={item.id}>
             <button
-              className="flex w-full items-center justify-between rounded-lg border border-orange-200 px-3 py-2 text-left transition hover:bg-orange-50"
+              className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left transition hover:bg-green-50 dark:border-[#3e3e42] dark:hover:bg-[#2d2d30]"
               onClick={() => onToggleOwned(item.id, isOwnedTarget)}
               type="button"
             >
-              <span className="font-medium text-ink">
+              <span className="font-medium text-ink dark:text-gray-200">
                 {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
               </span>
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-gray-600 dark:text-gray-400">
                 {item.quantity} {item.unit}
               </span>
             </button>
@@ -58,23 +58,24 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-orange-200 bg-white p-4">
-        <h4 className="mb-2 font-heading text-lg font-semibold text-ink">{t("shopping.toBuy")}</h4>
+      <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
+        <h4 className="mb-2 font-heading text-lg font-semibold text-ink dark:text-gray-100">{t("shopping.toBuy")}</h4>
         {renderItems(toBuy, true)}
       </section>
 
-      <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-        <h4 className="mb-2 font-heading text-lg font-semibold text-emerald-900">
+      <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/10">
+        <h4 className="mb-2 font-heading text-lg font-semibold text-emerald-900 dark:text-emerald-400">
           {t("shopping.alreadyOwned")}
         </h4>
         {renderItems(alreadyOwned, false)}
       </section>
 
-      <section className="rounded-2xl border border-orange-200 bg-white p-4">
-        <h4 className="mb-2 font-heading text-lg font-semibold text-ink">{t("shopping.addManual")}</h4>
+      <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
+        <h4 className="mb-2 font-heading text-lg font-semibold text-ink dark:text-gray-100">{t("shopping.addManual")}</h4>
         <form className="flex gap-2" onSubmit={onCustomSubmit}>
           <input
-            className="w-full rounded-lg border border-orange-200 px-3 py-2 text-sm outline-none focus:border-accent"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+            maxLength={200}
             onChange={(event) => setCustomName(event.target.value)}
             placeholder={t("shopping.manualPlaceholder")}
             value={customName}
@@ -86,16 +87,16 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
       </section>
 
       {data.recipes.length > 0 && (
-        <section className="rounded-2xl border border-orange-200 bg-white p-4">
-          <h4 className="mb-2 font-heading text-lg font-semibold text-ink">{t("shopping.recipesToCook")}</h4>
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
+          <h4 className="mb-2 font-heading text-lg font-semibold text-ink dark:text-gray-100">{t("shopping.recipesToCook")}</h4>
           <ul className="space-y-2">
             {data.recipes.map((recipe) => (
               <li
                 key={`${recipe.recipe_id}-${recipe.target_servings}`}
-                className="rounded-lg border border-orange-100 bg-orange-50 px-3 py-2"
+                className="rounded-lg border border-green-100 bg-green-50 px-3 py-2 dark:border-green-900/30 dark:bg-green-900/10"
               >
-                <p className="text-sm font-semibold text-ink">{recipe.title}</p>
-                <p className="mt-1 text-xs text-gray-600">
+                <p className="text-sm font-semibold text-ink dark:text-gray-200">{recipe.title}</p>
+                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
                   {t("shopping.targetServings", { count: recipe.target_servings })}
                 </p>
                 <a
@@ -113,11 +114,11 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
       )}
 
       {data.needs_review.length > 0 && (
-        <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-          <h4 className="mb-2 font-heading text-lg font-semibold text-amber-900">
+        <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700/30 dark:bg-amber-900/10">
+          <h4 className="mb-2 font-heading text-lg font-semibold text-amber-900 dark:text-amber-400">
             {t("shopping.needsReview")}
           </h4>
-          <ul className="space-y-1 text-sm text-amber-800">
+          <ul className="space-y-1 text-sm text-amber-800 dark:text-amber-300">
             {data.needs_review.map((item) => (
               <li key={item}>{item}</li>
             ))}

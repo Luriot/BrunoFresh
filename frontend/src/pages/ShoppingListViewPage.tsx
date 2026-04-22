@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ShoppingList } from "../components/ShoppingList";
@@ -7,6 +7,7 @@ import type { ShoppingList as ShoppingListType } from "../types";
 type Props = {
   list: ShoppingListType | null;
   onOpenShoppingList: (listId: number) => Promise<void>;
+  onRenameList: (listId: number, label: string) => Promise<void>;
   onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
   onAddCustomItem: (name: string) => Promise<void>;
 };
@@ -14,12 +15,15 @@ type Props = {
 export function ShoppingListViewPage({
   list,
   onOpenShoppingList,
+  onRenameList,
   onToggleOwned,
   onAddCustomItem,
 }: Props) {
   const { t } = useTranslation();
   const params = useParams();
   const listId = Number(params.listId);
+  const [isEditingLabel, setIsEditingLabel] = useState(false);
+  const [labelDraft, setLabelDraft] = useState("");
 
   useEffect(() => {
     if (Number.isFinite(listId) && listId > 0) {
@@ -27,27 +31,99 @@ export function ShoppingListViewPage({
     }
   }, [listId, onOpenShoppingList]);
 
+  useEffect(() => {
+    if (list && list.id === listId) {
+      setLabelDraft(list.label ?? "");
+      setIsEditingLabel(false);
+    }
+  }, [list, listId]);
+
+  async function onLabelSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!list || list.id !== listId) {
+      return;
+    }
+    await onRenameList(list.id, labelDraft.trim());
+    setIsEditingLabel(false);
+  }
+
   return (
     <main className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
-      <section className="rounded-2xl border border-orange-200 bg-white p-4 sm:p-6">
+      <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 dark:border-[#3e3e42] dark:bg-[#252526]">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="font-heading text-2xl font-semibold text-ink">
+            <h2 className="font-heading text-2xl font-semibold text-ink dark:text-gray-100">
               {t("shopping.listDetail", { id: Number.isFinite(listId) ? listId : "-" })}
             </h2>
+            {list && list.id === listId && (
+              <div className="mt-2">
+                {isEditingLabel ? (
+                  <form className="flex items-center gap-2" onSubmit={(event) => void onLabelSubmit(event)}>
+                    <input
+                      className="w-56 rounded-lg border border-gray-200 px-3 py-1 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+                      maxLength={160}
+                      value={labelDraft}
+                      onChange={(event) => setLabelDraft(event.target.value)}
+                      placeholder={t("shopping.renamePlaceholder")}
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-accent px-2 py-1 text-xs font-semibold text-white"
+                    >
+                      {t("shopping.save")}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-700 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                      onClick={() => {
+                        setLabelDraft(list.label ?? "");
+                        setIsEditingLabel(false);
+                      }}
+                    >
+                      {t("shopping.cancel")}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {list.label || t("history.defaultLabel")}
+                    </p>
+                    <button
+                      type="button"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-700 hover:bg-green-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                      onClick={() => setIsEditingLabel(true)}
+                      aria-label={t("shopping.rename")}
+                      title={t("shopping.rename")}
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {list && (
-              <p className="mt-1 text-sm text-gray-600">{new Date(list.created_at).toLocaleString()}</p>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{new Date(list.created_at).toLocaleString()}</p>
             )}
           </div>
-          <Link to="/history" className="rounded-lg border border-orange-200 px-3 py-1 text-sm text-gray-700">
-            {t("history.back")}
+          <Link
+            to="/history"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-700 hover:bg-green-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+            aria-label={t("history.back")}
+            title={t("history.back")}
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
           </Link>
         </div>
 
         {list && list.id === listId ? (
           <ShoppingList data={list} onAddCustomItem={onAddCustomItem} onToggleOwned={onToggleOwned} />
         ) : (
-          <p className="text-sm text-gray-600">{t("shopping.loading")}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t("shopping.loading")}</p>
         )}
       </section>
     </main>

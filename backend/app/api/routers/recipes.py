@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from ...database import get_db
 from ...models import Ingredient, Recipe, RecipeIngredient
-from ...schemas import IngredientPatch, RecipeDetail, RecipeIngredientOut, RecipeListItem
+from ...schemas import IngredientPatch, RecipeCreate, RecipeDetail, RecipeIngredientOut, RecipeListItem
 
 router = APIRouter(prefix="/api", tags=["recipes"])
 
@@ -35,7 +37,7 @@ async def list_recipes(
         stmt = stmt.where(Recipe.title.ilike(f"%{q}%"))
     if source:
         stmt = stmt.where(Recipe.source_domain == source)
-    recipes = (await db.scalars(stmt.offset(offset).limit(limit))).all()
+    recipes = (await db.scalars(stmt.order_by(Recipe.id.desc()).offset(offset).limit(limit))).all()
     return recipes
 
 
@@ -48,6 +50,68 @@ async def get_recipe(recipe_id: int, db: AsyncSession = Depends(get_db)):
     )
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
+
+    return RecipeDetail(
+        id=recipe.id,
+        title=recipe.title,
+        url=recipe.url,
+        source_domain=recipe.source_domain,
+        image_local_path=recipe.image_local_path,
+        image_original_url=recipe.image_original_url,
+        instructions_text=recipe.instructions_text,
+        base_servings=recipe.base_servings,
+        prep_time_minutes=recipe.prep_time_minutes,
+        ingredients=[_ing_to_out(link) for link in recipe.recipe_ingredients],
+    )
+
+
+@router.post("/recipes", response_model=RecipeDetail)
+async def create_custom_recipe(
+    payload: RecipeCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    unique_url = f"custom://recipe-{uuid.uuid4()}"
+    new_recipe = Recipe(
+        title=payload.title,
+        url=unique_url,
+        source_domain="custom",
+        instructions_text=payload.instructions_text,
+        base_servings=payload.base_servings,
+        prep_time_minutes=payload.prep_time_minutes,
+    )
+    db.add(new_recipe)
+
+    for ing_in in payload.ingredients:
+        ing_obj = await db.scalar(select(Ingredient).where(Ingredient.name_en == ing_in.ingredient_name))
+        if not ing_obj:
+            ing_obj = Ingredient(
+                name_en=ing_in.ingredient_name,
+                name_fr=ing_in.ingredient_name_fr,
+                category=ing_in.category or "Other",
+            )
+            db.add(ing_obj)
+            await db.flush()
+
+        link = RecipeIngredient(
+            recipe=new_recipe,
+            ingredient=ing_obj,
+            raw_string=ing_in.raw_string,
+            quantity=ing_in.quantity,
+            unit=ing_in.unit,
+        )
+        db.add(link)
+
+    await db.commit()
+    await db.refresh(new_recipe)
+
+    recipe = await db.scalar(
+        select(Recipe)
+        .options(selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient))
+        .where(Recipe.id == new_recipe.id)
+    )
+
+    if not recipe:
+        raise HTTPException(status_code=500, detail="Failed to retrieve created recipe")
 
     return RecipeDetail(
         id=recipe.id,

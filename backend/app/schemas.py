@@ -4,6 +4,23 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
+class RecipeIngredientCreate(BaseModel):
+    raw_string: str = Field(min_length=1, max_length=400)
+    quantity: float = Field(default=1, ge=0)
+    unit: str = Field(default="item", max_length=30)
+    ingredient_name: str = Field(min_length=1, max_length=200)
+    ingredient_name_fr: str | None = Field(default=None, max_length=200)
+    category: str = Field(default="Other", max_length=80)
+
+
+class RecipeCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    instructions_text: str = Field(default="", max_length=50_000)
+    base_servings: int = Field(default=2, ge=1, le=100)
+    prep_time_minutes: int | None = Field(default=None, ge=0, le=1440)
+    ingredients: list[RecipeIngredientCreate] = Field(default_factory=list, max_length=100)
+
+
 class RecipeListItem(BaseModel):
     id: int
     title: str
@@ -102,6 +119,10 @@ class ShoppingListCreateRequest(BaseModel):
 
 class ShoppingListItemPatch(BaseModel):
     is_already_owned: bool
+
+
+class ShoppingListPatch(BaseModel):
+    label: str | None = Field(default=None, max_length=160)
 
 
 class ShoppingListItemOut(BaseModel):

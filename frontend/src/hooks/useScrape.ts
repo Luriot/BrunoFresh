@@ -16,13 +16,12 @@ type JobStreamEvent = {
 export function useScrape() {
   const [loading, setLoading] = useState(false);
   const [scrapeState, setScrapeState] = useState<string | null>(null);
-  const isMountedRef = useRef(true);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    isMountedRef.current = true;
     return () => {
-      isMountedRef.current = false;
+      abortControllerRef.current?.abort();
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
     };
@@ -33,27 +32,56 @@ export function useScrape() {
     eventSourceRef.current = null;
   }, []);
 
-  const watchScrapeJob = useCallback(async (jobId: number, targetUrl: string, onRefresh: RefreshRecipes): Promise<void> => {
+  const beginRun = useCallback((): AbortController => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    return controller;
+  }, []);
+
+  const watchScrapeJob = useCallback(async (
+    jobId: number,
+    targetUrl: string,
+    onRefresh: RefreshRecipes,
+    signal: AbortSignal,
+  ): Promise<void> => {
     closeActiveStream();
 
     await new Promise<void>((resolve) => {
+      if (signal.aborted) {
+        resolve();
+        return;
+      }
+
       const stream = new EventSource(buildJobStreamUrl(jobId), { withCredentials: true });
       eventSourceRef.current = stream;
+      let settled = false;
 
-      const finalize = (nextState: string, shouldRefresh = false) => {
-        if (!isMountedRef.current) {
-          closeActiveStream();
-          resolve();
+      const settle = (nextState?: string, shouldRefresh = false) => {
+        if (settled) {
           return;
         }
+        settled = true;
 
-        setScrapeState(nextState);
+        signal.removeEventListener("abort", onAbort);
         closeActiveStream();
-        if (shouldRefresh) {
+
+        if (nextState && !signal.aborted) {
+          setScrapeState(nextState);
+        }
+
+        if (shouldRefresh && !signal.aborted) {
           void onRefresh();
         }
+
         resolve();
       };
+
+      const onAbort = () => {
+        settle();
+      };
+
+      signal.addEventListener("abort", onAbort, { once: true });
 
       stream.addEventListener("status", (rawEvent) => {
         const evt = rawEvent as MessageEvent<string>;
@@ -65,13 +93,18 @@ export function useScrape() {
           return;
         }
 
+        if (signal.aborted) {
+          settle();
+          return;
+        }
+
         if (payload.status === "completed") {
-          finalize(payload.message || "Recette ajoutée avec succès !", true);
+          settle(payload.message || "Recette ajoutée avec succès !", true);
           return;
         }
 
         if (payload.status === "failed") {
-          finalize(payload.error_message || "Scrape failed.");
+          settle(payload.error_message || "Scrape failed.");
           return;
         }
 
@@ -84,6 +117,11 @@ export function useScrape() {
 
         // Fallback ultra léger (une seule requête) si le stream casse.
         void (async () => {
+          if (signal.aborted) {
+            settle();
+            return;
+          }
+
           try {
             const recipes = await fetchRecipes();
             const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "").toLowerCase();
@@ -91,14 +129,14 @@ export function useScrape() {
             const found = recipes.some((recipe) => normalizeUrl(recipe.url) === target);
 
             if (found) {
-              finalize("Recette ajoutée avec succès !", true);
+              settle("Recette ajoutée avec succès !", true);
               return;
             }
           } catch {
             // ignore and show resilient stream error message below
           }
 
-          finalize("Connexion temps réel interrompue. Utilise Refresh.");
+          settle("Connexion temps réel interrompue. Utilise Refresh.");
         })();
       };
     });
@@ -111,12 +149,18 @@ export function useScrape() {
         return false;
       }
 
-      isMountedRef.current = true;
+      const controller = beginRun();
+      const { signal } = controller;
+
       setLoading(true);
       setScrapeState(null);
 
       try {
         const response = await queueScrape(trimmedUrl);
+
+        if (signal.aborted) {
+          return false;
+        }
 
         if (response.status === "completed") {
           setScrapeState(response.message);
@@ -129,15 +173,15 @@ export function useScrape() {
           return true;
         }
 
-        await watchScrapeJob(response.job_id, trimmedUrl, onRefresh);
+        await watchScrapeJob(response.job_id, trimmedUrl, onRefresh, signal);
         return true;
       } finally {
-        if (isMountedRef.current) {
+        if (!signal.aborted) {
           setLoading(false);
         }
       }
     },
-    [watchScrapeJob]
+    [beginRun, watchScrapeJob]
   );
 
   return {

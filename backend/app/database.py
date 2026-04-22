@@ -11,8 +11,5 @@ Base = declarative_base()
 
 
 async def get_db():
-    db: AsyncSession = SessionLocal()
-    try:
+    async with SessionLocal() as db:
         yield db
-    finally:
-        await db.close()

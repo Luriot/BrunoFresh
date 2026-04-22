@@ -1,3 +1,4 @@
+import ast
 from dataclasses import dataclass
 import asyncio
 import json
@@ -205,7 +206,7 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         })
 
     # Si tous les blocs étaient des en-têtes, pas besoin d'appeler Ollama
-    if not any(input_list):
+    if not any(item is not None for item in input_list):
         return [
             NormalizedIngredient("section_header_ignore", "section_header_ignore", 0, "piece", "Other")
             if item is None
@@ -266,7 +267,6 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         except json.JSONDecodeError as jde:
             logger.error(f"Le JSON de retour BATCH est invalide ! Contenu brut Ollama:\n{raw}\n--- Erreur: {jde}")
             # Si c'est juste un problème de guillemets simples (arrive parfois quand "thinking" leak du pseudo code python), on peut tenter eval:
-            import ast
             try:
                 parsed_array = ast.literal_eval(raw)
                 logger.warning("ast.literal_eval a pu récupérer le tableau malgré l'invalidité JSON stricte.")

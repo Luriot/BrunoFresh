@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type LoginProps = {
   onLogin: (passcode: string) => Promise<void>;
@@ -6,6 +7,7 @@ type LoginProps = {
 };
 
 export function Login({ onLogin, error }: LoginProps) {
+  const { t } = useTranslation();
   const [passcode, setPasscode] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,17 +28,17 @@ export function Login({ onLogin, error }: LoginProps) {
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-orange-200 bg-white p-6 shadow-sm">
-        <h1 className="font-heading text-2xl font-bold text-ink">BrunoFresh</h1>
-        <p className="mt-1 text-sm text-gray-600">Enter passcode to access your recipes.</p>
+      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+        <h1 className="font-heading text-2xl font-bold text-ink dark:text-gray-100">BrunoFresh</h1>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{t("auth.loginPrompt")}</p>
 
         <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
           <input
             type="password"
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
-            placeholder="Passcode"
-            className="w-full rounded-xl border border-orange-200 px-3 py-2 outline-none focus:border-accent"
+            placeholder={t("auth.passcodePlaceholder")}
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
             autoComplete="current-password"
           />
           {error && <p className="text-xs text-red-600">{error}</p>}
@@ -45,7 +47,7 @@ export function Login({ onLogin, error }: LoginProps) {
             className="w-full rounded-xl bg-accent px-4 py-2 font-semibold text-white disabled:opacity-60"
             disabled={submitting}
           >
-            {submitting ? "Signing in..." : "Sign in"}
+            {submitting ? t("auth.signingIn") : t("auth.signIn")}
           </button>
         </form>
       </div>

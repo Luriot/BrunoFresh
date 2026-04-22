@@ -9,6 +9,23 @@ export type CartEntry = {
   target_servings: number;
 };
 
+/** Validate a parsed value has the minimum shape required by CartEntry[]. */
+function isValidCartData(value: unknown): value is CartEntry[] {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+  return value.every(
+    (entry) =>
+      entry !== null &&
+      typeof entry === "object" &&
+      typeof (entry as CartEntry).target_servings === "number" &&
+      (entry as CartEntry).recipe !== null &&
+      typeof (entry as CartEntry).recipe === "object" &&
+      typeof (entry as CartEntry).recipe.id === "number" &&
+      typeof (entry as CartEntry).recipe.title === "string"
+  );
+}
+
 export function useCart() {
   const [cart, setCart] = useState<CartEntry[]>([]);
 
@@ -19,8 +36,12 @@ export function useCart() {
     }
 
     try {
-      const parsed = JSON.parse(raw) as CartEntry[];
-      setCart(parsed);
+      const parsed: unknown = JSON.parse(raw);
+      if (isValidCartData(parsed)) {
+        setCart(parsed);
+      } else {
+        window.localStorage.removeItem(CART_STORAGE_KEY);
+      }
     } catch {
       window.localStorage.removeItem(CART_STORAGE_KEY);
     }
@@ -55,6 +76,10 @@ export function useCart() {
     );
   }
 
+  function clearCart() {
+    setCart([]);
+  }
+
   function toCartInput(): CartInput[] {
     return cart.map((entry) => ({
       recipe_id: entry.recipe.id,
@@ -66,6 +91,7 @@ export function useCart() {
     cart,
     addToCart,
     updateServings,
+    clearCart,
     toCartInput,
   };
 }

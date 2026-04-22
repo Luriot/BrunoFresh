@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,6 +14,7 @@ from ...schemas import (
     ShoppingListItemOut,
     ShoppingListItemPatch,
     ShoppingListOut,
+    ShoppingListPatch,
     ShoppingListRecipeOut,
     ShoppingListSummaryOut,
 )
@@ -226,6 +227,41 @@ async def get_shopping_list(list_id: int, db: AsyncSession = Depends(get_db)):
     if not entity:
         raise HTTPException(status_code=404, detail="Shopping list not found")
     return _list_to_response(entity)
+
+
+@router.patch("/lists/{list_id}", response_model=ShoppingListOut)
+async def patch_shopping_list(
+    list_id: int,
+    payload: ShoppingListPatch,
+    db: AsyncSession = Depends(get_db),
+):
+    entity = await db.scalar(
+        select(ShoppingList)
+        .options(
+            selectinload(ShoppingList.items),
+            selectinload(ShoppingList.recipe_links).selectinload(ShoppingListRecipe.recipe),
+        )
+        .where(ShoppingList.id == list_id)
+    )
+    if not entity:
+        raise HTTPException(status_code=404, detail="Shopping list not found")
+
+    cleaned_label = payload.label.strip() if payload.label else None
+    entity.label = cleaned_label if cleaned_label else None
+    await db.commit()
+    await db.refresh(entity)
+    return _list_to_response(entity)
+
+
+@router.delete("/lists/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_shopping_list(list_id: int, db: AsyncSession = Depends(get_db)):
+    entity = await db.scalar(select(ShoppingList).where(ShoppingList.id == list_id))
+    if not entity:
+        raise HTTPException(status_code=404, detail="Shopping list not found")
+
+    await db.delete(entity)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/lists/{list_id}/items/{item_id}", response_model=ShoppingListItemOut)

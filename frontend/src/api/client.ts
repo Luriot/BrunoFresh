@@ -3,6 +3,8 @@ import type {
   CartInput,
   CartResponse,
   JobStatusResponse,
+  RecipeCreate,
+  RecipeDetail,
   RecipeListItem,
   ScrapeResponse,
   ShoppingList,
@@ -64,6 +66,16 @@ export async function fetchRecipes() {
   return data;
 }
 
+export async function fetchRecipeDetail(id: number) {
+  const { data } = await api.get<RecipeDetail>(`/recipes/${id}`);
+  return data;
+}
+
+export async function createCustomRecipe(payload: RecipeCreate) {
+  const { data } = await api.post<RecipeDetail>("/recipes", payload);
+  return data;
+}
+
 export async function queueScrape(url: string) {
   const { data } = await api.post<ScrapeResponse>("/scrape", { url });
   return data;
@@ -79,8 +91,8 @@ export async function generateCart(items: CartInput[]) {
   return data;
 }
 
-export async function createShoppingList(items: CartInput[]) {
-  const { data } = await api.post<ShoppingList>("/lists", { items });
+export async function createShoppingList(items: CartInput[], label?: string) {
+  const { data } = await api.post<ShoppingList>("/lists", { items, label });
   return data;
 }
 
@@ -92,6 +104,15 @@ export async function fetchShoppingLists() {
 export async function fetchShoppingList(listId: number) {
   const { data } = await api.get<ShoppingList>(`/lists/${listId}`);
   return data;
+}
+
+export async function patchShoppingList(listId: number, label: string | null) {
+  const { data } = await api.patch<ShoppingList>(`/lists/${listId}`, { label });
+  return data;
+}
+
+export async function deleteShoppingList(listId: number) {
+  await api.delete(`/lists/${listId}`);
 }
 
 export async function patchShoppingListItem(listId: number, itemId: number, isAlreadyOwned: boolean) {

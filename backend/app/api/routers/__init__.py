@@ -5,6 +5,7 @@ from .images import router as images_router
 from .lists import router as lists_router
 from .recipes import router as recipes_router
 from .scrape import router as scrape_router
+from .admin import router as admin_router
 
 __all__ = [
     "auth_router",
@@ -14,4 +15,5 @@ __all__ = [
     "lists_router",
     "recipes_router",
     "scrape_router",
+    "admin_router",
 ]

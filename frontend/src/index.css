@@ -5,11 +5,11 @@
 @tailwind utilities;
 
 :root {
-  color: #1f2937;
-  background: radial-gradient(circle at 10% 0%, #fff3e0, #f8f6ee 55%);
+  min-height: 100vh;
 }
 
 body {
   margin: 0;
   font-family: "Manrope", sans-serif;
+  @apply bg-slate-50 text-ink dark:bg-[#1e1e1e] dark:text-gray-200;
 }
