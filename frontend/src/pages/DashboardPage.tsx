@@ -42,7 +42,7 @@ export function DashboardPage({
   onGenerateList,
   onToggleOwned,
   onAddCustomItem,
-}: Props) {
+}: Readonly<Props>) {
   const { t } = useTranslation();
   const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
   const [isCustomRecipeModalOpen, setIsCustomRecipeModalOpen] = useState(false);
@@ -141,11 +141,11 @@ export function DashboardPage({
 
       {isMobilePanelOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/50"
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 cursor-default"
             onClick={() => setIsMobilePanelOpen(false)}
-            role="button"
-            tabIndex={0}
+            aria-label={t("app.close")}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 setIsMobilePanelOpen(false);

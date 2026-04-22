@@ -121,8 +121,7 @@ function App() {
       await loginWithPasscode(passcode);
       setIsAuthenticated(true);
       setAuthError(null);
-      await loadRecipes();
-      await loadShoppingListHistory();
+      // Data loading is handled by the useEffect that watches isAuthenticated.
     } catch {
       setAuthError(t("auth.invalidPasscode"));
     }
@@ -173,10 +172,10 @@ function App() {
   async function onRenameList(listId: number, label: string) {
     try {
       const updated = await patchShoppingList(listId, label || null);
-      setList((previous) => (previous && previous.id === listId ? updated : previous));
+      setList((previous) => (previous?.id === listId ? updated : previous));
       await loadShoppingListHistory();
     } catch {
-      if (list && list.id === listId) {
+      if (list?.id === listId) {
         await openShoppingList(list.id);
       }
     }
@@ -185,9 +184,8 @@ function App() {
   async function onDeleteList(listId: number) {
     try {
       await deleteShoppingList(listId);
-      setList((previous) => (previous && previous.id === listId ? null : previous));
+      setList((previous) => (previous?.id === listId ? null : previous));
       setListHistory((previous) => previous.filter((entry) => entry.id !== listId));
-      await loadShoppingListHistory();
     } catch {
       await loadShoppingListHistory();
     }

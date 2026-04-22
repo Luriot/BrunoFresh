@@ -27,9 +27,12 @@ def _resolve_frontend_dist_dir() -> Path | None:
     return None
 
 
+_NOT_FOUND = "Not Found"
+
+
 def register_spa(app: FastAPI) -> None:
     frontend_dist_dir = _resolve_frontend_dist_dir()
-    
+
     if frontend_dist_dir:
         assets_dir = frontend_dist_dir / "assets"
         if assets_dir.exists() and assets_dir.is_dir():
@@ -44,12 +47,15 @@ def register_spa(app: FastAPI) -> None:
 
         # Ne pas intercepter les appels d'API non résolus ni l'admin SQL
         if full_path.startswith("api") or full_path.startswith("admin"):
-            raise HTTPException(status_code=404, detail="Not Found")
+            raise HTTPException(status_code=404, detail=_NOT_FOUND)
 
         if not frontend_dist_dir:
-            raise HTTPException(status_code=404, detail="Not Found")
+            raise HTTPException(status_code=404, detail=_NOT_FOUND)
 
         if full_path:
+            # Guard against null-byte injection before constructing the path.
+            if "\x00" in full_path:
+                raise HTTPException(status_code=400, detail="Bad Request")
             requested_file = frontend_dist_dir / full_path
             if requested_file.exists() and requested_file.is_file():
                 return FileResponse(requested_file)
@@ -58,4 +64,4 @@ def register_spa(app: FastAPI) -> None:
         if index_file.exists() and index_file.is_file():
             return FileResponse(index_file)
 
-        raise HTTPException(status_code=404, detail="Not Found")
+        raise HTTPException(status_code=404, detail=_NOT_FOUND)

@@ -140,7 +140,7 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
         return None
 
 
-def normalize_fallback(raw_string: str, quantity: float, unit: str) -> NormalizedIngredient | None:
+def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient | None:
     text = raw_string.lower()
 
     def fallback(name_en: str, name_fr: str, qty: float, unit_value: str, category: str) -> NormalizedIngredient:
@@ -325,7 +325,7 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         for idx, res in enumerate(results):
             if res is None:
                 orig = ingredients[idx]
-                results[idx] = normalize_fallback(orig.raw, orig.quantity, orig.unit)
+                results[idx] = normalize_fallback(orig.raw, orig.quantity)
 
         logger.info("Normalisation batch terminée avec succès.")
         return results
@@ -334,4 +334,4 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         logger.error(f"Erreur globale lors de la normalisation BATCH: {exc}", exc_info=True)
         # Si globalement pété (réponse bizarre de Ollama), on fallback tout le monde
         logger.warning("Application du fallback sur la totalité du lot...")
-        return [normalize_fallback(i.raw, i.quantity, i.unit) for i in ingredients]
+        return [normalize_fallback(i.raw, i.quantity) for i in ingredients]

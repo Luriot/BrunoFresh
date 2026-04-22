@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from ...database import get_db
 from ...models import Ingredient, Recipe, RecipeIngredient
-from ...schemas import IngredientPatch, RecipeCreate, RecipeDetail, RecipeIngredientOut, RecipeListItem
+from ...schemas import IngredientDetail, IngredientPatch, RecipeCreate, RecipeDetail, RecipeIngredientOut, RecipeListItem
 
 router = APIRouter(prefix="/api", tags=["recipes"])
 
@@ -127,7 +127,7 @@ async def create_custom_recipe(
     )
 
 
-@router.patch("/ingredients/{ingredient_id}")
+@router.patch("/ingredients/{ingredient_id}", response_model=IngredientDetail)
 async def patch_ingredient(
     ingredient_id: int,
     payload: IngredientPatch,
@@ -142,4 +142,5 @@ async def patch_ingredient(
     ingredient.category = payload.category
     ingredient.is_normalized = True
     await db.commit()
-    return {"status": "updated"}
+    await db.refresh(ingredient)
+    return ingredient

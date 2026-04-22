@@ -116,6 +116,13 @@
     "Condiments": "Condiments",
     "Other": "Other"
   },
+  "scrape": {
+    "success": "Recipe added successfully!",
+    "failed": "Scrape failed.",
+    "inProgress": "Scraping in progress...",
+    "streamError": "Real-time connection interrupted. Try refreshing.",
+    "noJobId": "Scrape job started but no job ID returned."
+  },
   "lang": {
     "switchToEn": "EN",
     "switchToFr": "FR"

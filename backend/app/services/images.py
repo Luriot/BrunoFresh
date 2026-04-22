@@ -11,6 +11,10 @@ from .network import validate_public_host_for_download
 logger = logging.getLogger(__name__)
 
 
+_MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MB
+_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
 async def download_image(image_url: str | None, recipe_id: int) -> str | None:
     if not image_url:
         logger.debug(f"Aucune URL d'image fournie pour la recette {recipe_id}.")
@@ -27,7 +31,18 @@ async def download_image(image_url: str | None, recipe_id: int) -> str | None:
         async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
             response = await client.get(image_url)
             response.raise_for_status()
-            target.write_bytes(response.content)
+
+            content_type = response.headers.get("content-type", "").split(";")[0].strip().lower()
+            if content_type not in _ALLOWED_CONTENT_TYPES:
+                logger.warning(f"Type de contenu non accepté '{content_type}' pour l'image de la recette {recipe_id}.")
+                return None
+
+            content = response.content
+            if len(content) > _MAX_IMAGE_BYTES:
+                logger.warning(f"Image trop volumineuse ({len(content)} octets) pour la recette {recipe_id}.")
+                return None
+
+            target.write_bytes(content)
         rel = Path("images") / target.name
         logger.info(f"Image téléchargée avec succès et sauvegardée sous {rel}")
         return rel.as_posix()

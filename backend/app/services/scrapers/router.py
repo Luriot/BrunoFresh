@@ -4,7 +4,7 @@ import logging
 from urllib.parse import urlparse
 
 from .hellofresh import HelloFreshScraper
-from .static_sites import AllRecipesFrScraper, CuisineAzScraper, JowScraper
+from .static_sites import AllRecipesFrScraper, CuisineAzScraper, JowScraper, StaticRecipeScraper
 from .types import ScrapedRecipe
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ async def scrape_recipe_url(url: str) -> ScrapedRecipe:
         logger.info(f"Utilisation du scraper Jow pour l'URL : {url}")
         return await JowScraper(url).scrape()
 
-    logger.warning(f"Aucun scraper spécifique trouvé pour le domaine '{domain}', tentative avec le fallback (CuisineAz parser).")
-    # Fallback for unsupported domains currently routes to CuisineAz parser logic.
-    return await CuisineAzScraper(url).scrape()
+    # Generic JSON-LD fallback — covers 750g and any other supported domain
+    # that exposes structured recipe data.
+    logger.warning(f"Aucun scraper spécifique trouvé pour le domaine '{domain}', tentative avec le parseur JSON-LD générique.")
+    return await StaticRecipeScraper(url).scrape()

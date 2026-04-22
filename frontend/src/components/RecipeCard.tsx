@@ -8,7 +8,7 @@ type Props = {
   onClick?: (recipe: RecipeListItem) => void;
 };
 
-export function RecipeCard({ recipe, onAdd, onClick }: Props) {
+export function RecipeCard({ recipe, onAdd, onClick }: Readonly<Props>) {
   const { t } = useTranslation();
 
   return (

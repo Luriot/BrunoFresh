@@ -37,7 +37,7 @@ function extractApiDetail(error: unknown): string | null {
   return null;
 }
 
-export function CustomRecipeModal({ onClose, onCreated }: Props) {
+export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,12 +129,13 @@ export function CustomRecipeModal({ onClose, onCreated }: Props) {
     }
   };
 
+  // dialog is an interactive element; onKeyDown for Escape is intentional
   return (
-    <div
+    <dialog
+      open
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      role="dialog"
-      aria-modal="true"
-      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}  /* eslint-disable-line jsx-a11y/no-noninteractive-element-interactions */
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
     >
       <div
         className="absolute inset-0"
@@ -276,6 +277,6 @@ export function CustomRecipeModal({ onClose, onCreated }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

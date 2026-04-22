@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +19,9 @@ from ...schemas import (
 
 router = APIRouter(prefix="/api", tags=["lists"])
 
+_LIST_NOT_FOUND = "Shopping list not found"
+_ITEM_NOT_FOUND = "Shopping list item not found"
+
 
 def _parse_needs_review(blob: str | None) -> list[str]:
     if not blob:
@@ -32,7 +33,7 @@ async def _aggregate_recipe_items(
     payload_items: list[CartRecipeIn],
     db: AsyncSession,
 ) -> tuple[list[dict], list[str]]:
-    grouped: dict[tuple[str, str, str | None, str, int | None], dict] = defaultdict(dict)
+    grouped: dict[tuple[str, str, str | None, str, int | None], dict] = {}
     needs_review: list[str] = []
 
     if not payload_items:
@@ -67,8 +68,7 @@ async def _aggregate_recipe_items(
                 link.unit,
                 link.ingredient.id,
             )
-            row = grouped.get(key)
-            if not row:
+            if key not in grouped:
                 grouped[key] = {
                     "category": link.ingredient.category,
                     "name": link.ingredient.name_en,
@@ -77,9 +77,7 @@ async def _aggregate_recipe_items(
                     "quantity": 0.0,
                     "ingredient_id": link.ingredient.id,
                 }
-                row = grouped[key]
-
-            row["quantity"] += link.quantity * multiplier
+            grouped[key]["quantity"] += link.quantity * multiplier
 
     aggregated_rows = sorted(
         (
@@ -182,7 +180,7 @@ async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSess
         .where(ShoppingList.id == shopping_list.id)
     )
     if not entity:
-        raise HTTPException(status_code=404, detail="Shopping list not found")
+        raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
     return _list_to_response(entity)
 
 
@@ -225,7 +223,7 @@ async def get_shopping_list(list_id: int, db: AsyncSession = Depends(get_db)):
         .where(ShoppingList.id == list_id)
     )
     if not entity:
-        raise HTTPException(status_code=404, detail="Shopping list not found")
+        raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
     return _list_to_response(entity)
 
 
@@ -244,12 +242,24 @@ async def patch_shopping_list(
         .where(ShoppingList.id == list_id)
     )
     if not entity:
-        raise HTTPException(status_code=404, detail="Shopping list not found")
+        raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
 
     cleaned_label = payload.label.strip() if payload.label else None
     entity.label = cleaned_label if cleaned_label else None
     await db.commit()
-    await db.refresh(entity)
+
+    # Re-query with eager loading instead of refresh — db.refresh() expires
+    # lazy relationships which cannot be loaded in an async context.
+    entity = await db.scalar(
+        select(ShoppingList)
+        .options(
+            selectinload(ShoppingList.items),
+            selectinload(ShoppingList.recipe_links).selectinload(ShoppingListRecipe.recipe),
+        )
+        .where(ShoppingList.id == list_id)
+    )
+    if not entity:
+        raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
     return _list_to_response(entity)
 
 
@@ -257,7 +267,7 @@ async def patch_shopping_list(
 async def delete_shopping_list(list_id: int, db: AsyncSession = Depends(get_db)):
     entity = await db.scalar(select(ShoppingList).where(ShoppingList.id == list_id))
     if not entity:
-        raise HTTPException(status_code=404, detail="Shopping list not found")
+        raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
 
     await db.delete(entity)
     await db.commit()
@@ -278,7 +288,7 @@ async def patch_shopping_list_item(
         )
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Shopping list item not found")
+        raise HTTPException(status_code=404, detail=_ITEM_NOT_FOUND)
 
     item.is_already_owned = payload.is_already_owned
     await db.commit()
@@ -294,7 +304,7 @@ async def add_custom_shopping_list_item(
 ):
     exists = await db.scalar(select(ShoppingList.id).where(ShoppingList.id == list_id))
     if not exists:
-        raise HTTPException(status_code=404, detail="Shopping list not found")
+        raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
 
     current_max = await db.scalar(
         select(func.max(ShoppingListItem.sort_order)).where(ShoppingListItem.shopping_list_id == list_id)

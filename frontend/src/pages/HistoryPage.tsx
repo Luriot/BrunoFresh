@@ -8,7 +8,7 @@ type Props = {
   onDeleteList: (listId: number) => Promise<void>;
 };
 
-export function HistoryPage({ lists, onDeleteList }: Props) {
+export function HistoryPage({ lists, onDeleteList }: Readonly<Props>) {
   const { t } = useTranslation();
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -72,9 +72,6 @@ export function HistoryPage({ lists, onDeleteList }: Props) {
                 </p>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   {t("history.owned", { count: entry.already_owned_items })}
-                </p>
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  {new Date(entry.created_at).toLocaleString()}
                 </p>
               </article>
             ))}

@@ -1,7 +1,7 @@
 import asyncio
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import AsyncIterator
+from typing import AsyncGenerator
 
 
 @dataclass
@@ -22,7 +22,7 @@ class JobEventBus:
         for queue in listeners:
             await queue.put(event)
 
-    async def subscribe(self, job_id: int) -> AsyncIterator[asyncio.Queue[JobEvent]]:
+    async def subscribe(self, job_id: int) -> AsyncGenerator[asyncio.Queue[JobEvent], None]:
         queue: asyncio.Queue[JobEvent] = asyncio.Queue()
         async with self._lock:
             self._listeners[job_id].add(queue)
@@ -32,11 +32,10 @@ class JobEventBus:
         finally:
             async with self._lock:
                 listeners = self._listeners.get(job_id)
-                if listeners is None:
-                    return
-                listeners.discard(queue)
-                if not listeners:
-                    self._listeners.pop(job_id, None)
+                if listeners is not None:
+                    listeners.discard(queue)
+                    if not listeners:
+                        self._listeners.pop(job_id, None)
 
 
 job_event_bus = JobEventBus()

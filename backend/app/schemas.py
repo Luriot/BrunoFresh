@@ -169,3 +169,13 @@ class IngredientPatch(BaseModel):
     name_en: str
     name_fr: str | None = None
     category: str
+
+
+class IngredientDetail(BaseModel):
+    id: int
+    name_en: str
+    name_fr: str | None = None
+    category: str
+    is_normalized: bool
+
+    model_config = ConfigDict(from_attributes=True)

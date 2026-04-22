@@ -28,16 +28,21 @@ async def import_db(file: UploadFile = File(...)):
     if not (filename.endswith(".db") or filename.endswith(".sqlite") or filename.endswith(".sqlite3")):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload a SQLite database file.")
 
+    content = await file.read()
+    await file.close()
+
+    # Validate SQLite magic bytes ("SQLite format 3\000") before overwriting the live DB.
+    _SQLITE_MAGIC = b"SQLite format 3\x00"
+    if not content.startswith(_SQLITE_MAGIC):
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid SQLite database.")
+
     temp_path = settings.db_file.with_suffix(".temp")
     try:
-        content = await file.read()
         await asyncio.to_thread(temp_path.write_bytes, content)
         await asyncio.to_thread(shutil.move, str(temp_path), str(settings.db_file))
     except Exception:
         if temp_path.exists():
             temp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail="Failed to import database.")
-    finally:
-        await file.close()
 
     return {"message": "Database imported successfully."}

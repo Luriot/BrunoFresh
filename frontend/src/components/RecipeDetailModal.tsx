@@ -9,7 +9,7 @@ type Props = {
   onAddToCart: () => void;
 };
 
-export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Props) {
+export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<Props>) {
   const { t } = useTranslation();
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,13 +43,13 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Props) {
   }, [recipeId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true" onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}>  {/* eslint-disable-line jsx-a11y/no-noninteractive-element-interactions */}
+    <dialog open tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}>
       <div
         className="fixed inset-0 bg-black/50 transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl overflow-y-auto">
+      <div className="relative flex max-h-full w-full max-w-2xl flex-col overflow-y-auto rounded-2xl bg-white shadow-2xl">
         {loading ? (
           <div className="flex h-64 items-center justify-center">
             <svg
@@ -66,7 +66,8 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Props) {
               ></path>
             </svg>
           </div>
-        ) : error || !recipe ? (
+        ) : null}
+        {!loading && (error || !recipe) ? (
           <div className="flex pl-6 pr-6 pt-6 pb-6 h-64 flex-col items-center justify-center gap-4 text-center">
             <p className="text-red-500">{t("error.loadFailed")}</p>
             <button
@@ -76,7 +77,8 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Props) {
               {t("app.close")}
             </button>
           </div>
-        ) : (
+        ) : null}
+        {!loading && recipe ? (
           <>
             <div className="relative h-64 w-full shrink-0 bg-green-50 sm:h-80">
               {recipe.image_local_path ? (
@@ -106,7 +108,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Props) {
                 <h2 className="font-heading text-2xl font-bold text-ink sm:text-3xl">{recipe.title}</h2>
                 <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
                   <span>{recipe.source_domain}</span>
-                  {recipe.base_servings && (
+                  {Boolean(recipe.base_servings) && (
                     <span className="font-medium text-accent">
                       {recipe.base_servings} {t("recipe.servings")}
                     </span>
@@ -176,8 +178,8 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Props) {
               </button>
             </div>
           </>
-        )}
+        ) : null}
       </div>
-    </div>
+    </dialog>
   );
 }

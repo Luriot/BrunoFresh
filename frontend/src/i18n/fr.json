@@ -116,6 +116,13 @@
     "Condiments": "Condiments",
     "Other": "Autres"
   },
+  "scrape": {
+    "success": "Recette ajoutée avec succès !",
+    "failed": "Échec du scraping.",
+    "inProgress": "Scraping en cours...",
+    "streamError": "Connexion temps réel interrompue. Rafraîchissez la page.",
+    "noJobId": "Job de scraping démarré mais aucun ID retourné."
+  },
   "lang": {
     "switchToEn": "EN",
     "switchToFr": "FR"

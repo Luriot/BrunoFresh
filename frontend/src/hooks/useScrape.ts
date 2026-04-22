@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { buildJobStreamUrl, fetchRecipes, queueScrape } from "../api/client";
+import i18n from "../i18n/config";
 
 type RefreshRecipes = () => Promise<void>;
 
@@ -12,6 +13,39 @@ type JobStreamEvent = {
   message?: string | null;
   error_message?: string | null;
 };
+
+type SettleFn = (message?: string, refresh?: boolean) => void;
+
+/**
+ * Handles SSE stream errors by polling the recipe list once to check whether
+ * the scrape actually completed despite the broken connection.
+ */
+async function handleStreamError(
+  targetUrl: string,
+  signal: AbortSignal,
+  settle: SettleFn,
+): Promise<void> {
+  if (signal.aborted) {
+    settle();
+    return;
+  }
+
+  try {
+    const recipes = await fetchRecipes();
+    const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "").toLowerCase();
+    const target = normalizeUrl(targetUrl);
+    const found = recipes.some((recipe) => normalizeUrl(recipe.url) === target);
+
+    if (found) {
+      settle(i18n.t("scrape.success"), true);
+      return;
+    }
+  } catch {
+    // ignore and show resilient stream error message below
+  }
+
+  settle(i18n.t("scrape.streamError"));
+}
 
 export function useScrape() {
   const [loading, setLoading] = useState(false);
@@ -99,16 +133,16 @@ export function useScrape() {
         }
 
         if (payload.status === "completed") {
-          settle(payload.message || "Recette ajoutée avec succès !", true);
+          settle(payload.message || i18n.t("scrape.success"), true);
           return;
         }
 
         if (payload.status === "failed") {
-          settle(payload.error_message || "Scrape failed.");
+          settle(payload.error_message || i18n.t("scrape.failed"));
           return;
         }
 
-        setScrapeState(payload.message || "Scraping in progress...");
+        setScrapeState(payload.message || i18n.t("scrape.inProgress"));
       });
 
       stream.onerror = () => {
@@ -116,28 +150,7 @@ export function useScrape() {
         closeActiveStream();
 
         // Fallback ultra léger (une seule requête) si le stream casse.
-        void (async () => {
-          if (signal.aborted) {
-            settle();
-            return;
-          }
-
-          try {
-            const recipes = await fetchRecipes();
-            const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "").toLowerCase();
-            const target = normalizeUrl(targetUrl);
-            const found = recipes.some((recipe) => normalizeUrl(recipe.url) === target);
-
-            if (found) {
-              settle("Recette ajoutée avec succès !", true);
-              return;
-            }
-          } catch {
-            // ignore and show resilient stream error message below
-          }
-
-          settle("Connexion temps réel interrompue. Utilise Refresh.");
-        })();
+        void handleStreamError(targetUrl, signal, settle);
       };
     });
   }, [closeActiveStream]);
@@ -169,7 +182,7 @@ export function useScrape() {
         }
 
         if (!response.job_id) {
-          setScrapeState("Scrape job started but no job id returned.");
+          setScrapeState(i18n.t("scrape.noJobId"));
           return true;
         }
 
