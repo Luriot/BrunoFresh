@@ -1,16 +1,22 @@
 import { FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ShoppingList as ShoppingListType } from "../types";
+import { UnitSelector } from "./UnitSelector";
+
+type CustomItemPayload = { name: string; quantity: number; unit: string };
 
 type Props = {
   data: ShoppingListType | null;
   onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
-  onAddCustomItem: (name: string) => Promise<void>;
+  onAddCustomItem: (payload: CustomItemPayload) => Promise<void>;
 };
 
-export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
+export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Readonly<Props>) {
   const { t, i18n } = useTranslation();
   const [customName, setCustomName] = useState("");
+  const [customQty, setCustomQty] = useState<number>(1);
+  const [customUnit, setCustomUnit] = useState("unité");
+  const [copied, setCopied] = useState(false);
 
   if (!data) {
     return <p className="text-sm text-gray-600 dark:text-gray-400">{t("shopping.empty")}</p>;
@@ -25,8 +31,37 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
     if (!trimmed) {
       return;
     }
-    await onAddCustomItem(trimmed);
+    await onAddCustomItem({ name: trimmed, quantity: customQty, unit: customUnit });
     setCustomName("");
+    setCustomQty(1);
+    setCustomUnit("unité");
+  }
+
+  async function handleCopy() {
+    const grouped = toBuy.reduce<Record<string, typeof toBuy>>((acc, item) => {
+      const cat = item.category || "Other";
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+      return acc;
+    }, {});
+
+    const lines: string[] = [];
+    for (const [cat, items] of Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))) {
+      const catLabel = t(`category.${cat}`);
+      lines.push(`── ${catLabel} ──`);
+      for (const item of items) {
+        const name = i18n.language === "fr" && item.name_fr ? item.name_fr : item.name;
+        lines.push(`• ${item.quantity} ${item.unit} ${name}`);
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API not available
+    }
   }
 
   function renderItems(items: ShoppingListType["items"], isOwnedTarget: boolean) {
@@ -58,27 +93,53 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Props) {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
-        <h4 className="mb-2 font-heading text-lg font-semibold text-ink dark:text-gray-100">{t("shopping.toBuy")}</h4>
-        {renderItems(toBuy, true)}
-      </section>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="font-heading text-lg font-semibold text-ink dark:text-gray-100">{t("shopping.toBuy")}</h4>
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              disabled={toBuy.length === 0}
+              className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-gray-50 disabled:opacity-40 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
+            >
+              {copied ? t("shopping.copied") : t("shopping.copy")}
+            </button>
+          </div>
+          {renderItems(toBuy, true)}
+        </section>
 
-      <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/10">
-        <h4 className="mb-2 font-heading text-lg font-semibold text-emerald-900 dark:text-emerald-400">
-          {t("shopping.alreadyOwned")}
-        </h4>
-        {renderItems(alreadyOwned, false)}
-      </section>
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/10">
+          <h4 className="mb-2 font-heading text-lg font-semibold text-emerald-900 dark:text-emerald-400">
+            {t("shopping.alreadyOwned")}
+          </h4>
+          {renderItems(alreadyOwned, false)}
+        </section>
+      </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
         <h4 className="mb-2 font-heading text-lg font-semibold text-ink dark:text-gray-100">{t("shopping.addManual")}</h4>
-        <form className="flex gap-2" onSubmit={onCustomSubmit}>
+        <form className="flex flex-wrap gap-2" onSubmit={onCustomSubmit}>
           <input
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+            className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
             maxLength={200}
             onChange={(event) => setCustomName(event.target.value)}
             placeholder={t("shopping.manualPlaceholder")}
             value={customName}
+          />
+          <input
+            type="number"
+            step="0.1"
+            min="0.1"
+            max="9999"
+            className="w-20 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            value={customQty}
+            onChange={(e) => setCustomQty(Math.max(0.1, Number(e.target.value) || 1))}
+          />
+          <UnitSelector
+            value={customUnit}
+            onChange={setCustomUnit}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
           />
           <button className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white" type="submit">
             +

@@ -216,16 +216,16 @@ function App() {
     }
   }
 
-  async function onAddCustomItem(name: string) {
+  async function onAddCustomItem(payload: { name: string; quantity: number; unit: string }) {
     if (!list) {
       return;
     }
 
     try {
       const item = await addShoppingListCustomItem(list.id, {
-        name,
-        quantity: 1,
-        unit: "item",
+        name: payload.name,
+        quantity: payload.quantity,
+        unit: payload.unit,
         category: "Other",
       });
       setList((previous) => {

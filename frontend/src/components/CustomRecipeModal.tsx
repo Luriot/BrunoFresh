@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createCustomRecipe } from "../api/client";
 import type { RecipeCreate, RecipeIngredientCreate, RecipeDetail } from "../types";
+import { UnitSelector } from "./UnitSelector";
 
 type Props = {
   onClose: () => void;
@@ -50,7 +51,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
   const [ingredients, setIngredients] = useState<RecipeIngredientCreate[]>([]);
   const [ingRaw, setIngRaw] = useState("");
   const [ingQty, setIngQty] = useState<number | "">(1);
-  const [ingUnit, setIngUnit] = useState("item");
+  const [ingUnit, setIngUnit] = useState("unité");
   const [ingName, setIngName] = useState("");
   const [ingCat, setIngCat] = useState("Other");
 
@@ -68,16 +69,16 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
     setIngredients((prev) => [
       ...prev,
       {
-        raw_string: ingRaw.trim() || `${safeQty || 1} ${ingUnit.trim() || "item"} ${cleanName}`,
+        raw_string: ingRaw.trim() || `${safeQty || 1} ${ingUnit} ${cleanName}`,
         quantity: Number.isFinite(safeQty) && safeQty > 0 ? safeQty : 1,
-        unit: ingUnit.trim() || "item",
+        unit: ingUnit,
         ingredient_name: cleanName,
         category: ingCat,
       },
     ]);
     setIngRaw("");
     setIngQty(1);
-    setIngUnit("item");
+    setIngUnit("unité");
     setIngName("");
     setIngCat("Other");
   };
@@ -107,7 +108,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
       const normalizedIngredients: RecipeIngredientCreate[] = ingredients.map((ingredient) => ({
         ...ingredient,
         raw_string: (ingredient.raw_string || "").trim(),
-        unit: (ingredient.unit || "item").trim() || "item",
+        unit: ingredient.unit,
         ingredient_name: (ingredient.ingredient_name || "").trim(),
       }));
 
@@ -241,11 +242,10 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
                   value={ingQty}
                   onChange={(e) => setIngQty(e.target.value ? Number(e.target.value) : "")}
                 />
-                <input
-                  placeholder={t("customRecipe.fields.unit")}
-                  className="rounded border p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                <UnitSelector
                   value={ingUnit}
-                  onChange={(e) => setIngUnit(e.target.value)}
+                  onChange={setIngUnit}
+                  className="rounded border p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                 />
                 <button
                   type="button"

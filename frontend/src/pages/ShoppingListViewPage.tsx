@@ -9,7 +9,7 @@ type Props = {
   onOpenShoppingList: (listId: number) => Promise<void>;
   onRenameList: (listId: number, label: string) => Promise<void>;
   onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
-  onAddCustomItem: (name: string) => Promise<void>;
+  onAddCustomItem: (payload: { name: string; quantity: number; unit: string }) => Promise<void>;
 };
 
 export function ShoppingListViewPage({

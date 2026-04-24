@@ -49,7 +49,9 @@
     "renamePlaceholder": "List name",
     "save": "Save",
     "cancel": "Cancel",
-    "weekLabel": "Week {{week}}"
+    "weekLabel": "Week {{week}}",
+    "copy": "Copy list",
+    "copied": "Copied!"
   },
   "history": {
     "title": "History",

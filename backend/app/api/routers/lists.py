@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from ...database import get_db
 from ...models import Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe
+from ...services.normalizer import normalize_unit
 from ...schemas import (
     CartRecipeIn,
     ShoppingListCreateRequest,
@@ -61,11 +62,13 @@ async def _aggregate_recipe_items(
                 needs_review.append(f"{recipe.title}: {link.raw_string}")
                 continue
 
+            raw_qty = link.quantity * multiplier
+            norm_unit, norm_qty = normalize_unit(link.unit, raw_qty)
             key = (
                 link.ingredient.category,
                 link.ingredient.name_en,
                 link.ingredient.name_fr,
-                link.unit,
+                norm_unit,
                 link.ingredient.id,
             )
             if key not in grouped:
@@ -73,11 +76,11 @@ async def _aggregate_recipe_items(
                     "category": link.ingredient.category,
                     "name": link.ingredient.name_en,
                     "name_fr": link.ingredient.name_fr,
-                    "unit": link.unit,
+                    "unit": norm_unit,
                     "quantity": 0.0,
                     "ingredient_id": link.ingredient.id,
                 }
-            grouped[key]["quantity"] += link.quantity * multiplier
+            grouped[key]["quantity"] += norm_qty
 
     aggregated_rows = sorted(
         (

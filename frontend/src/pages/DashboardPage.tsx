@@ -23,7 +23,7 @@ type Props = {
   onClearCart: () => void;
   onGenerateList: () => Promise<void>;
   onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
-  onAddCustomItem: (name: string) => Promise<void>;
+  onAddCustomItem: (payload: { name: string; quantity: number; unit: string }) => Promise<void>;
 };
 
 export function DashboardPage({

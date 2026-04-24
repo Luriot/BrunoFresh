@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from ...database import get_db
 from ...models import Recipe, RecipeIngredient
 from ...schemas import CartGroupItem, CartRequest, CartResponse
+from ...services.normalizer import normalize_unit
 
 router = APIRouter(prefix="/api", tags=["cart"])
 
@@ -42,9 +43,11 @@ async def generate_cart(payload: CartRequest, db: AsyncSession = Depends(get_db)
                 needs_review.append(f"{recipe.title}: {link.raw_string}")
                 continue
 
+            raw_qty = link.quantity * multiplier
+            norm_unit, norm_qty = normalize_unit(link.unit, raw_qty)
             category = link.ingredient.category
-            key = (link.ingredient.name_en, link.unit)
-            grouped[category][key] += link.quantity * multiplier
+            key = (link.ingredient.name_en, norm_unit)
+            grouped[category][key] += norm_qty
 
     response_grouped: dict[str, list[CartGroupItem]] = {}
     for category, values in grouped.items():

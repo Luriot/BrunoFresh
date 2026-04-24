@@ -42,15 +42,81 @@ def _coerce_category(value: str) -> str:
     return "Other"
 
 
+# ── Canonical units (metric / European) ─────────────────────────────────────
+CANONICAL_UNITS: dict[str, list[str]] = {
+    "Poids":   ["g", "kg"],
+    "Volume":  ["ml", "cl", "L"],
+    "Cuisine": ["c. à soupe", "c. à thé", "tasse"],
+    "Compte":  ["unité", "botte", "tranche", "boîte", "paquet", "gousse"],
+    "Autre":   ["pincée", "au goût", "filet"],
+}
+
+_ALL_CANONICAL: frozenset[str] = frozenset(u for units in CANONICAL_UNITS.values() for u in units)
+_CANONICAL_LOWER: dict[str, str] = {u.lower(): u for u in _ALL_CANONICAL}
+
+# Alias map: non-canonical string → canonical unit (no quantity conversion)
+_UNIT_ALIASES: dict[str, str] = {
+    "piece": "unité", "pieces": "unité", "pcs": "unité", "pc": "unité",
+    "pièce": "unité", "pièces": "unité", "item": "unité", "items": "unité",
+    "unit": "unité", "units": "unité",
+    "bunch": "botte", "bouquet": "botte",
+    "slice": "tranche", "slices": "tranche",
+    "can": "boîte", "cans": "boîte", "tin": "boîte", "tins": "boîte",
+    "package": "paquet", "packages": "paquet", "pack": "paquet", "sachet": "paquet",
+    "clove": "gousse", "cloves": "gousse",
+    "pinch": "pincée", "pinches": "pincée",
+    "to taste": "au goût", "as needed": "au goût", "as required": "au goût",
+    "drizzle": "filet",
+    "tablespoon": "c. à soupe", "tablespoons": "c. à soupe", "tbsp": "c. à soupe",
+    "teaspoon": "c. à thé", "teaspoons": "c. à thé", "tsp": "c. à thé",
+    "cup": "tasse", "cups": "tasse",
+    "gram": "g", "grams": "g", "gramme": "g", "grammes": "g",
+    "kilogram": "kg", "kilograms": "kg", "kilogramme": "kg", "kilogrammes": "kg",
+    "milliliter": "ml", "milliliters": "ml", "millilitre": "ml", "millilitres": "ml",
+    "centiliter": "cl", "centiliters": "cl", "centilitre": "cl", "centilitres": "cl",
+    "liter": "L", "liters": "L", "litre": "L", "litres": "L",
+}
+
+# Conversion map: non-metric unit → (canonical unit, conversion factor)
+_UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
+    "oz":           ("g",  28.3495),
+    "ounce":        ("g",  28.3495),
+    "ounces":       ("g",  28.3495),
+    "lb":           ("kg", 0.453592),
+    "lbs":          ("kg", 0.453592),
+    "pound":        ("kg", 0.453592),
+    "pounds":       ("kg", 0.453592),
+    "fl oz":        ("ml", 29.5735),
+    "fl. oz":       ("ml", 29.5735),
+    "fluid ounce":  ("ml", 29.5735),
+    "fluid ounces": ("ml", 29.5735),
+}
+
+
+def normalize_unit(unit: str, quantity: float) -> tuple[str, float]:
+    """Return (canonical_unit, converted_quantity) for the given raw unit string."""
+    raw = (unit or "").strip().lower()
+
+    # Already canonical?
+    if raw in _CANONICAL_LOWER:
+        return _CANONICAL_LOWER[raw], quantity
+
+    # Non-metric → metric conversion
+    if raw in _UNIT_CONVERSIONS:
+        canonical, factor = _UNIT_CONVERSIONS[raw]
+        return canonical, round(quantity * factor, 4)
+
+    # Alias without quantity conversion
+    if raw in _UNIT_ALIASES:
+        return _UNIT_ALIASES[raw], quantity
+
+    # Unknown unit: default to "unité"
+    return "unité", quantity
+
+
 def _coerce_unit(value: str) -> str:
-    unit = (value or "piece").lower().strip()
-    if unit in {"g", "gram", "grams"}:
-        return "g"
-    if unit in {"ml", "milliliter", "milliliters"}:
-        return "ml"
-    if unit in {"piece", "pieces", "pc"}:
-        return "piece"
-    return "piece"
+    canonical, _ = normalize_unit(value or "", 1.0)
+    return canonical
 
 
 def _coerce_name_fr(value: str, fallback_name_en: str) -> str:
@@ -64,10 +130,11 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
     safe_raw = _sanitize_raw_ingredient(raw_string)
     raw = ""
     categories = ", ".join(settings.categories)
+    canonical_units = ", ".join(u for units in CANONICAL_UNITS.values() for u in units)
     prompt = (
         "You are an ingredient parser. Return strict JSON only with keys: "
         "name_en, name_fr, quantity, unit, category. "
-        "Allowed units: g, ml, piece. "
+        f"Allowed units (metric/European only): {canonical_units}. "
         f"Allowed categories: {categories}. "
         "Translate ingredient names to both English and French. "
         "Do not return markdown. "
@@ -148,10 +215,10 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
     
     # Ignorer les en-têtes de sections du type "Pour la sauce..." ou "Pour le gâteau..."
     if text.startswith("pour la ") or text.startswith("pour le ") or text.startswith("pour les "):
-        return fallback("section_header_ignore", "section_header_ignore", 0, "piece", "Other")
+        return fallback("section_header_ignore", "section_header_ignore", 0, "unité", "Other")
 
     if "garlic" in text or "ail" in text:
-        return fallback("garlic", "ail", quantity, "piece", "Produce")
+        return fallback("garlic", "ail", quantity, "unité", "Produce")
     if "tomato" in text or "tomate" in text:
         return fallback("tomato", "tomate", quantity, "g", "Produce")
     if "olive oil" in text or "huile" in text:
@@ -163,7 +230,7 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
     if "beurre" in text or "butter" in text:
         return fallback("butter", "beurre", quantity, "g", "Dairy")
     if "oignon" in text or "onion" in text:
-        return fallback("onion", "oignon", quantity, "piece", "Produce")
+        return fallback("onion", "oignon", quantity, "unité", "Produce")
     if "lait" in text or "milk" in text:
         return fallback("milk", "lait", quantity, "ml", "Dairy")
     if "farine" in text or "flour" in text:
@@ -181,7 +248,7 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
     if "herbe" in text or "herb" in text:
         return fallback("mixed herbs", "herbes melangees", max(1, quantity), "g", "Spices")
     if "lasagne" in text or "pâte" in text or "pasta" in text:
-        return fallback("lasagna sheets", "feuilles de lasagne", quantity, "piece", "Pantry")
+        return fallback("lasagna sheets", "feuilles de lasagne", quantity, "unité", "Pantry")
         
     return None
 
@@ -222,7 +289,7 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         "The root MUST be a JSON object with a single key 'ingredients' containing an array of all processed objects. "
         "Each object must have exactly these keys: idx, name_en, name_fr, quantity, unit, category. "
         'Example output:\n{"ingredients": [{"idx": 0, "name_en": "tomato", "name_fr": "tomate", "quantity": 300.0, "unit": "g", "category": "Produce"}]}\n'
-        "Allowed units: g, ml, piece. "
+        f"Allowed units (metric/European only): {', '.join(u for units in CANONICAL_UNITS.values() for u in units)}. "
         f"Allowed categories: {categories_str}. "
         "Translate ALL ingredient names to both English and French. "
         "Process ALL items from the input array. Maintain the exact idx passed.\n\n"
@@ -298,7 +365,7 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         for idx, item in enumerate(input_list):
             if item is None:
                 results[idx] = NormalizedIngredient(
-                    "section_header_ignore", "section_header_ignore", 0, "piece", "Other"
+                    "section_header_ignore", "section_header_ignore", 0, "unité", "Other"
                 )
 
         for item in parsed_array:
