@@ -40,22 +40,25 @@ export function HistoryPage({ lists, onDeleteList }: Readonly<Props>) {
             {lists.map((entry) => (
               <article
                 key={entry.id}
-                className="rounded-xl border border-gray-200 bg-green-50 p-4 transition hover:-translate-y-0.5 hover:shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]"
+                className="relative rounded-xl border border-gray-200 bg-green-50 p-4 transition hover:-translate-y-0.5 hover:shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]"
               >
-                <div className="flex items-start justify-between gap-3">
+                {/* Full-card link — sits behind all other content */}
+                <Link
+                  to={`/lists/${entry.id}`}
+                  className="absolute inset-0 z-0 rounded-xl"
+                  aria-label={entry.label || t("history.defaultLabel")}
+                />
+                <div className="relative z-10 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">#{entry.id}</p>
-                    <Link
-                      to={`/lists/${entry.id}`}
-                      className="mt-1 block truncate text-lg font-semibold text-ink underline-offset-2 hover:underline dark:text-gray-200"
-                    >
+                    <p className="mt-1 truncate text-lg font-semibold text-ink dark:text-gray-200">
                       {entry.label || t("history.defaultLabel")}
-                    </Link>
+                    </p>
                   </div>
                   <button
                     type="button"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-                    onClick={() => void handleDelete(entry.id)}
+                    className="relative z-20 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                    onClick={() => handleDelete(entry.id)}
                     disabled={deletingId === entry.id}
                     aria-label={t("history.delete")}
                     title={t("history.delete")}
@@ -67,10 +70,10 @@ export function HistoryPage({ lists, onDeleteList }: Readonly<Props>) {
                     </svg>
                   </button>
                 </div>
-                <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                <p className="relative z-10 mt-2 text-sm text-gray-700 dark:text-gray-300">
                   {t("history.items", { count: entry.total_items })}
                 </p>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
+                <p className="relative z-10 text-sm text-gray-700 dark:text-gray-300">
                   {t("history.owned", { count: entry.already_owned_items })}
                 </p>
               </article>

@@ -47,7 +47,7 @@ CANONICAL_UNITS: dict[str, list[str]] = {
     "Poids":   ["g", "kg"],
     "Volume":  ["ml", "cl", "L"],
     "Cuisine": ["c. à soupe", "c. à thé", "tasse"],
-    "Compte":  ["unité", "botte", "tranche", "boîte", "paquet", "gousse"],
+    "Compte":  ["piece", "botte", "tranche", "boîte", "paquet", "gousse"],
     "Autre":   ["pincée", "au goût", "filet"],
 }
 
@@ -56,9 +56,9 @@ _CANONICAL_LOWER: dict[str, str] = {u.lower(): u for u in _ALL_CANONICAL}
 
 # Alias map: non-canonical string → canonical unit (no quantity conversion)
 _UNIT_ALIASES: dict[str, str] = {
-    "piece": "unité", "pieces": "unité", "pcs": "unité", "pc": "unité",
-    "pièce": "unité", "pièces": "unité", "item": "unité", "items": "unité",
-    "unit": "unité", "units": "unité",
+    "piece": "piece", "pieces": "piece", "pcs": "piece", "pc": "piece",
+    "pièce": "piece", "pièces": "piece", "item": "piece", "items": "piece",
+    "unit": "piece", "units": "piece", "unité": "piece", "unités": "piece",
     "bunch": "botte", "bouquet": "botte",
     "slice": "tranche", "slices": "tranche",
     "can": "boîte", "cans": "boîte", "tin": "boîte", "tins": "boîte",
@@ -110,8 +110,8 @@ def normalize_unit(unit: str, quantity: float) -> tuple[str, float]:
     if raw in _UNIT_ALIASES:
         return _UNIT_ALIASES[raw], quantity
 
-    # Unknown unit: default to "unité"
-    return "unité", quantity
+    # Unknown unit: default to "piece"
+    return "piece", quantity
 
 
 def _coerce_unit(value: str) -> str:
@@ -215,10 +215,10 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
     
     # Ignorer les en-têtes de sections du type "Pour la sauce..." ou "Pour le gâteau..."
     if text.startswith("pour la ") or text.startswith("pour le ") or text.startswith("pour les "):
-        return fallback("section_header_ignore", "section_header_ignore", 0, "unité", "Other")
+        return fallback("section_header_ignore", "section_header_ignore", 0, "piece", "Other")
 
     if "garlic" in text or "ail" in text:
-        return fallback("garlic", "ail", quantity, "unité", "Produce")
+        return fallback("garlic", "ail", quantity, "piece", "Produce")
     if "tomato" in text or "tomate" in text:
         return fallback("tomato", "tomate", quantity, "g", "Produce")
     if "olive oil" in text or "huile" in text:
@@ -230,7 +230,7 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
     if "beurre" in text or "butter" in text:
         return fallback("butter", "beurre", quantity, "g", "Dairy")
     if "oignon" in text or "onion" in text:
-        return fallback("onion", "oignon", quantity, "unité", "Produce")
+        return fallback("onion", "oignon", quantity, "piece", "Produce")
     if "lait" in text or "milk" in text:
         return fallback("milk", "lait", quantity, "ml", "Dairy")
     if "farine" in text or "flour" in text:
@@ -248,7 +248,7 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
     if "herbe" in text or "herb" in text:
         return fallback("mixed herbs", "herbes melangees", max(1, quantity), "g", "Spices")
     if "lasagne" in text or "pâte" in text or "pasta" in text:
-        return fallback("lasagna sheets", "feuilles de lasagne", quantity, "unité", "Pantry")
+        return fallback("lasagna sheets", "feuilles de lasagne", quantity, "piece", "Pantry")
         
     return None
 
@@ -365,7 +365,7 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         for idx, item in enumerate(input_list):
             if item is None:
                 results[idx] = NormalizedIngredient(
-                    "section_header_ignore", "section_header_ignore", 0, "unité", "Other"
+                    "section_header_ignore", "section_header_ignore", 0, "piece", "Other"
                 )
 
         for item in parsed_array:

@@ -51,7 +51,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
   const [ingredients, setIngredients] = useState<RecipeIngredientCreate[]>([]);
   const [ingRaw, setIngRaw] = useState("");
   const [ingQty, setIngQty] = useState<number | "">(1);
-  const [ingUnit, setIngUnit] = useState("unité");
+  const [ingUnit, setIngUnit] = useState("piece");
   const [ingName, setIngName] = useState("");
   const [ingCat, setIngCat] = useState("Other");
 
@@ -78,7 +78,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
     ]);
     setIngRaw("");
     setIngQty(1);
-    setIngUnit("unité");
+    setIngUnit("piece");
     setIngName("");
     setIngCat("Other");
   };

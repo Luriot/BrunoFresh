@@ -40,14 +40,14 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
     <dialog
       open
       tabIndex={-1}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
 
       {/* Modal card */}
-      <div className="relative z-10 flex w-full max-w-2xl flex-col rounded-t-2xl bg-white shadow-2xl dark:bg-[#252526] dark:text-gray-100 sm:rounded-2xl" style={{ maxHeight: "92dvh" }}>
+      <div className="relative z-10 flex w-full max-w-2xl flex-col rounded-2xl border border-gray-200 bg-white dark:border-[#3e3e42] dark:bg-[#252526] dark:text-gray-100" style={{ maxHeight: "92dvh" }}>
 
         {/* Loading */}
         {loading && (
@@ -76,7 +76,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
         {!loading && recipe && (
           <>
             {/* Hero image — fixed height, never scrolls */}
-            <div className="relative h-48 w-full shrink-0 overflow-hidden rounded-t-2xl bg-green-50 dark:bg-[#1e1e1e] sm:h-64">
+              <div className="relative h-48 w-full shrink-0 overflow-hidden rounded-t-2xl bg-green-50 dark:bg-[#1e1e1e] sm:h-60">
               {recipe.image_local_path ? (
                 <img
                   className="h-full w-full object-cover"
@@ -168,7 +168,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
             </div>
 
             {/* Sticky footer */}
-            <div className="shrink-0 border-t border-gray-100 bg-gray-50 p-3 dark:border-[#3e3e42] dark:bg-[#1e1e1e] sm:p-4">
+            <div className="shrink-0 rounded-b-2xl border-t border-gray-100 bg-gray-50 p-3 dark:border-[#3e3e42] dark:bg-[#1e1e1e] sm:p-4">
               <div className="flex justify-end gap-2">
                 {recipe.url && (
                   <a

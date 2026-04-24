@@ -9,7 +9,7 @@ const UNIT_GROUPS: { label: string; units: string[] }[] = [
   { label: "Poids",   units: ["g", "kg"] },
   { label: "Volume",  units: ["ml", "cl", "L"] },
   { label: "Cuisine", units: ["c. à soupe", "c. à thé", "tasse"] },
-  { label: "Compte",  units: ["unité", "botte", "tranche", "boîte", "paquet", "gousse"] },
+  { label: "Compte",  units: ["piece", "botte", "tranche", "boîte", "paquet", "gousse"] },
   { label: "Autre",   units: ["pincée", "au goût", "filet"] },
 ];
 

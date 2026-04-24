@@ -15,7 +15,7 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Readonly<
   const { t, i18n } = useTranslation();
   const [customName, setCustomName] = useState("");
   const [customQty, setCustomQty] = useState<number>(1);
-  const [customUnit, setCustomUnit] = useState("unité");
+  const [customUnit, setCustomUnit] = useState("piece");
   const [copied, setCopied] = useState(false);
 
   if (!data) {
@@ -34,7 +34,7 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Readonly<
     await onAddCustomItem({ name: trimmed, quantity: customQty, unit: customUnit });
     setCustomName("");
     setCustomQty(1);
-    setCustomUnit("unité");
+    setCustomUnit("piece");
   }
 
   async function handleCopy() {
@@ -103,7 +103,16 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Readonly<
               disabled={toBuy.length === 0}
               className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-gray-50 disabled:opacity-40 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
             >
-              {copied ? t("shopping.copied") : t("shopping.copy")}
+              {copied ? (
+                <svg className="h-4 w-4 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-label={t("shopping.copied")}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-label={t("shopping.copy")}>
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+              )}
             </button>
           </div>
           {renderItems(toBuy, true)}

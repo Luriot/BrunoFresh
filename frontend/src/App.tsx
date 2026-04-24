@@ -35,6 +35,18 @@ function getIsoWeekNumber(date: Date): number {
 function App() {
   const { t } = useTranslation();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isDark, setIsDark] = useState(() => {
+    const stored = localStorage.getItem("brunofresh.theme");
+    if (stored) return stored === "dark";
+    return globalThis.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+    localStorage.setItem("brunofresh.theme", isDark ? "dark" : "light");
+  }, [isDark]);
+
+  const toggleDark = useCallback(() => setIsDark((d) => !d), []);
   const [authError, setAuthError] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const { cart, addToCart, updateServings, clearCart, toCartInput } = useCart();
@@ -257,7 +269,7 @@ function App() {
 
   return (
     <div className="min-h-screen text-ink">
-      <Navbar onLogout={onLogout} />
+      <Navbar onLogout={onLogout} isDark={isDark} onToggleDark={toggleDark} />
       <Routes>
         <Route
           path="/"
