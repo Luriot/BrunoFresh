@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { RecipeCard } from "../components/RecipeCard";
 import { ShoppingList } from "../components/ShoppingList";
@@ -6,17 +6,16 @@ import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
 import type { CartEntry } from "../hooks/useCart";
-import type { RecipeListItem, ShoppingList as ShoppingListType } from "../types";
+import type { RecipeListItem, ShoppingList as ShoppingListType, StatsOut, Tag } from "../types";
+import { fetchStats, fetchTags, fetchRecipes } from "../api/client";
 
 type Props = {
-  url: string;
-  setUrl: (value: string) => void;
   loading: boolean;
   scrapeState: string | null;
   recipes: RecipeListItem[];
   cart: CartEntry[];
   list: ShoppingListType | null;
-  onScrape: () => Promise<void>;
+  onScrape: (urls: string[]) => Promise<void>;
   onRefreshRecipes: () => Promise<void>;
   onAddToCart: (recipe: RecipeListItem) => void;
   onUpdateServings: (recipeId: number, servings: number) => void;
@@ -24,11 +23,10 @@ type Props = {
   onGenerateList: () => Promise<void>;
   onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
   onAddCustomItem: (payload: { name: string; quantity: number; unit: string }) => Promise<void>;
+  onRecipesChanged: (recipes: RecipeListItem[]) => void;
 };
 
 export function DashboardPage({
-  url,
-  setUrl,
   loading,
   scrapeState,
   recipes,
@@ -42,46 +40,117 @@ export function DashboardPage({
   onGenerateList,
   onToggleOwned,
   onAddCustomItem,
+  onRecipesChanged,
 }: Readonly<Props>) {
   const { t } = useTranslation();
   const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
   const [isCustomRecipeModalOpen, setIsCustomRecipeModalOpen] = useState(false);
   const [selectedRecipeToView, setSelectedRecipeToView] = useState<RecipeListItem | null>(null);
+
+  // Search + filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [stats, setStats] = useState<StatsOut | null>(null);
+
+  // URL input (managed locally — no need to lift to App)
+  const [urlInput, setUrlInput] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    fetchTags().then(setAllTags).catch(() => {});
+    fetchStats().then(setStats).catch(() => {});
+  }, []);
+
+  // Debounced server-side filter — runs only after user interacts (skips first render)
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void fetchRecipes({
+        q: searchQuery || undefined,
+        is_favorite: showFavoritesOnly || undefined,
+        tags: selectedTagIds.length > 0 ? selectedTagIds.join(",") : undefined,
+      }).then(onRecipesChanged).catch(() => {});
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchQuery, selectedTagIds, showFavoritesOnly, onRecipesChanged]);
+
+  function toggleTagFilter(tagId: number) {
+    setSelectedTagIds((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
+  }
+
+  async function handleMultiScrape() {
+    const urls = urlInput.split(/\n|,/).map((u) => u.trim()).filter(Boolean);
+    if (urls.length === 0) return;
+    setUrlInput("");
+    await onScrape(urls);
+  }
+
   const recipeCount = recipes.length;
 
   return (
     <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 pb-28 sm:px-6 lg:grid-cols-3 lg:px-8 lg:pb-10">
       <section className="space-y-4 lg:col-span-2">
+        {/* Stats mini-widget */}
+        {stats && (
+          <div className="flex flex-wrap gap-3">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+              <p className="text-2xl font-bold text-accent">{stats.total_recipes}</p>
+              <p className="text-xs text-gray-500">{t("stats.totalRecipes")}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+              <p className="text-2xl font-bold text-accent">{stats.total_lists}</p>
+              <p className="text-xs text-gray-500">{t("stats.totalLists")}</p>
+            </div>
+            {stats.recipes_by_source[0] && (
+              <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+                <p className="text-sm font-bold text-ink dark:text-gray-100">{stats.recipes_by_source[0].source_domain}</p>
+                <p className="text-xs text-gray-500">{t("stats.topSource")} ({stats.recipes_by_source[0].count})</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Scrape input card */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
-          <div className="flex flex-col gap-2 sm:flex-row flex-wrap xl:flex-nowrap">
-            <input
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
-              placeholder={t("app.urlPlaceholder")}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
+          <div className="flex flex-col gap-2">
+            <textarea
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+              placeholder={`${t("app.urlPlaceholder")} (${t("app.urlPerLine")})`}
+              rows={2}
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
             />
-            <button
-              className="shrink-0 whitespace-nowrap rounded-xl bg-accent px-4 py-2 font-semibold text-white"
-              onClick={() => void onScrape()}
-              disabled={loading}
-              type="button"
-            >
-              {loading ? t("app.scraping") : t("app.scrape")}
-            </button>
-            <button
-              className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 px-4 py-2 dark:border-[#3e3e42] dark:text-gray-200"
-              onClick={() => void onRefreshRecipes()}
-              type="button"
-            >
-              {t("app.refresh")}
-            </button>
-            <button
-              className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 font-medium hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#2d2d30] dark:hover:bg-[#3e3e42] dark:text-gray-200"
-              onClick={() => setIsCustomRecipeModalOpen(true)}
-              type="button"
-            >
-              {t("app.customRecipe")}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="shrink-0 whitespace-nowrap rounded-xl bg-accent px-4 py-2 font-semibold text-white"
+                onClick={() => void handleMultiScrape()}
+                disabled={loading}
+                type="button"
+              >
+                {loading ? t("app.scraping") : t("app.scrape")}
+              </button>
+              <button
+                className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 px-4 py-2 dark:border-[#3e3e42] dark:text-gray-200"
+                onClick={() => void onRefreshRecipes()}
+                type="button"
+              >
+                {t("app.refresh")}
+              </button>
+              <button
+                className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 font-medium hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#2d2d30] dark:hover:bg-[#3e3e42] dark:text-gray-200"
+                onClick={() => setIsCustomRecipeModalOpen(true)}
+                type="button"
+              >
+                {t("app.customRecipe")}
+              </button>
+            </div>
           </div>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t("app.recipesLoaded", { count: recipeCount })}</p>
           {scrapeState && (
@@ -106,13 +175,53 @@ export function DashboardPage({
           )}
         </div>
 
+        {/* Search + filter bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+            placeholder={`🔍 ${t("app.searchPlaceholder")}`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => setShowFavoritesOnly((v) => !v)}
+            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${showFavoritesOnly ? "border-red-300 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
+          >
+            ♥ {t("app.favoritesFilter")}
+          </button>
+        </div>
+
+        {/* Tag filter chips */}
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {allTags.map((tag) => {
+              const active = selectedTagIds.includes(tag.id);
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => toggleTagFilter(tag.id)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${active ? "text-white" : "border border-gray-300 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
+                  style={active ? { backgroundColor: tag.color ?? "#6b7280" } : undefined}
+                >
+                  {tag.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {recipes.map((recipe) => (
-            <RecipeCard 
-               key={recipe.id} 
-               recipe={recipe} 
-               onAdd={onAddToCart} 
+            <RecipeCard
+               key={recipe.id}
+               recipe={recipe}
+               onAdd={onAddToCart}
                onClick={setSelectedRecipeToView}
+               onFavoriteToggled={(updated) => {
+                 onRecipesChanged(recipes.map((r) => r.id === updated.id ? updated : r));
+               }}
             />
           ))}
         </div>

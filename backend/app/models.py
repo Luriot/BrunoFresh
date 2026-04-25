@@ -1,9 +1,18 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Table, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
+
+
+# Many-to-many association table for recipe tags
+recipe_tags = Table(
+    "recipe_tags",
+    Base.metadata,
+    Column("recipe_id", Integer, ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Recipe(Base):
@@ -18,6 +27,7 @@ class Recipe(Base):
     instructions_text: Mapped[str] = mapped_column(Text)
     base_servings: Mapped[int] = mapped_column(Integer, default=2)
     prep_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False)
 
     recipe_ingredients: Mapped[list["RecipeIngredient"]] = relationship(
         "RecipeIngredient", back_populates="recipe", cascade="all, delete-orphan"
@@ -25,6 +35,7 @@ class Recipe(Base):
     shopping_list_links: Mapped[list["ShoppingListRecipe"]] = relationship(
         "ShoppingListRecipe", back_populates="recipe", cascade="all, delete-orphan"
     )
+    tags: Mapped[list["Tag"]] = relationship("Tag", secondary=recipe_tags, back_populates="recipes")
 
 
 class Ingredient(Base):
@@ -119,3 +130,55 @@ class ShoppingListItem(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     shopping_list: Mapped[ShoppingList] = relationship("ShoppingList", back_populates="items")
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    color: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    recipes: Mapped[list["Recipe"]] = relationship("Recipe", secondary=recipe_tags, back_populates="tags")
+
+
+class PantryItem(Base):
+    __tablename__ = "pantry_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ingredient_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ingredients.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    name_fr: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ingredient: Mapped["Ingredient | None"] = relationship("Ingredient")
+
+
+class MealPlan(Base):
+    __tablename__ = "meal_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    label: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    week_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    entries: Mapped[list["MealPlanEntry"]] = relationship(
+        "MealPlanEntry", back_populates="meal_plan", cascade="all, delete-orphan"
+    )
+
+
+class MealPlanEntry(Base):
+    __tablename__ = "meal_plan_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    meal_plan_id: Mapped[int] = mapped_column(ForeignKey("meal_plans.id", ondelete="CASCADE"), index=True)
+    recipe_id: Mapped[int] = mapped_column(ForeignKey("recipes.id", ondelete="CASCADE"))
+    day_of_week: Mapped[int] = mapped_column(Integer)  # 0=Monday … 6=Sunday
+    meal_slot: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    target_servings: Mapped[int] = mapped_column(Integer, default=2)
+
+    meal_plan: Mapped[MealPlan] = relationship("MealPlan", back_populates="entries")
+    recipe: Mapped[Recipe] = relationship("Recipe")

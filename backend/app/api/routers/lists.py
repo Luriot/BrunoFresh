@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ...database import get_db
-from ...models import Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe
+from ...models import PantryItem, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe
 from ...services.normalizer import normalize_unit
 from ...schemas import (
     CartRecipeIn,
@@ -122,6 +122,11 @@ def _list_to_response(entity: ShoppingList) -> ShoppingListOut:
 async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSession = Depends(get_db)):
     aggregated_items, needs_review = await _aggregate_recipe_items(payload.items, db)
 
+    # Load pantry for auto-checking items already in stock
+    pantry_items = (await db.scalars(select(PantryItem))).all()
+    pantry_ingredient_ids: set[int] = {p.ingredient_id for p in pantry_items if p.ingredient_id is not None}
+    pantry_names_lower: set[str] = {p.name.strip().lower() for p in pantry_items}
+
     shopping_list = ShoppingList(
         label=payload.label,
         needs_review_blob="\n".join(needs_review) if needs_review else None,
@@ -140,6 +145,10 @@ async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSess
 
     sort_order = 0
     for row in aggregated_items:
+        in_pantry = (
+            (row["ingredient_id"] is not None and row["ingredient_id"] in pantry_ingredient_ids)
+            or row["name"].strip().lower() in pantry_names_lower
+        )
         db.add(
             ShoppingListItem(
                 shopping_list_id=shopping_list.id,
@@ -150,7 +159,7 @@ async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSess
                 unit=row["unit"],
                 category=row["category"],
                 is_custom=False,
-                is_already_owned=False,
+                is_already_owned=in_pantry,
                 sort_order=sort_order,
             )
         )
@@ -297,6 +306,25 @@ async def patch_shopping_list_item(
     await db.commit()
     await db.refresh(item)
     return ShoppingListItemOut.model_validate(item)
+
+
+@router.delete("/lists/{list_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_shopping_list_item(
+    list_id: int,
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    item = await db.scalar(
+        select(ShoppingListItem).where(
+            ShoppingListItem.id == item_id,
+            ShoppingListItem.shopping_list_id == list_id,
+        )
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail=_ITEM_NOT_FOUND)
+    await db.delete(item)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/lists/{list_id}/items", response_model=ShoppingListItemOut)

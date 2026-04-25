@@ -18,9 +18,6 @@ class Settings(BaseModel):
     environment: str = os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).strip().lower()
     db_file: Path = Path(__file__).resolve().parent.parent / "data" / "database.db"
     images_dir: Path = Path(__file__).resolve().parent.parent / "data" / "images"
-    hf_state_file: Path = Path(__file__).resolve().parent.parent / "data" / "hf_state.json"
-    hf_email: str | None = os.getenv("HF_EMAIL")
-    hf_password: str | None = os.getenv("HF_PASSWORD")
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen2.5:14b-instruct")
     allowed_origins: tuple[str, ...] = tuple(
@@ -90,4 +87,3 @@ def _validate_security_settings(current: Settings) -> None:
 settings = Settings()
 _validate_security_settings(settings)
 settings.images_dir.mkdir(parents=True, exist_ok=True)
-settings.hf_state_file.parent.mkdir(parents=True, exist_ok=True)

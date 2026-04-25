@@ -86,24 +86,3 @@ class StaticRecipeScraper(BaseScraper):
             prep_time_minutes=None,
             ingredients=ingredients or self._fallback_recipe().ingredients,
         )
-
-
-class CuisineAzScraper(StaticRecipeScraper):
-    title_selectors = ("h1", "[data-testid='recipe-title']")
-    image_selectors = (".recipe-media img", "figure img")
-    ingredient_selectors = (".ingredient", ".recipe_ingredients li", "li[data-testid='ingredient-item']")
-    instruction_selectors = (".recipe-preparation__list li", ".preparation li", "[data-testid='instruction-step']")
-
-
-class AllRecipesFrScraper(StaticRecipeScraper):
-    title_selectors = ("h1",)
-    image_selectors = ("article img", ".lead-media img")
-    ingredient_selectors = (".mntl-structured-ingredients__list-item", ".ingredients-item", "li")
-    instruction_selectors = (".mntl-sc-block-group--LI li", ".comp.recipe__steps-content li", "ol li")
-
-
-class JowScraper(StaticRecipeScraper):
-    title_selectors = ("h1", "[data-testid='recipe-title']")
-    image_selectors = ("img[alt*='recipe']", "picture img")
-    ingredient_selectors = ("[data-testid='ingredient']", ".ingredient-item", "li")
-    instruction_selectors = ("[data-testid='instruction-step']", ".step", "ol li")

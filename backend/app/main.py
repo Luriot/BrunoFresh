@@ -18,8 +18,11 @@ from .api.routers import (
     health_router,
     images_router,
     lists_router,
+    meal_plans_router,
+    pantry_router,
     recipes_router,
     scrape_router,
+    tags_router,
     admin_router,
 )
 from .config import settings
@@ -43,6 +46,9 @@ app.include_router(recipes_router, dependencies=[Depends(require_auth)])
 app.include_router(scrape_router, dependencies=[Depends(require_auth)])
 app.include_router(cart_router, dependencies=[Depends(require_auth)])
 app.include_router(lists_router, dependencies=[Depends(require_auth)])
+app.include_router(tags_router, dependencies=[Depends(require_auth)])
+app.include_router(pantry_router, dependencies=[Depends(require_auth)])
+app.include_router(meal_plans_router, dependencies=[Depends(require_auth)])
 app.include_router(admin_router, dependencies=[Depends(require_auth)])
 
 # SQLAdmin DOIT être initialisé AVANT d'enregistrer le catch-all du SPA

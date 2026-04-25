@@ -3,13 +3,17 @@
     "title": "BrunoFresh",
     "subtitle": "Scrape recipes, build a smart grocery list.",
     "urlPlaceholder": "Paste recipe URL",
+    "urlPerLine": "one URL per line",
     "scrape": "Scrape",
     "scraping": "Scraping...",
     "refresh": "Refresh",
     "recipesLoaded": "Recipes loaded: {{count}}",
     "checkingSession": "Checking session...",
+    "loading": "Loading...",
     "close": "Close",
-    "customRecipe": "Create Custom Recipe"
+    "customRecipe": "Create Custom Recipe",
+    "searchPlaceholder": "Search recipes...",
+    "favoritesFilter": "Favorites"
   },
   "recipe": {
     "noImage": "No image yet",
@@ -19,13 +23,24 @@
     "minutes": "mins",
     "ingredients": "Ingredients",
     "instructions": "Instructions",
-    "noIngredients": "No ingredients listed."
+    "noIngredients": "No ingredients listed.",
+    "noInstructions": "No instructions available.",
+    "tags": "Tags",
+    "noTags": "No tags — manage tags in Settings",
+    "favorite": "Add to favorites",
+    "unfavorite": "Remove from favorites",
+    "similar": "You might also like...",
+    "rescrape": "Update",
+    "cookMode": "Cook Mode",
+    "rescrapingInProgress": "In progress...",
+    "rescrapeQueued": "Update started, reloading in 4 s...",
+    "rescrapeError": "Error during re-scraping."
   },
   "cart": {
     "title": "Cart",
     "empty": "No recipes selected yet.",
     "servings": "Servings",
-    "generate": "Generate Shopping List",
+    "generate": "Generate List",
     "clear": "Clear cart",
     "decreaseServings": "Decrease servings",
     "increaseServings": "Increase servings",
@@ -51,7 +66,8 @@
     "cancel": "Cancel",
     "weekLabel": "Week {{week}}",
     "copy": "Copy list",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "deleteItem": "Remove item"
   },
   "history": {
     "title": "History",
@@ -65,7 +81,10 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "history": "History"
+    "history": "History",
+    "pantry": "Pantry",
+    "mealPlanner": "Meal Planner",
+    "ingredientsAdmin": "Ingredients"
   },
   "auth": {
     "logout": "Logout",
@@ -128,5 +147,84 @@
   "lang": {
     "switchToEn": "EN",
     "switchToFr": "FR"
+  },
+  "cookMode": {
+    "title": "Cook Mode",
+    "step": "Step {{current}} of {{total}}",
+    "prev": "Previous",
+    "next": "Next",
+    "formatWithAI": "Reformat with Ollama",
+    "formatting": "Reformatting...",
+    "formatError": "Ollama error. Please retry.",
+    "stepDot": "Step {{step}}"
+  },
+  "pantry": {
+    "title": "My Pantry",
+    "subtitle": "Ingredients already at home — automatically marked as owned in new lists.",
+    "add": "Add to pantry",
+    "namePlaceholder": "Ingredient name",
+    "nameFrPlaceholder": "French name (optional)",
+    "category": "Category",
+    "empty": "Your pantry is empty.",
+    "remove": "Remove"
+  },
+  "mealPlanner": {
+    "title": "Meal Planner",
+    "newPlan": "New plan",
+    "labelPlaceholder": "Plan name (optional)",
+    "weekStart": "Week start",
+    "generateList": "Generate List",
+    "emptyDay": "Drop a recipe",
+    "days": {
+      "0": "Monday",
+      "1": "Tuesday",
+      "2": "Wednesday",
+      "3": "Thursday",
+      "4": "Friday",
+      "5": "Saturday",
+      "6": "Sunday"
+    },
+    "slots": {
+      "breakfast": "Breakfast",
+      "lunch": "Lunch",
+      "dinner": "Dinner",
+      "snack": "Snack"
+    },
+    "servingsLabel": "Servings: {{count}}",
+    "listGenerated": "Shopping list generated!",
+    "noPlanSelected": "Select or create a meal plan.",
+    "chooseRecipe": "-- Select a recipe --",
+    "addEntry": "Add",
+    "mealHeader": "Meal",
+    "mealsCount": "({{count}} meals)",
+    "generateError": "Error generating list.",
+    "confirmDelete": "Delete this plan?"
+  },
+  "ingredients": {
+    "title": "Ingredients Admin",
+    "search": "Search ingredients...",
+    "needsReview": "Needs review only",
+    "nameEn": "English name",
+    "nameFr": "French name",
+    "category": "Category",
+    "save": "Save",
+    "mergeInto": "Merge",
+    "mergeLabel": "Merge:",
+    "sourcePlaceholder": "Source...",
+    "targetPlaceholder": "Target...",
+    "confirmMerge": "Merge '{{source}}' into '{{target}}'? This cannot be undone.",
+    "merged": "Merged successfully.",
+    "saveSuccess": "Saved.",
+    "saveError": "Error saving.",
+    "mergeError": "Error during merge.",
+    "edit": "Edit",
+    "usages": "Usages",
+    "noResults": "No ingredients found."
+  },
+  "stats": {
+    "totalRecipes": "Recipes",
+    "totalLists": "Lists",
+    "topSource": "Top source",
+    "topIngredient": "Top ingredient"
   }
 }

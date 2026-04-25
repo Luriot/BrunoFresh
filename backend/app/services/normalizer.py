@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import asyncio
 import json
 import logging
+import re
 
 import httpx
 
@@ -207,14 +208,20 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
         return None
 
 
+_SECTION_HEADER_RE = re.compile(
+    r"^(pour|for|sauce|marinade|garniture|dressing|topping|filling|croûte|crust|glaze|glaçage|base|pastry)",
+    re.IGNORECASE,
+)
+
+
 def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient | None:
     text = raw_string.lower()
 
     def fallback(name_en: str, name_fr: str, qty: float, unit_value: str, category: str) -> NormalizedIngredient:
         return NormalizedIngredient(name_en, name_fr, qty, unit_value, category)
-    
-    # Ignorer les en-têtes de sections du type "Pour la sauce..." ou "Pour le gâteau..."
-    if text.startswith("pour la ") or text.startswith("pour le ") or text.startswith("pour les "):
+
+    # Ignorer les en-têtes de sections (multilingue)
+    if _SECTION_HEADER_RE.match(raw_string.strip()):
         return fallback("section_header_ignore", "section_header_ignore", 0, "piece", "Other")
 
     if "garlic" in text or "ail" in text:
@@ -260,8 +267,8 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
     input_list: list[dict[str, float | str | int] | None] = []
     for i, ing in enumerate(ingredients):
         safe_raw = _sanitize_raw_ingredient(ing.raw)
-        # On pré-filtre les en-têtes directement ici au lieu de le faire via le LLM
-        if safe_raw.lower().startswith("pour la ") or safe_raw.lower().startswith("pour le ") or safe_raw.lower().startswith("pour les "):
+        # On pré-filtre les en-têtes de section directement ici (multilingue)
+        if _SECTION_HEADER_RE.match(safe_raw.strip()):
             input_list.append(None)
             continue
             

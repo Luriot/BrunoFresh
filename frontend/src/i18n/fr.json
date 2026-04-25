@@ -3,13 +3,17 @@
     "title": "BrunoFresh",
     "subtitle": "Scrapez des recettes et construisez une liste de courses intelligente.",
     "urlPlaceholder": "Collez une URL de recette",
+    "urlPerLine": "une URL par ligne",
     "scrape": "Scraper",
     "scraping": "Scraping...",
     "refresh": "Rafraîchir",
     "recipesLoaded": "Recettes chargées : {{count}}",
     "checkingSession": "Vérification de session...",
+    "loading": "Chargement...",
     "close": "Fermer",
-    "customRecipe": "Créer une recette"
+    "customRecipe": "Créer une recette",
+    "searchPlaceholder": "Rechercher des recettes...",
+    "favoritesFilter": "Favoris"
   },
   "recipe": {
     "noImage": "Pas encore d'image",
@@ -19,7 +23,18 @@
     "minutes": "min",
     "ingredients": "Ingrédients",
     "instructions": "Instructions",
-    "noIngredients": "Aucun ingrédient listé."
+    "noIngredients": "Aucun ingrédient listé.",
+    "noInstructions": "Aucune instruction disponible.",
+    "tags": "Tags",
+    "noTags": "Aucun tag — gérez les tags dans les paramètres",
+    "favorite": "Ajouter aux favoris",
+    "unfavorite": "Retirer des favoris",
+    "similar": "Vous aimerez aussi...",
+    "rescrape": "Mettre à jour",
+    "cookMode": "Mode cuisine",
+    "rescrapingInProgress": "En cours...",
+    "rescrapeQueued": "Mise à jour lancée, rechargement dans 4 s...",
+    "rescrapeError": "Erreur lors du re-scraping."
   },
   "cart": {
     "title": "Panier",
@@ -51,7 +66,8 @@
     "cancel": "Annuler",
     "weekLabel": "Semaine {{week}}",
     "copy": "Copier la liste",
-    "copied": "Copié !"
+    "copied": "Copié !",
+    "deleteItem": "Retirer l'article"
   },
   "history": {
     "title": "Historique",
@@ -65,7 +81,10 @@
   },
   "nav": {
     "dashboard": "Accueil",
-    "history": "Historique"
+    "history": "Historique",
+    "pantry": "Garde-manger",
+    "mealPlanner": "Planificateur",
+    "ingredientsAdmin": "Ingrédients"
   },
   "auth": {
     "logout": "Déconnexion",
@@ -128,5 +147,84 @@
   "lang": {
     "switchToEn": "EN",
     "switchToFr": "FR"
+  },
+  "cookMode": {
+    "title": "Mode cuisine",
+    "step": "Étape {{current}} sur {{total}}",
+    "prev": "Précédent",
+    "next": "Suivant",
+    "formatWithAI": "Reformatter avec Ollama",
+    "formatting": "Reformatage...",
+    "formatError": "Erreur Ollama. Réessayez.",
+    "stepDot": "Étape {{step}}"
+  },
+  "pantry": {
+    "title": "Mon garde-manger",
+    "subtitle": "Ingrédients déjà à la maison — marqués automatiquement comme possédés dans les nouvelles listes.",
+    "add": "Ajouter",
+    "namePlaceholder": "Nom de l'ingrédient",
+    "nameFrPlaceholder": "Nom français (optionnel)",
+    "category": "Catégorie",
+    "empty": "Votre garde-manger est vide.",
+    "remove": "Retirer"
+  },
+  "mealPlanner": {
+    "title": "Planificateur de repas",
+    "newPlan": "Nouveau plan",
+    "labelPlaceholder": "Nom du plan (optionnel)",
+    "weekStart": "Début de semaine",
+    "generateList": "Générer la liste de courses",
+    "emptyDay": "Ajouter une recette",
+    "days": {
+      "0": "Lundi",
+      "1": "Mardi",
+      "2": "Mercredi",
+      "3": "Jeudi",
+      "4": "Vendredi",
+      "5": "Samedi",
+      "6": "Dimanche"
+    },
+    "slots": {
+      "breakfast": "Petit-déjeuner",
+      "lunch": "Déjeuner",
+      "dinner": "Dîner",
+      "snack": "Collation"
+    },
+    "servingsLabel": "Portions : {{count}}",
+    "listGenerated": "Liste de courses générée !",
+    "noPlanSelected": "Sélectionnez ou créez un plan de repas.",
+    "chooseRecipe": "-- Choisir une recette --",
+    "addEntry": "Ajouter",
+    "mealHeader": "Repas",
+    "mealsCount": "({{count}} repas)",
+    "generateError": "Erreur lors de la génération.",
+    "confirmDelete": "Supprimer ce plan ?"
+  },
+  "ingredients": {
+    "title": "Admin ingrédients",
+    "search": "Rechercher des ingrédients...",
+    "needsReview": "À vérifier seulement",
+    "nameEn": "Nom anglais",
+    "nameFr": "Nom français",
+    "category": "Catégorie",
+    "save": "Enregistrer",
+    "mergeInto": "Fusionner",
+    "mergeLabel": "Fusion :",
+    "sourcePlaceholder": "Source...",
+    "targetPlaceholder": "Cible...",
+    "confirmMerge": "Fusionner '{{source}}' dans '{{target}}' ? Cette action est irréversible.",
+    "merged": "Fusion réussie.",
+    "saveSuccess": "Enregistré.",
+    "saveError": "Erreur lors de la sauvegarde.",
+    "mergeError": "Erreur lors de la fusion.",
+    "edit": "Modifier",
+    "usages": "Usages",
+    "noResults": "Aucun ingrédient trouvé."
+  },
+  "stats": {
+    "totalRecipes": "Recettes",
+    "totalLists": "Listes",
+    "topSource": "Source principale",
+    "topIngredient": "Ingrédient principal"
   }
 }

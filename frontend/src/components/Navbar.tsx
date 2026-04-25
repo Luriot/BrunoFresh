@@ -10,6 +10,9 @@ type Props = {
 export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
   const { t, i18n } = useTranslation();
 
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `rounded-lg px-3 py-1 ${isActive ? "bg-accent font-semibold text-white" : "text-gray-700 dark:text-gray-300 dark:hover:text-white"}`;
+
   return (
     <header className="mx-auto max-w-7xl px-4 pb-4 pt-8 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white/80 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-[#3e3e42] dark:bg-[#1e1e1e]/80">
@@ -19,24 +22,12 @@ export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <nav className="flex rounded-xl border border-gray-200 bg-green-50 p-1 text-sm dark:border-[#3e3e42] dark:bg-[#252526]">
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                `rounded-lg px-3 py-1 ${isActive ? "bg-accent font-semibold text-white" : "text-gray-700 dark:text-gray-300 dark:hover:text-white"}`
-              }
-            >
-              {t("nav.dashboard")}
-            </NavLink>
-            <NavLink
-              to="/history"
-              className={({ isActive }) =>
-                `rounded-lg px-3 py-1 ${isActive ? "bg-accent font-semibold text-white" : "text-gray-700 dark:text-gray-300 dark:hover:text-white"}`
-              }
-            >
-              {t("nav.history")}
-            </NavLink>
+          <nav className="flex flex-wrap rounded-xl border border-gray-200 bg-green-50 p-1 text-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+            <NavLink to="/" end className={navLinkClass}>{t("nav.dashboard")}</NavLink>
+            <NavLink to="/history" className={navLinkClass}>{t("nav.history")}</NavLink>
+            <NavLink to="/pantry" className={navLinkClass}>{t("nav.pantry")}</NavLink>
+            <NavLink to="/meal-planner" className={navLinkClass}>{t("nav.mealPlanner")}</NavLink>
+            <NavLink to="/admin/ingredients" className={navLinkClass}>{t("nav.ingredientsAdmin")}</NavLink>
           </nav>
 
           <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-[#3e3e42] dark:bg-[#252526]">

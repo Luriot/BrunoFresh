@@ -4,6 +4,7 @@ import {
   addShoppingListCustomItem,
   createShoppingList,
   deleteShoppingList,
+  deleteShoppingListItem,
   fetchRecipes,
   fetchShoppingList,
   fetchShoppingLists,
@@ -21,6 +22,9 @@ import { useScrape } from "./hooks/useScrape";
 import { DashboardPage } from "./pages/DashboardPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { ShoppingListViewPage } from "./pages/ShoppingListViewPage";
+import { PantryPage } from "./pages/PantryPage";
+import { MealPlannerPage } from "./pages/MealPlannerPage";
+import { IngredientsAdminPage } from "./pages/IngredientsAdminPage";
 import type { RecipeListItem, ShoppingList as ShoppingListType, ShoppingListSummary } from "./types";
 import { useTranslation } from "react-i18next";
 
@@ -53,7 +57,6 @@ function App() {
   const { loading, scrapeState, startScrape } = useScrape();
   const [list, setList] = useState<ShoppingListType | null>(null);
   const [listHistory, setListHistory] = useState<ShoppingListSummary[]>([]);
-  const [url, setUrl] = useState("");
 
   const loadRecipes = useCallback(async () => {
     try {
@@ -151,18 +154,6 @@ function App() {
     setList(null);
     setListHistory([]);
     clearCart();
-    setUrl("");
-  }
-
-  async function onScrape() {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    const started = await startScrape(url, loadRecipes);
-    if (started) {
-      setUrl("");
-    }
   }
 
   async function onGenerateList() {
@@ -255,6 +246,30 @@ function App() {
     }
   }
 
+  async function onDeleteItem(itemId: number) {
+    if (!list) return;
+    // Optimistic update
+    setList((previous) => {
+      if (!previous) return previous;
+      return { ...previous, items: previous.items.filter((i) => i.id !== itemId) };
+    });
+    try {
+      await deleteShoppingListItem(list.id, itemId);
+      await loadShoppingListHistory();
+    } catch {
+      await openShoppingList(list.id);
+    }
+  }
+
+  async function onScrape(urls: string[]) {
+    if (!isAuthenticated) return;
+    for (const u of urls) {
+      if (u.trim()) {
+        await startScrape(u.trim(), loadRecipes);
+      }
+    }
+  }
+
   if (isAuthenticated === null) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
@@ -275,8 +290,6 @@ function App() {
           path="/"
           element={
             <DashboardPage
-              url={url}
-              setUrl={setUrl}
               loading={loading}
               scrapeState={scrapeState}
               recipes={recipes}
@@ -290,6 +303,7 @@ function App() {
               onGenerateList={onGenerateList}
               onToggleOwned={onToggleOwned}
               onAddCustomItem={onAddCustomItem}
+              onRecipesChanged={setRecipes}
             />
           }
         />
@@ -303,9 +317,13 @@ function App() {
               onRenameList={onRenameList}
               onToggleOwned={onToggleOwned}
               onAddCustomItem={onAddCustomItem}
+              onDeleteItem={onDeleteItem}
             />
           }
         />
+        <Route path="/pantry" element={<PantryPage />} />
+        <Route path="/meal-planner" element={<MealPlannerPage onListGenerated={(l: ShoppingListType) => { setList(l); void loadShoppingListHistory(); }} />} />
+        <Route path="/admin/ingredients" element={<IngredientsAdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

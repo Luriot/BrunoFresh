@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,6 @@ from ...services.events import JobEvent, job_event_bus
 from ...services.network import validate_public_http_url
 from ...services.orchestrator import persist_scraped_recipe
 
-SUPPORTED_SCRAPE_DOMAINS = ("hellofresh", "cuisineaz", "allrecipes", "jow", "750g")
 scrape_semaphore = asyncio.Semaphore(max(1, settings.scrape_concurrency_limit))
 # Keeps a hard reference to fire-and-forget tasks so they aren't collected mid-execution.
 _background_tasks: set[asyncio.Task] = set()
@@ -31,12 +29,7 @@ def _format_sse(event_name: str, payload: dict[str, str | int | None]) -> str:
 
 
 async def _validate_scrape_url(url: str) -> str:
-    safe_url = await validate_public_http_url(url)
-    hostname = (urlparse(safe_url).hostname or "").lower()
-    if not any(domain in hostname for domain in SUPPORTED_SCRAPE_DOMAINS):
-        raise HTTPException(status_code=400, detail="Unsupported recipe domain")
-
-    return safe_url
+    return await validate_public_http_url(url)
 
 
 async def _run_scrape_job(job_id: int) -> None:

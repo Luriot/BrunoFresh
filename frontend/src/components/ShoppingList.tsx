@@ -9,9 +9,10 @@ type Props = {
   data: ShoppingListType | null;
   onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
   onAddCustomItem: (payload: CustomItemPayload) => Promise<void>;
+  onDeleteItem?: (itemId: number) => void;
 };
 
-export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Readonly<Props>) {
+export function ShoppingList({ data, onToggleOwned, onAddCustomItem, onDeleteItem }: Readonly<Props>) {
   const { t, i18n } = useTranslation();
   const [customName, setCustomName] = useState("");
   const [customQty, setCustomQty] = useState<number>(1);
@@ -72,9 +73,9 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Readonly<
     return (
       <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
         {items.map((item) => (
-          <li key={item.id}>
+          <li key={item.id} className="flex items-center gap-2">
             <button
-              className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left transition hover:bg-green-50 dark:border-[#3e3e42] dark:hover:bg-[#2d2d30]"
+              className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left transition hover:bg-green-50 dark:border-[#3e3e42] dark:hover:bg-[#2d2d30]"
               onClick={() => onToggleOwned(item.id, isOwnedTarget)}
               type="button"
             >
@@ -85,6 +86,22 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem }: Readonly<
                 {item.quantity} {item.unit}
               </span>
             </button>
+            {onDeleteItem && (
+              <button
+                type="button"
+                aria-label={t("shopping.deleteItem")}
+                title={t("shopping.deleteItem")}
+                onClick={() => onDeleteItem(item.id)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-red-300 hover:text-red-500 dark:border-[#3e3e42] dark:hover:border-red-700 dark:hover:text-red-400"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4h6v2" />
+                </svg>
+              </button>
+            )}
           </li>
         ))}
       </ul>

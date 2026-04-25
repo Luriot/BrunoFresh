@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -28,6 +28,8 @@ class RecipeListItem(BaseModel):
     source_domain: str
     image_local_path: str | None
     base_servings: int
+    is_favorite: bool = False
+    tags: list["TagOut"] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -60,6 +62,8 @@ class RecipeDetail(BaseModel):
     instructions_text: str
     base_servings: int
     prep_time_minutes: int | None
+    is_favorite: bool = False
+    tags: list["TagOut"] = []
     ingredients: list[RecipeIngredientOut]
 
 
@@ -175,7 +179,132 @@ class IngredientDetail(BaseModel):
     id: int
     name_en: str
     name_fr: str | None = None
-    category: str
+    category: str | None = None
     is_normalized: bool
+    needs_review: bool = False
+    usage_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── Tags ────────────────────────────────────────────────────────────────────
+
+class TagCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    color: str | None = Field(default=None, max_length=30)
+
+
+class TagOut(BaseModel):
+    id: int
+    name: str
+    color: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RecipeTagsUpdate(BaseModel):
+    tag_ids: list[int]
+
+
+# ── Favorites ───────────────────────────────────────────────────────────────
+
+class RecipePatch(BaseModel):
+    is_favorite: bool | None = None
+    instructions_text: str | None = Field(default=None, max_length=50_000)
+
+
+# ── Pantry ──────────────────────────────────────────────────────────────────
+
+class PantryItemCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    name_fr: str | None = Field(default=None, max_length=200)
+    ingredient_id: int | None = None
+    category: str | None = Field(default=None, max_length=80)
+
+
+class PantryItemOut(BaseModel):
+    id: int
+    name: str
+    name_fr: str | None = None
+    ingredient_id: int | None = None
+    category: str | None = None
+    added_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Stats ───────────────────────────────────────────────────────────────────
+
+class RecipeSourceStat(BaseModel):
+    source_domain: str
+    count: int
+
+
+class TopRecipeStat(BaseModel):
+    recipe_id: int
+    title: str
+    appearance_count: int
+
+
+class TopIngredientStat(BaseModel):
+    name: str
+    count: int
+
+
+class StatsOut(BaseModel):
+    total_recipes: int
+    total_lists: int
+    recipes_by_source: list[RecipeSourceStat]
+    top_recipes_in_lists: list[TopRecipeStat]
+    top_ingredients: list[TopIngredientStat]
+
+
+# ── Ingredient admin ────────────────────────────────────────────────────────
+
+class IngredientMergeRequest(BaseModel):
+    source_id: int
+    target_id: int
+
+
+# ── Meal Planner ────────────────────────────────────────────────────────────
+
+class MealPlanCreate(BaseModel):
+    label: str | None = Field(default=None, max_length=160)
+    week_start_date: date | None = None
+
+
+class MealPlanEntryCreate(BaseModel):
+    recipe_id: int
+    day_of_week: int = Field(ge=0, le=6)
+    meal_slot: str | None = Field(default=None, max_length=40)
+    target_servings: int = Field(default=2, ge=1, le=20)
+
+
+class MealPlanEntryOut(BaseModel):
+    id: int
+    recipe_id: int
+    recipe_title: str
+    recipe_image_local_path: str | None
+    day_of_week: int
+    meal_slot: str | None
+    target_servings: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MealPlanOut(BaseModel):
+    id: int
+    label: str | None
+    week_start_date: date | None
+    created_at: datetime
+    entries: list[MealPlanEntryOut]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MealPlanSummaryOut(BaseModel):
+    id: int
+    label: str | None
+    week_start_date: date | None
+    created_at: datetime
+    entry_count: int

@@ -1,3 +1,9 @@
+export type Tag = {
+  id: number;
+  name: string;
+  color: string | null;
+};
+
 export type RecipeListItem = {
   id: number;
   title: string;
@@ -5,6 +11,8 @@ export type RecipeListItem = {
   source_domain: string;
   image_local_path: string | null;
   base_servings: number;
+  is_favorite: boolean;
+  tags: Tag[];
 };
 
 export type RecipeIngredientOut = {
@@ -97,6 +105,71 @@ export type JobStatusResponse = {
   job_id: number;
   status: "pending" | "running" | "completed" | "failed";
   error_message?: string | null;
+};
+
+// ── Pantry ────────────────────────────────────────────────────────────────
+
+export type PantryItem = {
+  id: number;
+  name: string;
+  name_fr: string | null;
+  ingredient_id: number | null;
+  category: string | null;
+  added_at: string;
+};
+
+// ── Stats ─────────────────────────────────────────────────────────────────
+
+export type RecipeSourceStat = { source_domain: string; count: number };
+export type TopRecipeStat = { recipe_id: number; title: string; appearance_count: number };
+export type TopIngredientStat = { name: string; count: number };
+
+export type StatsOut = {
+  total_recipes: number;
+  total_lists: number;
+  recipes_by_source: RecipeSourceStat[];
+  top_recipes_in_lists: TopRecipeStat[];
+  top_ingredients: TopIngredientStat[];
+};
+
+// ── Meal Planner ──────────────────────────────────────────────────────────
+
+export type MealPlanEntry = {
+  id: number;
+  recipe_id: number;
+  recipe_title: string;
+  recipe_image_local_path: string | null;
+  day_of_week: number;
+  meal_slot: string | null;
+  target_servings: number;
+};
+
+export type MealPlan = {
+  id: number;
+  label: string | null;
+  week_start_date: string | null;
+  created_at: string;
+  entries: MealPlanEntry[];
+};
+
+export type MealPlanSummary = {
+  id: number;
+  label: string | null;
+  week_start_date: string | null;
+  created_at: string;
+  entry_count: number;
+};
+
+// ── Ingredient admin ──────────────────────────────────────────────────────
+
+export type IngredientDetail = {
+  id: number;
+  name_en: string;
+  name_fr: string | null;
+  category: string | null;
+  is_normalized: boolean;
+  needs_review: boolean;
+  usage_count: number;
 };
 
 export type RecipeIngredientCreate = {
