@@ -14,7 +14,9 @@ export default defineConfig({
         name: "BrunoFresh",
         short_name: "BrunoFresh",
         description: "BrunoFresh application",
-        theme_color: "#ffffff",
+        display: "standalone",
+        background_color: "#1e1e1e",
+        theme_color: "#1e1e1e",
         icons: [
           {
             src: "/pwa-192x192.png",

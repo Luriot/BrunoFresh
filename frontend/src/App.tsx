@@ -50,6 +50,10 @@ function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
     localStorage.setItem("brunofresh.theme", isDark ? "dark" : "light");
+    // Keep Android PWA status bar in sync with the user's chosen theme
+    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => {
+      m.content = isDark ? "#1e1e1e" : "#ffffff";
+    });
   }, [isDark]);
 
   const toggleDark = useCallback(() => setIsDark((d) => !d), []);
