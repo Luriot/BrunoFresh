@@ -28,6 +28,7 @@ class RecipeListItem(BaseModel):
     source_domain: str
     image_local_path: str | None
     base_servings: int
+    prep_time_minutes: int | None
     is_favorite: bool = False
     tags: list["TagOut"] = []
 
@@ -69,9 +70,19 @@ class RecipeDetail(BaseModel):
 
 class ScrapeRequest(BaseModel):
     url: HttpUrl
+    force: bool = False
 
 
-JobStatus = Literal["pending", "running", "completed", "failed"]
+JobStatus = Literal["pending", "running", "completed", "failed", "duplicate_warning"]
+
+
+class DuplicateWarningInfo(BaseModel):
+    id: int
+    title: str
+    url: str
+    image_local_path: str | None = None
+    title_score: float
+    ingredient_score: float
 
 
 class ScrapeResponse(BaseModel):
@@ -79,6 +90,24 @@ class ScrapeResponse(BaseModel):
     url: str
     job_id: int | None = None
     status: JobStatus
+    similar_recipe: DuplicateWarningInfo | None = None
+
+
+class RecipeSimilarPair(BaseModel):
+    recipe_a_id: int
+    recipe_a_title: str
+    recipe_a_url: str
+    recipe_a_image: str | None = None
+    recipe_b_id: int
+    recipe_b_title: str
+    recipe_b_url: str
+    recipe_b_image: str | None = None
+    title_score: float
+    ingredient_score: float
+
+
+class RecipeSimilarPairsResponse(BaseModel):
+    pairs: list[RecipeSimilarPair]
 
 
 class JobStatusResponse(BaseModel):
@@ -169,10 +198,14 @@ class ShoppingListOut(BaseModel):
     needs_review: list[str]
 
 
-class IngredientPatch(BaseModel):
-    name_en: str
-    name_fr: str | None = None
-    category: str
+class IngredientNamePatch(BaseModel):
+    """Patch an ingredient by providing a name in any supported language.
+
+    The backend auto-translates to all other configured languages via Ollama.
+    """
+    name: str = Field(min_length=1, max_length=200)
+    lang: str = Field(default="en", min_length=2, max_length=10)
+    category: str = Field(max_length=80)
 
 
 class IngredientDetail(BaseModel):
@@ -183,8 +216,23 @@ class IngredientDetail(BaseModel):
     is_normalized: bool
     needs_review: bool = False
     usage_count: int = 0
+    translations: dict[str, str] = {}
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── Merge suggestions ────────────────────────────────────────────────────────
+
+class MergeSuggestion(BaseModel):
+    source_id: int
+    source_name: str
+    target_id: int
+    target_name: str
+    reason: str
+
+
+class MergeSuggestionResponse(BaseModel):
+    suggestions: list[MergeSuggestion]
 
 
 # ── Tags ────────────────────────────────────────────────────────────────────
@@ -217,7 +265,7 @@ class RecipePatch(BaseModel):
 
 class PantryItemCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    name_fr: str | None = Field(default=None, max_length=200)
+    lang: str = Field(default="en", min_length=2, max_length=10)
     ingredient_id: int | None = None
     category: str | None = Field(default=None, max_length=80)
 

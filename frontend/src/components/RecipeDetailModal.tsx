@@ -209,7 +209,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                           }`}
                           style={active ? { backgroundColor: tag.color ?? "#6b7280" } : undefined}
                         >
-                          {tag.name}
+                          {t(`tags.names.${tag.name}`, { defaultValue: tag.name })}
                         </button>
                       );
                     })}

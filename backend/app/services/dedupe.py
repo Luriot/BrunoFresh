@@ -20,6 +20,20 @@ def _jaccard_similarity(a: set[str], b: set[str]) -> float:
     return inter / max(union, 1)
 
 
+def similarity_score(
+    existing_title: str,
+    existing_ingredient_names: list[str],
+    new_title: str,
+    new_ingredient_names: list[str],
+) -> tuple[float, float]:
+    """Return (title_score 0–100, ingredient_jaccard 0–1)."""
+    title_score = fuzz.token_set_ratio(_normalize_text(existing_title), _normalize_text(new_title))
+    existing_set = {_normalize_text(x) for x in existing_ingredient_names if x.strip()}
+    new_set = {_normalize_text(x) for x in new_ingredient_names if x.strip()}
+    ingredient_score = _jaccard_similarity(existing_set, new_set)
+    return float(title_score), ingredient_score
+
+
 def looks_like_duplicate(
     existing_title: str,
     existing_ingredient_names: list[str],
@@ -28,11 +42,5 @@ def looks_like_duplicate(
     title_threshold: int = 85,
     ingredients_threshold: float = 0.7,
 ) -> bool:
-    title_score = fuzz.token_set_ratio(_normalize_text(existing_title), _normalize_text(new_title))
-    if title_score < title_threshold:
-        return False
-
-    existing_set = {_normalize_text(x) for x in existing_ingredient_names if x.strip()}
-    new_set = {_normalize_text(x) for x in new_ingredient_names if x.strip()}
-    ingredient_score = _jaccard_similarity(existing_set, new_set)
-    return ingredient_score >= ingredients_threshold
+    ts, ing = similarity_score(existing_title, existing_ingredient_names, new_title, new_ingredient_names)
+    return ts >= title_threshold and ing >= ingredients_threshold

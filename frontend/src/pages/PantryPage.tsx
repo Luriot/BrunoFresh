@@ -13,7 +13,6 @@ export function PantryPage() {
   const [items, setItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
-  const [nameFr, setNameFr] = useState("");
   const [category, setCategory] = useState("Other");
   const [adding, setAdding] = useState(false);
 
@@ -38,12 +37,11 @@ export function PantryPage() {
     try {
       const item = await addPantryItem({
         name: trimmed,
-        name_fr: nameFr.trim() || undefined,
+        lang: i18n.language,
         category,
       });
       setItems((prev) => [...prev, item]);
       setName("");
-      setNameFr("");
       setCategory("Other");
     } finally {
       setAdding(false);
@@ -83,13 +81,6 @@ export function PantryPage() {
             placeholder={t("pantry.namePlaceholder")}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={200}
-          />
-          <input
-            className="w-40 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
-            placeholder={t("pantry.nameFrPlaceholder")}
-            value={nameFr}
-            onChange={(e) => setNameFr(e.target.value)}
             maxLength={200}
           />
           <select

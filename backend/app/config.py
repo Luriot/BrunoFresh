@@ -27,7 +27,7 @@ class Settings(BaseModel):
     )
     allowed_methods: tuple[str, ...] = tuple(
         method.strip().upper()
-        for method in os.getenv("ALLOWED_METHODS", "GET,POST,PATCH,OPTIONS").split(",")
+        for method in os.getenv("ALLOWED_METHODS", "GET,POST,PUT,PATCH,DELETE,OPTIONS").split(",")
         if method.strip()
     )
     allowed_headers: tuple[str, ...] = tuple(

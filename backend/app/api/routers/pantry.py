@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...database import get_db
 from ...models import Ingredient, PantryItem
 from ...schemas import PantryItemCreate, PantryItemOut
+from ...services.normalizer import translate_ingredient_name
 
 router = APIRouter(prefix="/api", tags=["pantry"])
 
@@ -35,9 +36,14 @@ async def add_pantry_item(payload: PantryItemCreate, db: AsyncSession = Depends(
         if not category:
             category = ingredient.category
 
+    # Auto-translate: always store English as the primary name
+    translations = await translate_ingredient_name(payload.name, payload.lang, ["en", "fr"])
+    primary_name = translations.get("en", payload.name)
+    name_fr = translations.get("fr") if "fr" != payload.lang else payload.name
+
     item = PantryItem(
-        name=payload.name.strip(),
-        name_fr=payload.name_fr.strip() if payload.name_fr else None,
+        name=primary_name,
+        name_fr=name_fr,
         ingredient_id=payload.ingredient_id,
         category=category,
     )

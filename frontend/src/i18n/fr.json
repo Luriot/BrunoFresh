@@ -13,7 +13,10 @@
     "close": "Fermer",
     "customRecipe": "Créer une recette",
     "searchPlaceholder": "Rechercher des recettes...",
-    "favoritesFilter": "Favoris"
+    "favoritesFilter": "Favoris",
+    "filtersLabel": "Filtres",
+    "filterByTag": "Filtrer par tag",
+    "clearFilters": "Effacer"
   },
   "recipe": {
     "noImage": "Pas encore d'image",
@@ -84,7 +87,7 @@
     "history": "Historique",
     "pantry": "Garde-manger",
     "mealPlanner": "Planificateur",
-    "ingredientsAdmin": "Ingrédients"
+    "admin": "Admin"
   },
   "auth": {
     "logout": "Déconnexion",
@@ -124,6 +127,32 @@
   "error": {
     "loadFailed": "Impossible de charger le détail de la recette."
   },
+  "unit": {
+    "group": {
+      "Weight": "Poids",
+      "Volume": "Volume",
+      "Cooking": "Cuisine",
+      "Count": "Compte",
+      "Other": "Autre"
+    },
+    "g": "g",
+    "kg": "kg",
+    "ml": "ml",
+    "cl": "cl",
+    "L": "L",
+    "c. à soupe": "c. à soupe",
+    "c. à thé": "c. à thé",
+    "tasse": "tasse",
+    "piece": "pièce",
+    "botte": "botte",
+    "tranche": "tranche",
+    "boîte": "boîte",
+    "paquet": "sachet",
+    "gousse": "gousse",
+    "pincée": "pincée",
+    "au goût": "au goût",
+    "filet": "filet"
+  },
   "category": {
     "Produce": "Fruits et légumes",
     "Meat": "Viandes",
@@ -142,7 +171,13 @@
     "failed": "Échec du scraping.",
     "inProgress": "Scraping en cours...",
     "streamError": "Connexion temps réel interrompue. Rafraîchissez la page.",
-    "noJobId": "Job de scraping démarré mais aucun ID retourné."
+    "noJobId": "Job de scraping démarré mais aucun ID retourné.",
+    "duplicateTitle": "Recette similaire trouvée",
+    "duplicateMessage": "Une recette très similaire existe déjà dans votre collection. Importer quand même ?",
+    "titleScore": "Titre",
+    "ingredientScore": "Ingrédients",
+    "forceImport": "Importer quand même",
+    "cancelImport": "Annuler"
   },
   "lang": {
     "switchToEn": "EN",
@@ -163,7 +198,6 @@
     "subtitle": "Ingrédients déjà à la maison — marqués automatiquement comme possédés dans les nouvelles listes.",
     "add": "Ajouter",
     "namePlaceholder": "Nom de l'ingrédient",
-    "nameFrPlaceholder": "Nom français (optionnel)",
     "category": "Catégorie",
     "empty": "Votre garde-manger est vide.",
     "remove": "Retirer"
@@ -172,8 +206,8 @@
     "title": "Planificateur de repas",
     "newPlan": "Nouveau plan",
     "labelPlaceholder": "Nom du plan (optionnel)",
-    "weekStart": "Début de semaine",
-    "generateList": "Générer la liste de courses",
+    "weekStart": "Début semaine",
+    "generateList": "Générer la liste",
     "emptyDay": "Ajouter une recette",
     "days": {
       "0": "Lundi",
@@ -206,6 +240,7 @@
     "needsReview": "À vérifier seulement",
     "nameEn": "Nom anglais",
     "nameFr": "Nom français",
+    "name": "Nom",
     "category": "Catégorie",
     "save": "Enregistrer",
     "mergeInto": "Fusionner",
@@ -219,12 +254,58 @@
     "mergeError": "Erreur lors de la fusion.",
     "edit": "Modifier",
     "usages": "Usages",
-    "noResults": "Aucun ingrédient trouvé."
+    "noResults": "Aucun ingrédient trouvé.",
+    "aiSuggestMerges": "Suggestions IA",
+    "aiSuggestMergesTitle": "Doublons suggérés par l'IA",
+    "aiMerging": "Analyse en cours...",
+    "applyMerges": "Appliquer ({{count}})",
+    "noSuggestions": "Aucun doublon détecté.",
+    "mergeApplied": "{{count}} fusion(s) appliquée(s).",
+    "aiUnavailable": "Ollama indisponible. Vérifiez qu'il est lancé."
   },
   "stats": {
     "totalRecipes": "Recettes",
     "totalLists": "Listes",
     "topSource": "Source principale",
     "topIngredient": "Ingrédient principal"
+  },
+  "recipes": {
+    "findDuplicates": "Recettes similaires",
+    "scan": "Scanner",
+    "scanning": "Analyse en cours...",
+    "noDuplicates": "Aucune paire similaire trouvée.",
+    "duplicatePairs": "{{count}} paire(s) similaire(s) trouvée(s)",
+    "delete": "Supprimer",
+    "deleted": "Recette supprimée.",
+    "confirmDelete": "Supprimer cette recette ? Cette action est irréversible.",
+    "deleteError": "Impossible de supprimer la recette.",
+    "scanError": "Impossible de scanner les recettes similaires."
+  },
+  "tags": {
+    "manage": "Gestion des tags",
+    "namePlaceholder": "Nom du tag",
+    "colorLabel": "Couleur",
+    "add": "Ajouter",
+    "empty": "Aucun tag. Créez-en un pour activer les filtres de recettes.",
+    "delete": "Supprimer",
+    "confirmDelete": "Supprimer ce tag ?",
+    "createError": "Impossible de créer le tag.",
+    "deleteError": "Impossible de supprimer le tag.",
+    "names": {
+      "Rapide": "Rapide",
+      "V\u00e9g\u00e9tarien": "V\u00e9g\u00e9tarien",
+      "V\u00e9gan": "V\u00e9gan",
+      "\u00c9pic\u00e9": "\u00c9pic\u00e9",
+      "Peu de vaisselle": "Peu de vaisselle",
+      "Healthy": "Healthy",
+      "Comfort food": "Comfort food",
+      "P\u00e2tes": "P\u00e2tes",
+      "Riz": "Riz",
+      "Poulet": "Poulet",
+      "Poisson": "Poisson",
+      "Dessert": "Dessert",
+      "Petit-d\u00e9jeuner": "Petit-d\u00e9jeuner",
+      "Batch cooking": "Batch cooking"
+    }
   }
 }

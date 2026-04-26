@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import {
   addShoppingListCustomItem,
   createShoppingList,
@@ -24,7 +24,7 @@ import { HistoryPage } from "./pages/HistoryPage";
 import { ShoppingListViewPage } from "./pages/ShoppingListViewPage";
 import { PantryPage } from "./pages/PantryPage";
 import { MealPlannerPage } from "./pages/MealPlannerPage";
-import { IngredientsAdminPage } from "./pages/IngredientsAdminPage";
+import { AdminPage } from "./pages/AdminPage";
 import type { RecipeListItem, ShoppingList as ShoppingListType, ShoppingListSummary } from "./types";
 import { useTranslation } from "react-i18next";
 
@@ -38,6 +38,7 @@ function getIsoWeekNumber(date: Date): number {
 
 function App() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isDark, setIsDark] = useState(() => {
     const stored = localStorage.getItem("brunofresh.theme");
@@ -54,7 +55,7 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const { cart, addToCart, updateServings, clearCart, toCartInput } = useCart();
-  const { loading, scrapeState, startScrape } = useScrape();
+  const { loading, scrapeState, duplicateWarning, startScrape, confirmImport, dismissDuplicate } = useScrape();
   const [list, setList] = useState<ShoppingListType | null>(null);
   const [listHistory, setListHistory] = useState<ShoppingListSummary[]>([]);
 
@@ -167,6 +168,7 @@ function App() {
       const data = await createShoppingList(cartInput, defaultLabel);
       setList(data);
       await loadShoppingListHistory();
+      navigate(`/lists/${data.id}`);
     } catch {
       // 401 is handled by the global interceptor; other errors are transient.
     }
@@ -285,6 +287,54 @@ function App() {
   return (
     <div className="min-h-screen text-ink">
       <Navbar onLogout={onLogout} isDark={isDark} onToggleDark={toggleDark} />
+
+      {/* Duplicate recipe warning modal */}
+      {duplicateWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1e1e1e]">
+            <h2 className="mb-1 font-heading text-lg font-bold text-amber-600 dark:text-amber-400">
+              ⚠️ {t("scrape.duplicateTitle")}
+            </h2>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              {t("scrape.duplicateMessage")}
+            </p>
+            <div className="mb-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-700/30 dark:bg-amber-900/10">
+              {duplicateWarning.similarRecipe.image_local_path && (
+                <img
+                  src={`/images/${duplicateWarning.similarRecipe.image_local_path}`}
+                  className="h-16 w-16 rounded-lg object-cover"
+                  alt=""
+                />
+              )}
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-ink dark:text-gray-100">
+                  {duplicateWarning.similarRecipe.title}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {t("scrape.titleScore")}: {duplicateWarning.similarRecipe.title_score}% &nbsp;·&nbsp;
+                  {t("scrape.ingredientScore")}: {Math.round(duplicateWarning.similarRecipe.ingredient_score * 100)}%
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={dismissDuplicate}
+                className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+              >
+                {t("scrape.cancelImport")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmImport()}
+                className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-400"
+              >
+                {t("scrape.forceImport")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <Routes>
         <Route
           path="/"
@@ -294,15 +344,12 @@ function App() {
               scrapeState={scrapeState}
               recipes={recipes}
               cart={cart}
-              list={list}
               onScrape={onScrape}
               onRefreshRecipes={loadRecipes}
               onAddToCart={addToCart}
               onUpdateServings={updateServings}
               onClearCart={clearCart}
               onGenerateList={onGenerateList}
-              onToggleOwned={onToggleOwned}
-              onAddCustomItem={onAddCustomItem}
               onRecipesChanged={setRecipes}
             />
           }
@@ -323,7 +370,7 @@ function App() {
         />
         <Route path="/pantry" element={<PantryPage />} />
         <Route path="/meal-planner" element={<MealPlannerPage onListGenerated={(l: ShoppingListType) => { setList(l); void loadShoppingListHistory(); }} />} />
-        <Route path="/admin/ingredients" element={<IngredientsAdminPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

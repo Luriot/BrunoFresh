@@ -21,13 +21,13 @@ export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{t("app.subtitle")}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
           <nav className="flex flex-wrap rounded-xl border border-gray-200 bg-green-50 p-1 text-sm dark:border-[#3e3e42] dark:bg-[#252526]">
             <NavLink to="/" end className={navLinkClass}>{t("nav.dashboard")}</NavLink>
             <NavLink to="/history" className={navLinkClass}>{t("nav.history")}</NavLink>
             <NavLink to="/pantry" className={navLinkClass}>{t("nav.pantry")}</NavLink>
             <NavLink to="/meal-planner" className={navLinkClass}>{t("nav.mealPlanner")}</NavLink>
-            <NavLink to="/admin/ingredients" className={navLinkClass}>{t("nav.ingredientsAdmin")}</NavLink>
+            <NavLink to="/admin" className={navLinkClass}>{t("nav.admin")}</NavLink>
           </nav>
 
           <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-[#3e3e42] dark:bg-[#252526]">

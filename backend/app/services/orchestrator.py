@@ -2,21 +2,44 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..models import Ingredient, Recipe, RecipeIngredient
-from .dedupe import looks_like_duplicate
+from ..models import Ingredient, Recipe, RecipeIngredient, Tag
+from .dedupe import looks_like_duplicate, similarity_score
 from .images import download_image
 from .normalizer import normalize_ingredients_batch
 from .scraper import scrape_recipe_url
 from .events import JobEvent, job_event_bus
+from .tag_rules import match_tags
 
 logger = logging.getLogger(__name__)
 
-async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None = None) -> None:
+
+@dataclass
+class DuplicateFound:
+    existing_id: int
+    existing_title: str
+    existing_url: str
+    existing_image: str | None
+    title_score: float
+    ingredient_score: float
+
+
+async def persist_scraped_recipe(
+    url: str,
+    db: AsyncSession,
+    job_id: int | None = None,
+    force: bool = False,
+) -> DuplicateFound | None:
+    """Scrape and persist a recipe.
+
+    Returns ``DuplicateFound`` if a similar recipe exists and ``force`` is False.
+    Returns ``None`` on success (recipe saved).
+    """
     async def notify_progress(msg: str):
         if job_id:
             await job_event_bus.publish(job_id, JobEvent(status="running", message=msg))
@@ -27,7 +50,7 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
     if existing:
         logger.info(f"La recette existe déjà avec l'ID {existing.id}. Action annulée.")
         await notify_progress("La recette existe déjà. Fin.")
-        return
+        return None
 
     logger.debug("Extraction des données de la recette...")
     await notify_progress("Téléchargement et analyse du site web...")
@@ -37,7 +60,6 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
     logger.debug("Normalisation par lot (batch) des ingrédients via Ollama...")
     await notify_progress(f"Analyse IA des {len(scraped.ingredients)} ingrédients...")
 
-    # On envoie tout d'un coup pour éviter d'asphyxier l'API
     normalized_ingredients = await normalize_ingredients_batch(scraped.ingredients)
 
     incoming_names: list[str] = [
@@ -54,15 +76,25 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
     ).all()
     logger.debug(f"Détection de doublons face à {len(existing_recipes)} recettes existantes...")
     await notify_progress("Vérification des recettes similaires...")
-    for candidate in existing_recipes:
-        candidate_names = [
-            link.ingredient.name_en if link.ingredient else link.raw_string
-            for link in candidate.recipe_ingredients
-        ]
-        if looks_like_duplicate(candidate.title, candidate_names, scraped.title, incoming_names):
-            logger.info(f"Doublon exact ou similaire trouvé: {candidate.id} - {candidate.title}. Scraping annulé.")
-            await notify_progress("Recette similaire détectée. Abandon.")
-            return
+
+    if not force:
+        for candidate in existing_recipes:
+            candidate_names = [
+                link.ingredient.name_en if link.ingredient else link.raw_string
+                for link in candidate.recipe_ingredients
+            ]
+            ts, ing_s = similarity_score(candidate.title, candidate_names, scraped.title, incoming_names)
+            if ts >= 85 and ing_s >= 0.7:
+                logger.info(f"Doublon détecté: {candidate.id} - {candidate.title}. Renvoi de l'avertissement.")
+                await notify_progress("Recette similaire détectée.")
+                return DuplicateFound(
+                    existing_id=candidate.id,
+                    existing_title=candidate.title,
+                    existing_url=candidate.url,
+                    existing_image=candidate.image_local_path,
+                    title_score=round(ts, 1),
+                    ingredient_score=round(ing_s, 2),
+                )
 
     logger.info(f"Création de la recette '{scraped.title}' en base...")
     await notify_progress(f"Création de la recette '{scraped.title}'...")
@@ -91,13 +123,12 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
     logger.debug("Sauvegarde et liaison des ingrédients à la recette...")
     await notify_progress("Sauvegarde des ingrédients...")
 
-    # Optimisation: Précharger tous les ingrédients connus pour éviter le problème "N+1 select"
     normalized_names = [
-        norm.name_en 
-        for norm in normalized_ingredients 
+        norm.name_en
+        for norm in normalized_ingredients
         if norm and norm.name_en != "section_header_ignore"
     ]
-    existing_ingredients = {}
+    existing_ingredients: dict[str, Ingredient] = {}
     if normalized_names:
         result = await db.scalars(select(Ingredient).where(Ingredient.name_en.in_(normalized_names)))
         for ing_obj in result:
@@ -105,15 +136,13 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
 
     for ing, normalized in zip(scraped.ingredients, normalized_ingredients):
         ingredient = None
-        needs_review = False
         quantity = ing.quantity
         unit = ing.unit
 
         if normalized:
-            # Ignorer les en-têtes (ex: "Pour la sauce")
             if normalized.name_en == "section_header_ignore":
                 continue
-                
+
             ingredient = existing_ingredients.get(normalized.name_en)
             if not ingredient:
                 ingredient = Ingredient(
@@ -123,16 +152,27 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
                     is_normalized=True,
                 )
                 db.add(ingredient)
-                # On met en cache localement au cas où le même ingrédient apparaîtrait deux fois dans la même recette
                 existing_ingredients[normalized.name_en] = ingredient
                 logger.debug(f"Nouvel ingrédient normalisé: {ingredient.name_en} ({ingredient.category})")
-                await db.flush() # Flush requis pour obtenir l'ID si c'est un nouvel ingrédient
+                await db.flush()
             elif not ingredient.name_fr and normalized.name_fr:
                 ingredient.name_fr = normalized.name_fr
             quantity = normalized.quantity
             unit = normalized.unit
         else:
-            needs_review = True
+            # Normalization failed: create a raw ingredient so it still appears in shopping lists
+            raw_name = ing.raw.strip().lower() or "unknown ingredient"
+            ingredient = existing_ingredients.get(raw_name)
+            if not ingredient:
+                ingredient = Ingredient(
+                    name_en=raw_name,
+                    name_fr=raw_name,
+                    category="Other",
+                    is_normalized=False,
+                )
+                db.add(ingredient)
+                existing_ingredients[raw_name] = ingredient
+                await db.flush()
 
         db.add(
             RecipeIngredient(
@@ -141,10 +181,30 @@ async def persist_scraped_recipe(url: str, db: AsyncSession, job_id: int | None 
                 raw_string=ing.raw,
                 quantity=quantity,
                 unit=unit,
-                needs_review=needs_review,
+                needs_review=False,
             )
         )
+
+    # ── Auto-tag ────────────────────────────────────────────────────────────
+    await notify_progress("Application automatique des tags...")
+    await _auto_tag_recipe(recipe, scraped.title, incoming_names, scraped.prep_time_minutes, db)
 
     logger.info("Validation finale en base des modifications pour la recette..")
     await db.commit()
     logger.info(f"Persistance terminée avec succès pour la recette #{recipe.id}")
+    return None
+
+
+async def _auto_tag_recipe(
+    recipe: Recipe,
+    title: str,
+    ingredient_names: list[str],
+    prep_time_minutes: int | None,
+    db: AsyncSession,
+) -> None:
+    """Apply tags based on keyword matching in title/ingredients and prep time."""
+    all_tags = list((await db.scalars(select(Tag))).all())
+    matched = match_tags(all_tags, title, ingredient_names, prep_time_minutes)
+    if matched:
+        recipe.tags = matched
+        logger.debug(f"Auto-tags appliqués à la recette #{recipe.id}: {[t.name for t in matched]}")

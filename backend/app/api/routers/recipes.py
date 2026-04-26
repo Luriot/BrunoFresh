@@ -1,16 +1,17 @@
 import asyncio
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ...database import get_db
 from ...models import Ingredient, Recipe, RecipeIngredient, Tag
+from ...models import recipe_tags as recipe_tags_table
 from ...schemas import (
     IngredientDetail,
-    IngredientPatch,
+    IngredientNamePatch,
     RecipeCreate,
     RecipeDetail,
     RecipeIngredientOut,
@@ -95,7 +96,6 @@ async def list_recipes(
 
     if tags:
         tag_names = [t.strip() for t in tags.split(",") if t.strip()]
-        from ...models import recipe_tags as recipe_tags_table
         tag_subq = (
             select(recipe_tags_table.c.recipe_id)
             .join(Tag, recipe_tags_table.c.tag_id == Tag.id)
@@ -103,7 +103,7 @@ async def list_recipes(
         )
         stmt = stmt.where(Recipe.id.in_(tag_subq))
 
-    recipes = (await db.scalars(stmt.order_by(Recipe.is_favorite.desc(), Recipe.id.desc()).offset(offset).limit(limit))).all()
+    recipes = (await db.scalars(stmt.order_by(Recipe.is_favorite.desc(), func.lower(Recipe.title).asc()).offset(offset).limit(limit))).all()
     return recipes
 
 
@@ -159,7 +159,6 @@ async def create_custom_recipe(
         db.add(link)
 
     await db.commit()
-    await db.refresh(new_recipe)
 
     recipe = await db.scalar(
         select(Recipe)
@@ -210,6 +209,20 @@ async def patch_recipe(
     if not recipe:
         raise HTTPException(status_code=404, detail=_RECIPE_NOT_FOUND)
     return _recipe_to_detail(recipe)
+
+
+@router.delete("/recipes/{recipe_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_recipe(
+    recipe_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Recipe).where(Recipe.id == recipe_id))
+    recipe = result.scalar_one_or_none()
+    if not recipe:
+        raise HTTPException(status_code=404, detail=_RECIPE_NOT_FOUND)
+    await db.delete(recipe)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.put("/recipes/{recipe_id}/tags", response_model=RecipeDetail)
@@ -471,19 +484,53 @@ async def format_recipe_instructions(
 @router.patch("/ingredients/{ingredient_id}", response_model=IngredientDetail)
 async def patch_ingredient(
     ingredient_id: int,
-    payload: IngredientPatch,
+    payload: IngredientNamePatch,
     db: AsyncSession = Depends(get_db),
 ):
+    from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+    from ...models import IngredientTranslation
+    from ...services.normalizer import translate_ingredient_name
+
     ingredient = await db.get(Ingredient, ingredient_id)
     if not ingredient:
         raise HTTPException(status_code=404, detail="Ingredient not found")
 
-    ingredient.name_en = payload.name_en
-    ingredient.name_fr = payload.name_fr
+    # Translate to all supported languages
+    supported_langs = ["en", "fr"]
+    translations = await translate_ingredient_name(payload.name, payload.lang, supported_langs)
+
+    # Update the ingredient row (backward compat columns)
+    ingredient.name_en = translations.get("en", payload.name)
+    ingredient.name_fr = translations.get("fr")
     ingredient.category = payload.category
     ingredient.is_normalized = True
+
+    # Upsert into ingredient_translations
+    for lang_code, trans_name in translations.items():
+        existing = await db.scalar(
+            select(IngredientTranslation).where(
+                IngredientTranslation.ingredient_id == ingredient_id,
+                IngredientTranslation.lang_code == lang_code,
+            )
+        )
+        if existing:
+            existing.name = trans_name
+        else:
+            db.add(IngredientTranslation(
+                ingredient_id=ingredient_id,
+                lang_code=lang_code,
+                name=trans_name,
+            ))
+
     await db.commit()
     await db.refresh(ingredient)
+
+    # Reload translations
+    trans_rows = (await db.scalars(
+        select(IngredientTranslation).where(IngredientTranslation.ingredient_id == ingredient_id)
+    )).all()
+    translations_dict = {row.lang_code: row.name for row in trans_rows}
+
     usage_count = (
         await db.scalar(
             select(func.count()).select_from(RecipeIngredient).where(RecipeIngredient.ingredient_id == ingredient.id)
@@ -497,4 +544,5 @@ async def patch_ingredient(
         is_normalized=ingredient.is_normalized,
         needs_review=False,
         usage_count=usage_count,
+        translations=translations_dict,
     )

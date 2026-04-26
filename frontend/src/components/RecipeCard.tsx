@@ -69,22 +69,33 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
               className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
               style={{ backgroundColor: tag.color ?? "#6b7280" }}
             >
-              {tag.name}
+              {t(`tags.names.${tag.name}`, { defaultValue: tag.name })}
             </span>
           ))}
         </div>
       )}
 
       <div className="mt-auto">
-        <a
-          className="mb-3 inline-flex text-sm font-semibold text-accent underline-offset-2 hover:underline dark:text-accent/80"
-          href={recipe.url}
-          target="_blank"
-          rel="noreferrer"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {t("recipe.viewOriginal")}
-        </a>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <a
+            className="inline-flex text-sm font-semibold text-accent underline-offset-2 hover:underline dark:text-accent/80"
+            href={recipe.url}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {t("recipe.viewOriginal")}
+          </a>
+          {recipe.prep_time_minutes != null && (
+            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <path strokeLinecap="round" d="M12 6v6l4 2" />
+              </svg>
+              {recipe.prep_time_minutes} {t("recipe.minutes")}
+            </span>
+          )}
+        </div>
         <button
           className="mt-2 w-full rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:hover:bg-accent/80"
           onClick={(e) => {

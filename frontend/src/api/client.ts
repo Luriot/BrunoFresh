@@ -7,10 +7,12 @@ import type {
   MealPlan,
   MealPlanEntry,
   MealPlanSummary,
+  MergeSuggestionResponse,
   PantryItem,
   RecipeCreate,
   RecipeDetail,
   RecipeListItem,
+  RecipeSimilarPairsResponse,
   ScrapeResponse,
   ShoppingList,
   ShoppingListCustomItemInput,
@@ -91,8 +93,8 @@ export async function createCustomRecipe(payload: RecipeCreate) {
   return data;
 }
 
-export async function queueScrape(url: string) {
-  const { data } = await api.post<ScrapeResponse>("/scrape", { url });
+export async function queueScrape(url: string, force = false) {
+  const { data } = await api.post<ScrapeResponse>("/scrape", { url, force });
   return data;
 }
 
@@ -153,6 +155,10 @@ export async function patchRecipe(id: number, payload: { is_favorite?: boolean; 
   return data;
 }
 
+export async function deleteRecipe(id: number) {
+  await api.delete(`/recipes/${id}`);
+}
+
 export async function setRecipeTags(recipeId: number, tagIds: number[]) {
   const { data } = await api.put<RecipeDetail>(`/recipes/${recipeId}/tags`, { tag_ids: tagIds });
   return data;
@@ -196,7 +202,7 @@ export async function fetchPantry() {
   return data;
 }
 
-export async function addPantryItem(payload: { name: string; name_fr?: string; ingredient_id?: number; category?: string }) {
+export async function addPantryItem(payload: { name: string; lang: string; ingredient_id?: number; category?: string }) {
   const { data } = await api.post<PantryItem>("/pantry", payload);
   return data;
 }
@@ -259,12 +265,22 @@ export async function fetchIngredientsAdmin(params?: { q?: string; needs_review?
   return data;
 }
 
-export async function patchIngredient(id: number, payload: { name_en: string; name_fr?: string; category: string }) {
+export async function patchIngredient(id: number, payload: { name: string; lang: string; category: string }) {
   const { data } = await api.patch<IngredientDetail>(`/ingredients/${id}`, payload);
   return data;
 }
 
 export async function mergeIngredients(sourceId: number, targetId: number) {
   const { data } = await api.post<IngredientDetail>("/admin/ingredients/merge", { source_id: sourceId, target_id: targetId });
+  return data;
+}
+
+export async function findDuplicateRecipes() {
+  const { data } = await api.post<RecipeSimilarPairsResponse>("/admin/recipes/find-duplicates");
+  return data;
+}
+
+export async function suggestIngredientMerges() {
+  const { data } = await api.post<MergeSuggestionResponse>("/admin/ingredients/ai-suggest-merges");
   return data;
 }

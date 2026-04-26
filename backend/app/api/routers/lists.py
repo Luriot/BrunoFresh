@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -202,10 +202,20 @@ async def list_shopping_lists(
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    entities = (
-        await db.scalars(
-            select(ShoppingList)
-            .options(selectinload(ShoppingList.items))
+    # Use aggregated counts instead of loading all items into memory
+    rows = (
+        await db.execute(
+            select(
+                ShoppingList.id,
+                ShoppingList.label,
+                ShoppingList.created_at,
+                func.count(ShoppingListItem.id).label("total_items"),
+                func.sum(
+                    case((ShoppingListItem.is_already_owned == True, 1), else_=0)
+                ).label("already_owned_items"),
+            )
+            .outerjoin(ShoppingListItem, ShoppingListItem.shopping_list_id == ShoppingList.id)
+            .group_by(ShoppingList.id)
             .order_by(ShoppingList.created_at.desc())
             .offset(offset)
             .limit(limit)
@@ -214,13 +224,13 @@ async def list_shopping_lists(
 
     return [
         ShoppingListSummaryOut(
-            id=item.id,
-            label=item.label,
-            created_at=item.created_at,
-            total_items=len(item.items),
-            already_owned_items=sum(1 for entry in item.items if entry.is_already_owned),
+            id=row.id,
+            label=row.label,
+            created_at=row.created_at,
+            total_items=row.total_items or 0,
+            already_owned_items=row.already_owned_items or 0,
         )
-        for item in entities
+        for row in rows
     ]
 
 

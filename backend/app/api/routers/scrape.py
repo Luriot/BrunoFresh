@@ -2,8 +2,6 @@ import asyncio
 import json
 import logging
 
-logger = logging.getLogger(__name__)
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -12,10 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...config import settings
 from ...database import SessionLocal, get_db
 from ...models import Recipe, ScrapeJob
-from ...schemas import JobStatus, JobStatusResponse, ScrapeRequest, ScrapeResponse
+from ...schemas import DuplicateWarningInfo, JobStatus, JobStatusResponse, ScrapeRequest, ScrapeResponse
 from ...services.events import JobEvent, job_event_bus
 from ...services.network import validate_public_http_url
-from ...services.orchestrator import persist_scraped_recipe
+from ...services.orchestrator import DuplicateFound, persist_scraped_recipe
+
+logger = logging.getLogger(__name__)
 
 scrape_semaphore = asyncio.Semaphore(max(1, settings.scrape_concurrency_limit))
 # Keeps a hard reference to fire-and-forget tasks so they aren't collected mid-execution.
@@ -28,11 +28,7 @@ def _format_sse(event_name: str, payload: dict[str, str | int | None]) -> str:
     return f"event: {event_name}\ndata: {json.dumps(payload)}\n\n"
 
 
-async def _validate_scrape_url(url: str) -> str:
-    return await validate_public_http_url(url)
-
-
-async def _run_scrape_job(job_id: int) -> None:
+async def _run_scrape_job(job_id: int, force: bool = False) -> None:
     async with SessionLocal() as db:
         job = await db.get(ScrapeJob, job_id)
         if not job:
@@ -46,18 +42,36 @@ async def _run_scrape_job(job_id: int) -> None:
 
         async with scrape_semaphore:
             try:
-                await persist_scraped_recipe(job.url, db, job_id)
+                result = await persist_scraped_recipe(job.url, db, job_id, force=force)
+                if isinstance(result, DuplicateFound):
+                    job.status = "duplicate_warning"
+                    job.error_message = f"DUPLICATE:{result.existing_id}:{result.existing_title}:{result.title_score}:{result.ingredient_score}"
+                    await db.commit()
+                    await job_event_bus.publish(
+                        job_id,
+                        JobEvent(
+                            status="duplicate_warning",
+                            message=f"Recette similaire : {result.existing_title}",
+                            extra={
+                                "similar_id": result.existing_id,
+                                "similar_title": result.existing_title,
+                                "similar_url": result.existing_url,
+                                "similar_image": result.existing_image,
+                                "title_score": result.title_score,
+                                "ingredient_score": result.ingredient_score,
+                            },
+                        ),
+                    )
+                    return
                 job.status = "completed"
                 job.error_message = None
                 await db.commit()
-                
                 logger.info(f"Job {job_id} terminé avec succès.")
                 await job_event_bus.publish(job_id, JobEvent(status="completed", message="Recette ajoutée avec succès !"))
             except Exception as exc:
                 job.status = "failed"
                 job.error_message = str(exc)[:700]
                 await db.commit()
-                
                 logger.error(f"Échec du job {job_id}: {exc}", exc_info=True)
                 await job_event_bus.publish(
                     job_id,
@@ -70,7 +84,7 @@ async def enqueue_scrape(
     payload: ScrapeRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    safe_url = await _validate_scrape_url(str(payload.url))
+    safe_url = await validate_public_http_url(str(payload.url))
 
     existing = await db.scalar(select(Recipe).where(Recipe.url == safe_url))
     if existing:
@@ -81,7 +95,7 @@ async def enqueue_scrape(
     await db.commit()
     await db.refresh(job)
 
-    task = asyncio.create_task(_run_scrape_job(job.id))
+    task = asyncio.create_task(_run_scrape_job(job.id, force=payload.force))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return ScrapeResponse(message="Scrape job queued", url=safe_url, job_id=job.id, status="pending")
@@ -93,7 +107,7 @@ async def get_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    _valid: set[JobStatus] = {"pending", "running", "completed", "failed"}
+    _valid: set[JobStatus] = {"pending", "running", "completed", "failed", "duplicate_warning"}
     status: JobStatus = job.status if job.status in _valid else "pending"  # type: ignore[assignment]
 
     return JobStatusResponse(
@@ -135,16 +149,16 @@ async def stream_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
             while True:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=2.0)
-                    yield _format_sse(
-                        "status",
-                        {
-                            "job_id": job_id,
-                            "status": event.status,
-                            "message": event.message,
-                            "error_message": event.message if event.status == "failed" else None,
-                        },
-                    )
-                    if event.status in {"completed", "failed"}:
+                    payload: dict = {
+                        "job_id": job_id,
+                        "status": event.status,
+                        "message": event.message,
+                        "error_message": event.message if event.status == "failed" else None,
+                    }
+                    if event.extra:
+                        payload.update(event.extra)
+                    yield _format_sse("status", payload)
+                    if event.status in {"completed", "failed", "duplicate_warning"}:
                         return
                 except TimeoutError:
                     # Si un événement est raté (race condition), on lit la DB et on force le statut final.
@@ -153,7 +167,7 @@ async def stream_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
                         if not heartbeat_job:
                             return
 
-                        if heartbeat_job.status in {"completed", "failed"}:
+                        if heartbeat_job.status in {"completed", "failed", "duplicate_warning"}:
                             yield _format_sse(
                                 "status",
                                 {

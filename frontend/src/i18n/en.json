@@ -13,7 +13,10 @@
     "close": "Close",
     "customRecipe": "Create Custom Recipe",
     "searchPlaceholder": "Search recipes...",
-    "favoritesFilter": "Favorites"
+    "favoritesFilter": "Favorites",
+    "filtersLabel": "Filters",
+    "filterByTag": "Filter by tag",
+    "clearFilters": "Clear"
   },
   "recipe": {
     "noImage": "No image yet",
@@ -84,7 +87,7 @@
     "history": "History",
     "pantry": "Pantry",
     "mealPlanner": "Meal Planner",
-    "ingredientsAdmin": "Ingredients"
+    "admin": "Admin"
   },
   "auth": {
     "logout": "Logout",
@@ -124,6 +127,32 @@
   "error": {
     "loadFailed": "Failed to load recipe details."
   },
+  "unit": {
+    "group": {
+      "Weight": "Weight",
+      "Volume": "Volume",
+      "Cooking": "Cooking",
+      "Count": "Count",
+      "Other": "Other"
+    },
+    "g": "g",
+    "kg": "kg",
+    "ml": "ml",
+    "cl": "cl",
+    "L": "L",
+    "c. à soupe": "tbsp",
+    "c. à thé": "tsp",
+    "tasse": "cup",
+    "piece": "piece",
+    "botte": "bunch",
+    "tranche": "slice",
+    "boîte": "can",
+    "paquet": "pack",
+    "gousse": "clove",
+    "pincée": "pinch",
+    "au goût": "to taste",
+    "filet": "drizzle"
+  },
   "category": {
     "Produce": "Produce",
     "Meat": "Meat",
@@ -142,7 +171,13 @@
     "failed": "Scrape failed.",
     "inProgress": "Scraping in progress...",
     "streamError": "Real-time connection interrupted. Try refreshing.",
-    "noJobId": "Scrape job started but no job ID returned."
+    "noJobId": "Scrape job started but no job ID returned.",
+    "duplicateTitle": "Similar recipe found",
+    "duplicateMessage": "A very similar recipe already exists in your collection. Import anyway?",
+    "titleScore": "Title match",
+    "ingredientScore": "Ingredient match",
+    "forceImport": "Import anyway",
+    "cancelImport": "Cancel"
   },
   "lang": {
     "switchToEn": "EN",
@@ -163,7 +198,6 @@
     "subtitle": "Ingredients already at home — automatically marked as owned in new lists.",
     "add": "Add to pantry",
     "namePlaceholder": "Ingredient name",
-    "nameFrPlaceholder": "French name (optional)",
     "category": "Category",
     "empty": "Your pantry is empty.",
     "remove": "Remove"
@@ -206,6 +240,7 @@
     "needsReview": "Needs review only",
     "nameEn": "English name",
     "nameFr": "French name",
+    "name": "Name",
     "category": "Category",
     "save": "Save",
     "mergeInto": "Merge",
@@ -219,12 +254,58 @@
     "mergeError": "Error during merge.",
     "edit": "Edit",
     "usages": "Usages",
-    "noResults": "No ingredients found."
+    "noResults": "No ingredients found.",
+    "aiSuggestMerges": "AI Suggestions",
+    "aiSuggestMergesTitle": "AI-suggested duplicates",
+    "aiMerging": "Analysing...",
+    "applyMerges": "Apply ({{count}})",
+    "noSuggestions": "No duplicates detected.",
+    "mergeApplied": "{{count}} merge(s) applied.",
+    "aiUnavailable": "Ollama unavailable. Make sure it is running."
   },
   "stats": {
     "totalRecipes": "Recipes",
     "totalLists": "Lists",
     "topSource": "Top source",
     "topIngredient": "Top ingredient"
+  },
+  "recipes": {
+    "findDuplicates": "Similar recipes",
+    "scan": "Scan",
+    "scanning": "Scanning...",
+    "noDuplicates": "No similar pairs found.",
+    "duplicatePairs": "{{count}} similar pair(s) found",
+    "delete": "Delete",
+    "deleted": "Recipe deleted.",
+    "confirmDelete": "Delete this recipe? This cannot be undone.",
+    "deleteError": "Failed to delete recipe.",
+    "scanError": "Failed to scan for similar recipes."
+  },
+  "tags": {
+    "manage": "Tag management",
+    "namePlaceholder": "Tag name",
+    "colorLabel": "Color",
+    "add": "Add",
+    "empty": "No tags yet. Create one above to enable recipe filters.",
+    "delete": "Delete",
+    "confirmDelete": "Delete this tag?",
+    "createError": "Failed to create tag.",
+    "deleteError": "Failed to delete tag.",
+    "names": {
+      "Rapide": "Quick",
+      "V\u00e9g\u00e9tarien": "Vegetarian",
+      "V\u00e9gan": "Vegan",
+      "\u00c9pic\u00e9": "Spicy",
+      "Peu de vaisselle": "Low washing-up",
+      "Healthy": "Healthy",
+      "Comfort food": "Comfort food",
+      "P\u00e2tes": "Pasta",
+      "Riz": "Rice",
+      "Poulet": "Chicken",
+      "Poisson": "Fish",
+      "Dessert": "Dessert",
+      "Petit-d\u00e9jeuner": "Breakfast",
+      "Batch cooking": "Batch cooking"
+    }
   }
 }

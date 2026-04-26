@@ -409,3 +409,80 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         # Si globalement pété (réponse bizarre de Ollama), on fallback tout le monde
         logger.warning("Application du fallback sur la totalité du lot...")
         return [normalize_fallback(i.raw, i.quantity) for i in ingredients]
+
+
+# ── Name translation ──────────────────────────────────────────────────────
+
+_LANG_NAMES: dict[str, str] = {
+    "en": "English",
+    "fr": "French",
+    "es": "Spanish",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+}
+
+
+async def translate_ingredient_name(
+    name: str,
+    from_lang: str,
+    target_langs: list[str],
+) -> dict[str, str]:
+    """Translate a food ingredient name to multiple languages using Ollama.
+
+    Returns a dict mapping lang_code → translated name.  The source language
+    is always included unchanged.  On any Ollama failure the original name is
+    used as the fallback for all target languages.
+    """
+    result: dict[str, str] = {from_lang: name}
+    to_translate = [lang for lang in target_langs if lang != from_lang]
+    if not to_translate:
+        return result
+
+    # Pre-populate fallbacks so we always return every requested lang
+    for lang in to_translate:
+        result[lang] = name
+
+    from_name = _LANG_NAMES.get(from_lang, from_lang)
+    targets_desc = ", ".join(
+        f"{lang} ({_LANG_NAMES.get(lang, lang)})" for lang in to_translate
+    )
+    safe_name = _sanitize_raw_ingredient(name)
+    prompt = (
+        f"Translate this food ingredient name from {from_name} to: {targets_desc}. "
+        f"Ingredient: \"{safe_name}\". "
+        "Reply with JSON only — no markdown, no explanation. "
+        "Example: {\"en\": \"flour\", \"fr\": \"farine\"}. "
+        "Use the most common culinary name."
+    )
+
+    try:
+        async with ollama_semaphore:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{settings.ollama_base_url}/api/generate",
+                    json={
+                        "model": settings.ollama_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "format": "json",
+                    },
+                )
+        resp.raise_for_status()
+        raw_text = resp.json().get("response", "")
+
+        # Strip markdown code fences if present
+        raw_text = re.sub(r"```(?:json)?", "", raw_text).strip()
+        parsed = json.loads(raw_text)
+
+        for lang in to_translate:
+            val = parsed.get(lang, "")
+            if isinstance(val, str) and val.strip():
+                result[lang] = val.strip()
+
+    except Exception:
+        logger.warning(
+            "translate_ingredient_name failed for '%s' — using original name as fallback", name
+        )
+
+    return result

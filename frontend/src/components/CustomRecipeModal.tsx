@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createCustomRecipe } from "../api/client";
 import type { RecipeCreate, RecipeIngredientCreate, RecipeDetail } from "../types";
@@ -56,6 +56,14 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
   const [ingCat, setIngCat] = useState("Other");
 
   const canSubmit = useMemo(() => title.trim().length > 0 && !loading, [title, loading]);
+  const instructionsRef = useRef<HTMLTextAreaElement>(null);
+
+  function handleInstructionsInput() {
+    const el = instructionsRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }
 
   const addIngredient = () => {
     const cleanName = ingName.trim();
@@ -200,10 +208,11 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
             <div>
               <label className="mb-1 block text-sm font-medium">{t("customRecipe.fields.instructions")}</label>
               <textarea
-                className="w-full rounded-xl border border-gray-300 p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
-                rows={4}
+                ref={instructionsRef}
+                className="w-full min-h-[8rem] resize-none overflow-hidden rounded-xl border border-gray-300 p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
+                onInput={handleInstructionsInput}
               />
             </div>
 

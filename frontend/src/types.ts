@@ -11,6 +11,7 @@ export type RecipeListItem = {
   source_domain: string;
   image_local_path: string | null;
   base_servings: number;
+  prep_time_minutes: number | null;
   is_favorite: boolean;
   tags: Tag[];
 };
@@ -94,17 +95,44 @@ export type ShoppingListSummary = {
   already_owned_items: number;
 };
 
+export type DuplicateWarningInfo = {
+  id: number;
+  title: string;
+  url: string;
+  image_local_path: string | null;
+  title_score: number;
+  ingredient_score: number;
+};
+
 export type ScrapeResponse = {
   message: string;
   url: string;
   job_id?: number;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "running" | "completed" | "failed" | "duplicate_warning";
+  similar_recipe?: DuplicateWarningInfo | null;
 };
 
 export type JobStatusResponse = {
   job_id: number;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "running" | "completed" | "failed" | "duplicate_warning";
   error_message?: string | null;
+};
+
+export type RecipeSimilarPair = {
+  recipe_a_id: number;
+  recipe_a_title: string;
+  recipe_a_url: string;
+  recipe_a_image: string | null;
+  recipe_b_id: number;
+  recipe_b_title: string;
+  recipe_b_url: string;
+  recipe_b_image: string | null;
+  title_score: number;
+  ingredient_score: number;
+};
+
+export type RecipeSimilarPairsResponse = {
+  pairs: RecipeSimilarPair[];
 };
 
 // ── Pantry ────────────────────────────────────────────────────────────────
@@ -170,6 +198,19 @@ export type IngredientDetail = {
   is_normalized: boolean;
   needs_review: boolean;
   usage_count: number;
+  translations: Record<string, string>;
+};
+
+export type MergeSuggestion = {
+  source_id: number;
+  source_name: string;
+  target_id: number;
+  target_name: string;
+  reason: string;
+};
+
+export type MergeSuggestionResponse = {
+  suggestions: MergeSuggestion[];
 };
 
 export type RecipeIngredientCreate = {

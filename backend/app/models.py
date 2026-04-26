@@ -50,6 +50,22 @@ class Ingredient(Base):
     recipe_links: Mapped[list["RecipeIngredient"]] = relationship(
         "RecipeIngredient", back_populates="ingredient"
     )
+    translations: Mapped[list["IngredientTranslation"]] = relationship(
+        "IngredientTranslation", back_populates="ingredient", cascade="all, delete-orphan"
+    )
+
+
+class IngredientTranslation(Base):
+    __tablename__ = "ingredient_translations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ingredient_id: Mapped[int] = mapped_column(
+        ForeignKey("ingredients.id", ondelete="CASCADE"), index=True
+    )
+    lang_code: Mapped[str] = mapped_column(String(10))
+    name: Mapped[str] = mapped_column(String(200))
+
+    ingredient: Mapped["Ingredient"] = relationship("Ingredient", back_populates="translations")
 
 
 class RecipeIngredient(Base):

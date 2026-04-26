@@ -1,23 +1,32 @@
 import asyncio
+import json
+import re
 import shutil
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
 from ...database import get_db
-from ...models import Ingredient, Recipe, RecipeIngredient, ShoppingList, ShoppingListRecipe
+from ...models import Ingredient, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListRecipe
 from ...schemas import (
     IngredientDetail,
     IngredientMergeRequest,
+    MergeSuggestion,
+    MergeSuggestionResponse,
+    RecipeSimilarPair,
+    RecipeSimilarPairsResponse,
     RecipeSourceStat,
     StatsOut,
     TopIngredientStat,
     TopRecipeStat,
 )
+from ...services.dedupe import similarity_score
 from ..dependencies import require_auth
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_auth)])
@@ -69,18 +78,20 @@ async def list_ingredients_admin(
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Ingredient)
+    stmt = select(Ingredient).options(selectinload(Ingredient.translations))
     if q:
         stmt = stmt.where(Ingredient.name_en.ilike(f"%{q}%") | Ingredient.name_fr.ilike(f"%{q}%"))
     if needs_review is not None:
-        # Ingredients with needs_review=True means they have RecipeIngredients flagged
         if needs_review:
+            # Show ingredients that have at least one flagged RecipeIngredient
             subq = select(RecipeIngredient.ingredient_id).where(
                 RecipeIngredient.needs_review == True,
                 RecipeIngredient.ingredient_id.isnot(None),
             )
             stmt = stmt.where(Ingredient.id.in_(subq))
-        stmt = stmt.where(Ingredient.is_normalized == (not needs_review))
+        else:
+            # Show only fully-normalised ingredients
+            stmt = stmt.where(Ingredient.is_normalized == True)
     stmt = stmt.order_by(Ingredient.name_en).offset(offset).limit(limit)
     ingredients = (await db.scalars(stmt)).all()
 
@@ -120,9 +131,82 @@ async def list_ingredients_admin(
             is_normalized=i.is_normalized,
             needs_review=i.id in review_set,
             usage_count=usage_map.get(i.id, 0),
+            translations={t.lang_code: t.name for t in i.translations},
         )
         for i in ingredients
     ]
+
+
+@router.post("/ingredients/ai-suggest-merges", response_model=MergeSuggestionResponse)
+async def ai_suggest_merges(db: AsyncSession = Depends(get_db)):
+    """Ask Ollama to identify ingredient names that are likely duplicates.
+
+    Read-only endpoint — no DB writes.  The frontend applies the suggestions
+    via the regular /merge endpoint.
+    """
+    ingredients = (
+        await db.scalars(
+            select(Ingredient).order_by(Ingredient.name_en).limit(300)
+        )
+    ).all()
+
+    ing_list = [{"id": i.id, "name": i.name_en} for i in ingredients]
+    prompt = (
+        "You are a food ingredient database administrator. "
+        "Here is a JSON array of ingredient entries with integer IDs and English names: "
+        f"{json.dumps(ing_list)}. "
+        "Identify pairs of entries that clearly refer to the same ingredient "
+        "(e.g. different spelling, plural, abbreviation, or minor variation). "
+        "For each pair, designate the preferred canonical entry as target_name. "
+        "Return JSON only: "
+        '{"suggestions": [{"source_name": "...", "target_name": "...", "reason": "..."}]}. '
+        "If no clear duplicates exist, return {\"suggestions\": []}. "
+        "Limit to at most 30 suggestions."
+    )
+
+    try:
+        from ...services.normalizer import ollama_semaphore  # noqa: PLC0415
+        async with ollama_semaphore:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(
+                    f"{settings.ollama_base_url}/api/generate",
+                    json={
+                        "model": settings.ollama_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "format": "json",
+                    },
+                )
+        resp.raise_for_status()
+        raw_text = resp.json().get("response", "")
+        raw_text = re.sub(r"```(?:json)?", "", raw_text).strip()
+        parsed = json.loads(raw_text)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI unavailable. Is Ollama running? ({exc})",
+        ) from exc
+
+    name_to_id = {i.name_en: i.id for i in ingredients}
+    suggestions: list[MergeSuggestion] = []
+    for s in parsed.get("suggestions", [])[:30]:
+        src_name = str(s.get("source_name", "")).strip()
+        tgt_name = str(s.get("target_name", "")).strip()
+        reason = str(s.get("reason", ""))[:200]
+        src_id = name_to_id.get(src_name)
+        tgt_id = name_to_id.get(tgt_name)
+        if src_id and tgt_id and src_id != tgt_id:
+            suggestions.append(
+                MergeSuggestion(
+                    source_id=src_id,
+                    source_name=src_name,
+                    target_id=tgt_id,
+                    target_name=tgt_name,
+                    reason=reason,
+                )
+            )
+
+    return MergeSuggestionResponse(suggestions=suggestions)
 
 
 @router.post("/ingredients/merge", response_model=IngredientDetail)
@@ -163,6 +247,52 @@ async def merge_ingredients(
         needs_review=False,
         usage_count=usage_count,
     )
+
+
+# ── Recipe duplicate scan ────────────────────────────────────────────────────
+
+@router.post("/recipes/find-duplicates", response_model=RecipeSimilarPairsResponse)
+async def find_duplicate_recipes(
+    title_threshold: float = 75.0,
+    ingredient_threshold: float = 0.5,
+    db: AsyncSession = Depends(get_db),
+):
+    """Scan all recipes and return pairs that look like duplicates."""
+    recipes = (
+        await db.scalars(
+            select(Recipe).options(
+                selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
+            )
+        )
+    ).all()
+
+    pairs: list[RecipeSimilarPair] = []
+    for i, a in enumerate(recipes):
+        a_names = [
+            link.ingredient.name_en if link.ingredient else link.raw_string
+            for link in a.recipe_ingredients
+        ]
+        for b in recipes[i + 1:]:
+            b_names = [
+                link.ingredient.name_en if link.ingredient else link.raw_string
+                for link in b.recipe_ingredients
+            ]
+            ts, ing_s = similarity_score(a.title, a_names, b.title, b_names)
+            if ts >= title_threshold and ing_s >= ingredient_threshold:
+                pairs.append(RecipeSimilarPair(
+                    recipe_a_id=a.id,
+                    recipe_a_title=a.title,
+                    recipe_a_url=a.url,
+                    recipe_a_image=a.image_local_path,
+                    recipe_b_id=b.id,
+                    recipe_b_title=b.title,
+                    recipe_b_url=b.url,
+                    recipe_b_image=b.image_local_path,
+                    title_score=round(ts, 1),
+                    ingredient_score=round(ing_s, 2),
+                ))
+
+    return RecipeSimilarPairsResponse(pairs=pairs)
 
 
 # ── Stats ────────────────────────────────────────────────────────────────────

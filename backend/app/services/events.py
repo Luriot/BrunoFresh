@@ -8,6 +8,7 @@ from typing import AsyncGenerator
 class JobEvent:
     status: str
     message: str | None = None
+    extra: dict | None = None
 
 
 class JobEventBus:

@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { RecipeCard } from "../components/RecipeCard";
-import { ShoppingList } from "../components/ShoppingList";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
 import type { CartEntry } from "../hooks/useCart";
-import type { RecipeListItem, ShoppingList as ShoppingListType, StatsOut, Tag } from "../types";
+import type { RecipeListItem, StatsOut, Tag } from "../types";
 import { fetchStats, fetchTags, fetchRecipes } from "../api/client";
 
 type Props = {
@@ -14,15 +13,12 @@ type Props = {
   scrapeState: string | null;
   recipes: RecipeListItem[];
   cart: CartEntry[];
-  list: ShoppingListType | null;
   onScrape: (urls: string[]) => Promise<void>;
   onRefreshRecipes: () => Promise<void>;
   onAddToCart: (recipe: RecipeListItem) => void;
   onUpdateServings: (recipeId: number, servings: number) => void;
   onClearCart: () => void;
   onGenerateList: () => Promise<void>;
-  onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
-  onAddCustomItem: (payload: { name: string; quantity: number; unit: string }) => Promise<void>;
   onRecipesChanged: (recipes: RecipeListItem[]) => void;
 };
 
@@ -31,15 +27,12 @@ export function DashboardPage({
   scrapeState,
   recipes,
   cart,
-  list,
   onScrape,
   onRefreshRecipes,
   onAddToCart,
   onUpdateServings,
   onClearCart,
   onGenerateList,
-  onToggleOwned,
-  onAddCustomItem,
   onRecipesChanged,
 }: Readonly<Props>) {
   const { t } = useTranslation();
@@ -51,6 +44,7 @@ export function DashboardPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [stats, setStats] = useState<StatsOut | null>(null);
 
@@ -83,6 +77,14 @@ export function DashboardPage({
 
   function toggleTagFilter(tagId: number) {
     setSelectedTagIds((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
+  }
+
+  function sortRecipes(list: RecipeListItem[]): RecipeListItem[] {
+    return [...list].sort((a, b) => {
+      // Favorites first, then alphabetical
+      if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+      return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    });
   }
 
   async function handleMultiScrape() {
@@ -184,6 +186,20 @@ export function DashboardPage({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           <button
+              type="button"
+              onClick={() => allTags.length > 0 && setShowFilters((v) => !v)}
+              disabled={allTags.length === 0}
+              title={allTags.length === 0 ? t("tags.empty") : undefined}
+              className={`relative rounded-xl border px-3 py-2 text-sm font-semibold transition ${allTags.length === 0 ? "cursor-not-allowed border-gray-200 text-gray-400 opacity-50 dark:border-[#3e3e42] dark:text-gray-600" : showFilters || selectedTagIds.length > 0 ? "border-accent bg-accent/10 text-accent dark:bg-accent/20" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
+            >
+              🏷 {t("app.filtersLabel")}
+              {selectedTagIds.length > 0 && (
+                <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
+                  {selectedTagIds.length}
+                </span>
+              )}
+            </button>
+          <button
             type="button"
             onClick={() => setShowFavoritesOnly((v) => !v)}
             className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${showFavoritesOnly ? "border-red-300 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
@@ -192,23 +208,39 @@ export function DashboardPage({
           </button>
         </div>
 
-        {/* Tag filter chips */}
-        {allTags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {allTags.map((tag) => {
-              const active = selectedTagIds.includes(tag.id);
-              return (
+        {/* Collapsible tag filter panel */}
+        {showFilters && allTags.length > 0 && (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-[#3e3e42] dark:bg-[#252526]">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {t("app.filterByTag")}
+              </span>
+              {selectedTagIds.length > 0 && (
                 <button
-                  key={tag.id}
                   type="button"
-                  onClick={() => toggleTagFilter(tag.id)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${active ? "text-white" : "border border-gray-300 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
-                  style={active ? { backgroundColor: tag.color ?? "#6b7280" } : undefined}
+                  onClick={() => setSelectedTagIds([])}
+                  className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
-                  {tag.name}
+                  {t("app.clearFilters")}
                 </button>
-              );
-            })}
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {allTags.map((tag) => {
+                const active = selectedTagIds.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleTagFilter(tag.id)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${active ? "text-white" : "border border-gray-300 text-gray-600 hover:border-gray-400 dark:border-[#3e3e42] dark:text-gray-400"}`}
+                    style={active ? { backgroundColor: tag.color ?? "#6b7280" } : undefined}
+                  >
+                    {t(`tags.names.${tag.name}`, { defaultValue: tag.name })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -220,7 +252,7 @@ export function DashboardPage({
                onAdd={onAddToCart}
                onClick={setSelectedRecipeToView}
                onFavoriteToggled={(updated) => {
-                 onRecipesChanged(recipes.map((r) => r.id === updated.id ? updated : r));
+                 onRecipesChanged(sortRecipes(recipes.map((r) => r.id === updated.id ? updated : r)));
                }}
             />
           ))}
@@ -234,10 +266,6 @@ export function DashboardPage({
           onClearCart={onClearCart}
           onGenerateList={onGenerateList}
         />
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
-          <h2 className="mb-2 font-heading text-xl font-semibold text-ink dark:text-white">{t("shopping.title")}</h2>
-          <ShoppingList data={list} onAddCustomItem={onAddCustomItem} onToggleOwned={onToggleOwned} />
-        </section>
       </aside>
 
       <button
@@ -278,10 +306,6 @@ export function DashboardPage({
               onClearCart={onClearCart}
               onGenerateList={onGenerateList}
             />
-            <section className="mt-4 rounded-2xl border border-gray-200 bg-white p-4">
-              <h2 className="mb-2 font-heading text-xl font-semibold">{t("shopping.title")}</h2>
-              <ShoppingList data={list} onAddCustomItem={onAddCustomItem} onToggleOwned={onToggleOwned} />
-            </section>
           </div>
         </div>
       )}
