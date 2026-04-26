@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass
 
@@ -105,6 +106,7 @@ async def persist_scraped_recipe(
         image_local_path=None,
         image_original_url=scraped.image_url,
         instructions_text=scraped.instructions_text,
+        instruction_steps_json=json.dumps(scraped.instruction_steps) if scraped.instruction_steps else None,
         base_servings=scraped.base_servings,
         prep_time_minutes=scraped.prep_time_minutes,
     )

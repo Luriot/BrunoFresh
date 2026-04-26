@@ -13,7 +13,9 @@ from ...schemas import (
     MealPlanCreate,
     MealPlanEntryCreate,
     MealPlanEntryOut,
+    MealPlanEntryPatch,
     MealPlanOut,
+    MealPlanPatch,
     MealPlanSummaryOut,
     ShoppingListOut,
 )
@@ -57,22 +59,31 @@ async def list_meal_plans(
     plans = (
         await db.scalars(
             select(MealPlan)
-            .options(selectinload(MealPlan.entries))
+            .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))
             .order_by(MealPlan.created_at.desc())
             .offset(offset)
             .limit(limit)
         )
     ).all()
-    return [
-        MealPlanSummaryOut(
-            id=p.id,
-            label=p.label,
-            week_start_date=p.week_start_date,
-            created_at=p.created_at,
-            entry_count=len(p.entries),
+    result = []
+    for p in plans:
+        seen: set[int] = set()
+        images: list[str | None] = []
+        for e in sorted(p.entries, key=lambda e: (e.day_of_week, e.id)):
+            if e.recipe_id not in seen and len(images) < 4:
+                seen.add(e.recipe_id)
+                images.append(e.recipe.image_local_path if e.recipe else None)
+        result.append(
+            MealPlanSummaryOut(
+                id=p.id,
+                label=p.label,
+                week_start_date=p.week_start_date,
+                created_at=p.created_at,
+                entry_count=len(p.entries),
+                preview_images=images,
+            )
         )
-        for p in plans
-    ]
+    return result
 
 
 @router.post("/meal-plans", response_model=MealPlanOut, status_code=status.HTTP_201_CREATED)
@@ -107,6 +118,26 @@ async def delete_meal_plan(plan_id: int, db: AsyncSession = Depends(get_db)):
     await db.delete(plan)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/meal-plans/{plan_id}", response_model=MealPlanOut)
+async def patch_meal_plan(plan_id: int, payload: MealPlanPatch, db: AsyncSession = Depends(get_db)):
+    plan = await db.scalar(
+        select(MealPlan)
+        .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))
+        .where(MealPlan.id == plan_id)
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail=_NOT_FOUND)
+    plan.label = payload.label
+    await db.commit()
+    await db.refresh(plan)
+    plan = await db.scalar(
+        select(MealPlan)
+        .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))
+        .where(MealPlan.id == plan_id)
+    )
+    return _plan_to_out(plan)
 
 
 @router.post("/meal-plans/{plan_id}/entries", response_model=MealPlanEntryOut, status_code=status.HTTP_201_CREATED)
@@ -158,6 +189,31 @@ async def delete_meal_plan_entry(
     await db.delete(entry)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/meal-plans/{plan_id}/entries/{entry_id}", response_model=MealPlanEntryOut)
+async def patch_meal_plan_entry(
+    plan_id: int,
+    entry_id: int,
+    payload: MealPlanEntryPatch,
+    db: AsyncSession = Depends(get_db),
+):
+    entry = await db.scalar(
+        select(MealPlanEntry)
+        .options(selectinload(MealPlanEntry.recipe))
+        .where(MealPlanEntry.id == entry_id, MealPlanEntry.meal_plan_id == plan_id)
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail=_ENTRY_NOT_FOUND)
+    entry.target_servings = payload.target_servings
+    await db.commit()
+    await db.refresh(entry)
+    entry = await db.scalar(
+        select(MealPlanEntry)
+        .options(selectinload(MealPlanEntry.recipe))
+        .where(MealPlanEntry.id == entry_id)
+    )
+    return _entry_to_out(entry)
 
 
 @router.post("/meal-plans/{plan_id}/generate-list", response_model=ShoppingListOut)

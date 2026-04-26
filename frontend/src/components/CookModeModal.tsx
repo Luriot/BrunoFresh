@@ -27,7 +27,14 @@ function parseSteps(text: string): string[] {
 
 export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Props>) {
   const { t } = useTranslation();
-  const steps = parseSteps(recipe.instructions_text ?? "");
+  // Use structured steps when scraped, otherwise fall back to parsing text
+  const hasStructuredSteps = recipe.instruction_steps && recipe.instruction_steps.length > 0;
+  const steps = hasStructuredSteps
+    ? recipe.instruction_steps.map((s) => s.text)
+    : parseSteps(recipe.instructions_text ?? "");
+  const stepImages = hasStructuredSteps
+    ? recipe.instruction_steps.map((s) => s.image_url ?? null)
+    : steps.map(() => null);
   const [currentStep, setCurrentStep] = useState(0);
   const [formatting, setFormatting] = useState(false);
   const [formatError, setFormatError] = useState<string | null>(null);
@@ -107,6 +114,15 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
           <p className="mb-6 text-lg font-semibold text-green-400">
             {t("cookMode.step", { current: currentStep + 1, total: totalSteps })}
           </p>
+
+          {/* Step image (when available from structured scrape) */}
+          {stepImages[currentStep] && (
+            <img
+              src={stepImages[currentStep]}
+              alt={`Step ${currentStep + 1}`}
+              className="mb-6 max-h-56 w-full max-w-lg rounded-2xl object-cover shadow-lg"
+            />
+          )}
 
           {/* Step text */}
           <p className="max-w-2xl text-3xl font-medium leading-snug sm:text-4xl">

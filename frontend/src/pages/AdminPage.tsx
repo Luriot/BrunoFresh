@@ -1,7 +1,9 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { createTag, deleteTag, deleteRecipe, fetchIngredientsAdmin, fetchTags, findDuplicateRecipes, mergeIngredients, patchIngredient, suggestIngredientMerges } from "../api/client";
+import { createTag, deleteTag, deleteRecipe, exportDb, fetchIngredientsAdmin, fetchTags, findDuplicateRecipes, importDb, mergeIngredients, patchIngredient, suggestIngredientMerges } from "../api/client";
 import type { IngredientDetail, MergeSuggestion, RecipeSimilarPair, Tag } from "../types";
+
+type AdminTab = "ingredients" | "tags" | "duplicates" | "database";
 
 const CATEGORIES = [
   "Produce", "Meat", "Fish", "Dairy", "Pantry",
@@ -13,6 +15,7 @@ type StatusMsg = { text: string; isError: boolean } | null;
 
 export function AdminPage() {
   const { t, i18n } = useTranslation();
+  const [activeTab, setActiveTab] = useState<AdminTab>("ingredients");
   const [ingredients, setIngredients] = useState<IngredientDetail[]>([]);
   const [search, setSearch] = useState("");
   const [needsReview, setNeedsReview] = useState(false);
@@ -94,6 +97,12 @@ export function AdminPage() {
   }
   const [aiLoading, setAiLoading] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+
+  // Database tab state
+  const [dbExporting, setDbExporting] = useState(false);
+  const [dbImporting, setDbImporting] = useState(false);
+  const [dbStatus, setDbStatus] = useState<StatusMsg>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -191,9 +200,74 @@ export function AdminPage() {
     setStatus({ text: t("ingredients.mergeApplied", { count: applied }), isError: false });
   }
 
+  async function handleExportDb() {
+    setDbExporting(true);
+    setDbStatus(null);
+    try {
+      const blob = await exportDb();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "brunofresh_backup.db";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDbStatus({ text: t("admin.db.importError"), isError: true });
+    } finally {
+      setDbExporting(false);
+    }
+  }
+
+  async function handleImportDb(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!confirm(t("admin.db.importDesc"))) {
+      if (importFileRef.current) importFileRef.current.value = "";
+      return;
+    }
+    setDbImporting(true);
+    setDbStatus(null);
+    try {
+      await importDb(file);
+      setDbStatus({ text: t("admin.db.importSuccess"), isError: false });
+    } catch {
+      setDbStatus({ text: t("admin.db.importError"), isError: true });
+    } finally {
+      setDbImporting(false);
+      if (importFileRef.current) importFileRef.current.value = "";
+    }
+  }
+
+  const TABS: { key: AdminTab; label: string }[] = [
+    { key: "ingredients", label: t("admin.tabs.ingredients") },
+    { key: "tags", label: t("admin.tabs.tags") },
+    { key: "duplicates", label: t("admin.tabs.duplicates") },
+    { key: "database", label: t("admin.tabs.database") },
+  ];
+
   return (
     <main className="mx-auto max-w-5xl px-4 pb-10 pt-4 sm:px-6 lg:px-8">
-      <h1 className="mb-6 font-heading text-2xl font-bold text-ink dark:text-gray-100">{t("ingredients.title")}</h1>
+      {/* Tab bar */}
+      <div className="mb-6 flex flex-wrap gap-1 rounded-2xl border border-gray-200 bg-gray-50 p-1 dark:border-[#3e3e42] dark:bg-[#252526]">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              activeTab === tab.key
+                ? "bg-accent text-white shadow"
+                : "text-gray-600 hover:text-ink dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Ingredients tab ──────────────────────────────────────────────── */}
+      {activeTab === "ingredients" && (
+        <>
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap gap-3">
@@ -394,9 +468,12 @@ export function AdminPage() {
           </table>
         </div>
       )}
+        </>
+      )}
 
-      {/* Recipe duplicate scan */}
-      <section className="mt-10">
+      {/* ── Duplicates tab ───────────────────────────────────────────────── */}
+      {activeTab === "duplicates" && (
+      <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-heading text-base font-bold text-ink dark:text-gray-100">
             🔍 {t("recipes.findDuplicates")}
@@ -462,9 +539,11 @@ export function AdminPage() {
           </div>
         )}
       </section>
+      )}
 
-      {/* Tag management */}
-      <section className="mt-10">
+      {/* ── Tags tab ─────────────────────────────────────────────────────── */}
+      {activeTab === "tags" && (
+      <section>
         <h2 className="mb-4 font-heading text-base font-bold text-ink dark:text-gray-100">
           🏷 {t("tags.manage")}
         </h2>
@@ -517,6 +596,56 @@ export function AdminPage() {
           </div>
         )}
       </section>
+      )}
+
+      {/* ── Database tab ─────────────────────────────────────────────────── */}
+      {activeTab === "database" && (
+        <div className="space-y-6">
+          <h2 className="font-heading text-base font-bold text-ink dark:text-gray-100">
+            🗄 {t("admin.db.title")}
+          </h2>
+
+          {dbStatus && (
+            <p className={`text-sm font-medium ${dbStatus.isError ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+              {dbStatus.text}
+            </p>
+          )}
+
+          {/* Export */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#3e3e42] dark:bg-[#252526]">
+            <h3 className="mb-1 text-sm font-semibold text-ink dark:text-gray-200">{t("admin.db.exportBtn")}</h3>
+            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">{t("admin.db.exportDesc")}</p>
+            <button
+              type="button"
+              disabled={dbExporting}
+              onClick={() => void handleExportDb()}
+              className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
+            >
+              {dbExporting ? t("app.loading") : `⬇ ${t("admin.db.exportBtn")}`}
+            </button>
+          </div>
+
+          {/* Import */}
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-700/30 dark:bg-red-900/10">
+            <h3 className="mb-1 text-sm font-semibold text-red-800 dark:text-red-300">{t("admin.db.importBtn")}</h3>
+            <p className="mb-3 text-xs text-red-600 dark:text-red-400">{t("admin.db.importDesc")}</p>
+            <label className="flex cursor-pointer items-center gap-3">
+              <span className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-700/40 dark:bg-[#252526] dark:text-red-400 dark:hover:bg-[#2d2d30]">
+                {dbImporting ? t("app.loading") : `⬆ ${t("admin.db.importBtn")}`}
+              </span>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".db"
+                disabled={dbImporting}
+                onChange={(e) => void handleImportDb(e)}
+                className="sr-only"
+                aria-label={t("admin.db.importFileLabel")}
+              />
+            </label>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

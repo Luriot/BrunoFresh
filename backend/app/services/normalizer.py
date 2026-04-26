@@ -213,8 +213,48 @@ _SECTION_HEADER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Matches a leading number (integer, decimal with . or ,, or simple fraction like 1/2)
+_LEADING_QTY_RE = re.compile(r"^\s*(\d+(?:[.,]\d+)?(?:\s*/\s*\d+)?)")
+# Optionally also captures the unit that immediately follows the quantity
+_LEADING_QTY_UNIT_RE = re.compile(
+    r"^\s*\d+(?:[.,]\d+)?(?:\s*/\s*\d+)?\s*(g|kg|ml|cl|L|l|piece|tranche|botte|c\.?\s*à\s*\w+)\b",
+    re.IGNORECASE,
+)
+
+
+def _parse_qty_from_raw(raw: str) -> float:
+    """Extract a leading numeric quantity from a raw ingredient string."""
+    m = _LEADING_QTY_RE.match(raw.strip())
+    if not m:
+        return 0.0
+    qty_str = m.group(1)
+    if "/" in qty_str:
+        parts = qty_str.split("/")
+        try:
+            return float(parts[0].strip()) / float(parts[1].strip())
+        except (ValueError, ZeroDivisionError):
+            return 0.0
+    return float(qty_str.replace(",", "."))
+
+
+def _parse_unit_from_raw(raw: str) -> str:
+    """Extract the canonical unit that immediately follows the leading number, or empty string."""
+    m = _LEADING_QTY_UNIT_RE.match(raw.strip())
+    if not m:
+        return ""
+    canonical, _ = normalize_unit(m.group(1).strip(), 1.0)
+    return canonical
+
 
 def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient | None:
+    # If the scraper left quantity=0, try to parse it from the raw string itself
+    if quantity == 0:
+        parsed = _parse_qty_from_raw(raw_string)
+        if parsed > 0:
+            quantity = parsed
+    # Detect the unit from the raw string (used in last-resort and liquid ingredients)
+    raw_unit = _parse_unit_from_raw(raw_string)
+
     text = raw_string.lower()
 
     def fallback(name_en: str, name_fr: str, qty: float, unit_value: str, category: str) -> NormalizedIngredient:
@@ -256,8 +296,60 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
         return fallback("mixed herbs", "herbes melangees", max(1, quantity), "g", "Spices")
     if "lasagne" in text or "pâte" in text or "pasta" in text:
         return fallback("lasagna sheets", "feuilles de lasagne", quantity, "piece", "Pantry")
-        
-    return None
+    if "œuf" in text or "oeuf" in text or "egg" in text:
+        return fallback("egg", "oeuf", quantity, "piece", "Dairy")
+    if "mascarpone" in text:
+        return fallback("mascarpone", "mascarpone", quantity, "g", "Dairy")
+    if "crème" in text or "creme" in text or "cream" in text:
+        return fallback("cream", "crème", quantity, "ml", "Dairy")
+    if "boudoir" in text or "biscuit" in text or "cookie" in text:
+        return fallback("biscuit", "biscuit boudoir", quantity, "piece", "Pantry")
+    if "citron" in text or "lemon" in text:
+        is_juice = "jus" in text or "juice" in text
+        u = raw_unit if raw_unit and raw_unit in ("ml", "cl", "L") else ("ml" if is_juice else "piece")
+        return fallback(
+            "lemon juice" if is_juice else "lemon",
+            "jus de citron" if is_juice else "citron",
+            quantity, u, "Produce"
+        )
+    if "fraise" in text or "strawberr" in text or "fraisier" in text:
+        return fallback("strawberry", "fraise", quantity, "g", "Produce")
+    if "vanille" in text or "vanilla" in text:
+        return fallback("vanilla", "vanille", max(1, quantity), "piece", "Spices")
+    if "chocolat" in text or "chocolate" in text:
+        return fallback("chocolate", "chocolat", quantity, "g", "Pantry")
+    if "vinaigre" in text or "vinegar" in text:
+        return fallback("vinegar", "vinaigre", quantity, "ml", "Pantry")
+    if "miel" in text or "honey" in text:
+        return fallback("honey", "miel", quantity, "g", "Pantry")
+    if "poulet" in text or "chicken" in text:
+        return fallback("chicken", "poulet", quantity, "g", "Meat")
+    if "porc" in text or "pork" in text or "lardons" in text:
+        return fallback("pork", "porc", quantity, "g", "Meat")
+    if "saumon" in text or "salmon" in text:
+        return fallback("salmon", "saumon", quantity, "g", "Meat")
+    if "thon" in text or "tuna" in text:
+        return fallback("tuna", "thon", quantity, "g", "Meat")
+    if "carotte" in text or "carrot" in text:
+        return fallback("carrot", "carotte", quantity, raw_unit or "piece", "Produce")
+    if "courgette" in text or "zucchini" in text:
+        return fallback("zucchini", "courgette", quantity, raw_unit or "piece", "Produce")
+    if "champignon" in text or "mushroom" in text:
+        return fallback("mushroom", "champignon", quantity, raw_unit or "g", "Produce")
+    if "pomme de terre" in text or "pommes de terre" in text or "potato" in text:
+        return fallback("potato", "pomme de terre", quantity, raw_unit or "piece", "Produce")
+    if "riz" in text or "rice" in text:
+        return fallback("rice", "riz", quantity, "g", "Pantry")
+    if "fromage" in text or "cheese" in text:
+        return fallback("cheese", "fromage", quantity, "g", "Dairy")
+    if "yaourt" in text or "yogurt" in text or "yoghurt" in text:
+        return fallback("yogurt", "yaourt", quantity, "g", "Dairy")
+    # Last resort: preserve the parsed quantity with a cleaned name rather than losing it
+    clean_name = re.sub(r'^[\d\s.,/]+(?:g|kg|ml|cl|l|piece|tranche|botte)?\s*', '', raw_string, flags=re.I).strip()
+    clean_name = re.sub(r'\(s\)', '', clean_name).strip()
+    name = clean_name.lower()[:100] if clean_name else raw_string.strip().lower()[:100]
+    u = raw_unit or "piece"
+    return fallback(name, name, quantity, u, "Other")
 
 
 async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> list[NormalizedIngredient | None]:

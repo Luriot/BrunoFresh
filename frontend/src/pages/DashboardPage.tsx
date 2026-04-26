@@ -102,16 +102,16 @@ export function DashboardPage({
         {/* Stats mini-widget */}
         {stats && (
           <div className="flex flex-wrap gap-3">
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
               <p className="text-2xl font-bold text-accent">{stats.total_recipes}</p>
               <p className="text-xs text-gray-500">{t("stats.totalRecipes")}</p>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
               <p className="text-2xl font-bold text-accent">{stats.total_lists}</p>
               <p className="text-xs text-gray-500">{t("stats.totalLists")}</p>
             </div>
             {stats.recipes_by_source[0] && (
-              <div className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+              <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
                 <p className="text-sm font-bold text-ink dark:text-gray-100">{stats.recipes_by_source[0].source_domain}</p>
                 <p className="text-xs text-gray-500">{t("stats.topSource")} ({stats.recipes_by_source[0].count})</p>
               </div>

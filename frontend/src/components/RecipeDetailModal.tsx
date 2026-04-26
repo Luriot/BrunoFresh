@@ -18,7 +18,7 @@ type Props = {
 };
 
 export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<Props>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -241,10 +241,9 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                           <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
                           <div className="min-w-0">
                             <p className="truncate font-medium text-ink dark:text-gray-200">
-                              {ing.ingredient_name ?? ing.raw_string}
-                              {ing.ingredient_name_fr && (
-                                <span className="ml-1 text-sm text-gray-400">({ing.ingredient_name_fr})</span>
-                              )}
+                              {i18n.language === "fr" && ing.ingredient_name_fr
+                                ? ing.ingredient_name_fr
+                                : (ing.ingredient_name ?? ing.raw_string)}
                             </p>
                             {(ing.quantity != null || ing.unit) && (
                               <p className="text-sm text-gray-500 dark:text-gray-400">

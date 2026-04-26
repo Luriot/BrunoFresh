@@ -24,6 +24,7 @@ import { HistoryPage } from "./pages/HistoryPage";
 import { ShoppingListViewPage } from "./pages/ShoppingListViewPage";
 import { PantryPage } from "./pages/PantryPage";
 import { MealPlannerPage } from "./pages/MealPlannerPage";
+import { MealPlanDetailPage } from "./pages/MealPlanDetailPage";
 import { AdminPage } from "./pages/AdminPage";
 import type { RecipeListItem, ShoppingList as ShoppingListType, ShoppingListSummary } from "./types";
 import { useTranslation } from "react-i18next";
@@ -369,7 +370,8 @@ function App() {
           }
         />
         <Route path="/pantry" element={<PantryPage />} />
-        <Route path="/meal-planner" element={<MealPlannerPage onListGenerated={(l: ShoppingListType) => { setList(l); void loadShoppingListHistory(); }} />} />
+        <Route path="/planner" element={<MealPlannerPage onListGenerated={(l: ShoppingListType) => { setList(l); void loadShoppingListHistory(); }} />} />
+        <Route path="/planner/:planId" element={<MealPlanDetailPage onListGenerated={(l: ShoppingListType) => { setList(l); void loadShoppingListHistory(); }} />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -378,3 +380,4 @@ function App() {
 }
 
 export default App;
+

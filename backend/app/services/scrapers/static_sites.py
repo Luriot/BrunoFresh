@@ -69,13 +69,14 @@ class StaticRecipeScraper(BaseScraper):
                 digits = "".join(ch for ch in jsonld["recipeYield"] if ch.isdigit())
                 if digits:
                     base_servings = max(1, int(digits))
-
         ingredients: list[ScrapedIngredient] = [
             self._parse_ingredient_line(line) for line in ingredient_lines if line.strip()
         ]
 
         if not title:
             return self._fallback_recipe()
+
+        instruction_steps = self._extract_instruction_steps(jsonld) if jsonld else []
 
         return ScrapedRecipe(
             title=title,
@@ -85,4 +86,5 @@ class StaticRecipeScraper(BaseScraper):
             base_servings=base_servings,
             prep_time_minutes=None,
             ingredients=ingredients or self._fallback_recipe().ingredients,
+            instruction_steps=instruction_steps,
         )

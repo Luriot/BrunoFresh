@@ -26,11 +26,17 @@ export type RecipeIngredientOut = {
   category: string | null;
 };
 
+export type InstructionStep = {
+  text: string;
+  image_url?: string | null;
+};
+
 export type RecipeDetail = RecipeListItem & {
   image_original_url: string | null;
   instructions_text: string | null;
   prep_time_minutes: number | null;
   ingredients: RecipeIngredientOut[];
+  instruction_steps: InstructionStep[];
 };
 
 export type CartInput = {
@@ -186,6 +192,7 @@ export type MealPlanSummary = {
   week_start_date: string | null;
   created_at: string;
   entry_count: number;
+  preview_images: (string | null)[];
 };
 
 // ── Ingredient admin ──────────────────────────────────────────────────────

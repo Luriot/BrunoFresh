@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -12,6 +13,7 @@ from ...models import recipe_tags as recipe_tags_table
 from ...schemas import (
     IngredientDetail,
     IngredientNamePatch,
+    InstructionStep,
     RecipeCreate,
     RecipeDetail,
     RecipeIngredientOut,
@@ -40,6 +42,13 @@ def _ing_to_out(link: RecipeIngredient) -> RecipeIngredientOut:
 
 
 def _recipe_to_detail(recipe: Recipe) -> RecipeDetail:
+    steps: list[InstructionStep] = []
+    if recipe.instruction_steps_json:
+        try:
+            raw = json.loads(recipe.instruction_steps_json)
+            steps = [InstructionStep(**s) for s in raw if isinstance(s, dict)]
+        except Exception:
+            pass
     return RecipeDetail(
         id=recipe.id,
         title=recipe.title,
@@ -53,6 +62,7 @@ def _recipe_to_detail(recipe: Recipe) -> RecipeDetail:
         is_favorite=recipe.is_favorite,
         tags=[TagOut.model_validate(t) for t in recipe.tags],
         ingredients=[_ing_to_out(link) for link in recipe.recipe_ingredients],
+        instruction_steps=steps,
     )
 
 

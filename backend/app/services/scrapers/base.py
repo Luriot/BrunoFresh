@@ -47,6 +47,38 @@ class BaseScraper(ABC):
                             return graph_item
         return None
 
+    def _extract_instruction_steps(self, jsonld: dict) -> list[dict]:
+        """Extract structured steps with optional images from JSON-LD recipeInstructions."""
+        steps: list[dict] = []
+        raw = jsonld.get("recipeInstructions")
+        if not isinstance(raw, list):
+            return steps
+        for item in raw:
+            if isinstance(item, str) and item.strip():
+                steps.append({"text": item.strip(), "image_url": None})
+            elif isinstance(item, dict):
+                text = item.get("text", "").strip()
+                if not text:
+                    continue
+                # image may be a string URL or a list/dict with "url"
+                image_raw = item.get("image")
+                if isinstance(image_raw, str):
+                    image_url: str | None = image_raw
+                elif isinstance(image_raw, dict):
+                    image_url = image_raw.get("url")
+                elif isinstance(image_raw, list) and image_raw:
+                    first = image_raw[0]
+                    if isinstance(first, str):
+                        image_url = first
+                    elif isinstance(first, dict):
+                        image_url = first.get("url")
+                    else:
+                        image_url = None
+                else:
+                    image_url = None
+                steps.append({"text": text, "image_url": image_url})
+        return steps
+
     def _parse_ingredient_line(self, line: str) -> ScrapedIngredient:
         cleaned = re.sub(r"\s+", " ", line).strip()
         if not cleaned:

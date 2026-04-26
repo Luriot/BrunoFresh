@@ -36,6 +36,17 @@ htmlcov/
 
 # Database & Local Data (BrunoFresh specific)
 backend/data/database.db
+backend/data/database.db-shm
+backend/data/database.db-wal
+*.db-shm
+*.db-wal
 backend/data/images/*
 !backend/data/images/.gitkeep
 backend/data/hf_state.json
+
+# Python type stubs / cache
+.mypy_cache/
+.ruff_cache/
+
+# Alembic generated (local only)
+backend/data/*.db

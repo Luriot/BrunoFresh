@@ -232,7 +232,19 @@
     "mealHeader": "Meal",
     "mealsCount": "({{count}} meals)",
     "generateError": "Error generating list.",
-    "confirmDelete": "Delete this plan?"
+    "confirmDelete": "Delete this plan?",
+    "showSnack": "Show snacks",
+    "hideSnack": "Hide snacks",
+    "dragHint": "Drag a recipe here",
+    "dropHere": "Drop here",
+    "backToPlans": "Back to plans",
+    "editLabel": "Edit plan name",
+    "servingsShort": "{{count}} srv",
+    "noPlans": "No meal plans yet...",
+    "newPlanBtn": "New plan",
+    "planDetail": "Plan detail",
+    "recipePicker": "Recipes",
+    "searchRecipes": "Search recipes..."
   },
   "ingredients": {
     "title": "Ingredients Admin",
@@ -306,6 +318,24 @@
       "Dessert": "Dessert",
       "Petit-d\u00e9jeuner": "Breakfast",
       "Batch cooking": "Batch cooking"
+    }
+  },
+  "admin": {
+    "tabs": {
+      "ingredients": "Ingredients",
+      "tags": "Tags",
+      "duplicates": "Duplicates",
+      "database": "Database"
+    },
+    "db": {
+      "title": "Database",
+      "exportBtn": "Export Database",
+      "exportDesc": "Download a backup of the SQLite database.",
+      "importBtn": "Import Database",
+      "importDesc": "Replace the database with a previous backup.",
+      "importFileLabel": "SQLite file (.db)",
+      "importSuccess": "Database imported successfully.",
+      "importError": "Import failed."
     }
   }
 }

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -17,3 +17,4 @@ class ScrapedRecipe:
     base_servings: int
     prep_time_minutes: int | None
     ingredients: list[ScrapedIngredient]
+    instruction_steps: list[dict] = field(default_factory=list)

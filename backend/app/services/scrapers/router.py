@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from urllib.parse import urlparse
 
 import httpx
 from recipe_scrapers import scrape_html  # type: ignore
+
+_PAREN_DUP_RE = re.compile(r'^(.+)\(\1\)\s*$')
+
+
+def _clean_raw_ingredient(line: str) -> str:
+    """Strip duplicate trailing parenthetical: '1 cl citron(1 cl citron)' → '1 cl citron'."""
+    stripped = line.strip()
+    m = _PAREN_DUP_RE.match(stripped)
+    return m.group(1).strip() if m else stripped
 
 from .static_sites import StaticRecipeScraper
 from .types import ScrapedIngredient, ScrapedRecipe
@@ -58,7 +68,7 @@ def _try_recipe_scrapers(url: str) -> ScrapedRecipe | None:
 
         domain = urlparse(url).netloc.replace("www.", "")
         ingredients = [
-            ScrapedIngredient(raw=line, quantity=0, unit="")
+            ScrapedIngredient(raw=_clean_raw_ingredient(line), quantity=0, unit="")
             for line in raw_ingredients
             if line.strip()
         ]

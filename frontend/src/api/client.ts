@@ -253,6 +253,16 @@ export async function deleteMealPlanEntry(planId: number, entryId: number) {
   await api.delete(`/meal-plans/${planId}/entries/${entryId}`);
 }
 
+export async function patchMealPlanEntry(planId: number, entryId: number, payload: { target_servings: number }) {
+  const { data } = await api.patch<MealPlanEntry>(`/meal-plans/${planId}/entries/${entryId}`, payload);
+  return data;
+}
+
+export async function patchMealPlan(planId: number, payload: { label: string | null }) {
+  const { data } = await api.patch<MealPlan>(`/meal-plans/${planId}`, payload);
+  return data;
+}
+
 export async function generateListFromMealPlan(planId: number) {
   const { data } = await api.post<ShoppingList>(`/meal-plans/${planId}/generate-list`);
   return data;
@@ -283,4 +293,19 @@ export async function findDuplicateRecipes() {
 export async function suggestIngredientMerges() {
   const { data } = await api.post<MergeSuggestionResponse>("/admin/ingredients/ai-suggest-merges");
   return data;
+}
+
+// ── Admin: database ───────────────────────────────────────────────────────
+
+export async function exportDb(): Promise<Blob> {
+  const response = await api.get("/admin/db/export", { responseType: "blob" });
+  return response.data as Blob;
+}
+
+export async function importDb(file: File): Promise<void> {
+  const form = new FormData();
+  form.append("file", file);
+  await api.post("/admin/db/import", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 }

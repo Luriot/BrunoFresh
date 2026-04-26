@@ -1,7 +1,7 @@
 {
   "app": {
     "title": "BrunoFresh",
-    "subtitle": "Scrapez des recettes et construisez une liste de courses intelligente.",
+    "subtitle": "Scrapez des recettes, construisez des listes de courses.",
     "urlPlaceholder": "Collez une URL de recette",
     "urlPerLine": "une URL par ligne",
     "scrape": "Scraper",
@@ -86,11 +86,11 @@
     "dashboard": "Accueil",
     "history": "Historique",
     "pantry": "Garde-manger",
-    "mealPlanner": "Planificateur",
+    "mealPlanner": "Plan",
     "admin": "Admin"
   },
   "auth": {
-    "logout": "Déconnexion",
+    "logout": "Quitter",
     "loginPrompt": "Entrez le code d'accès pour voir vos recettes.",
     "passcodePlaceholder": "Code d'accès",
     "signIn": "Se connecter",
@@ -232,7 +232,19 @@
     "mealHeader": "Repas",
     "mealsCount": "({{count}} repas)",
     "generateError": "Erreur lors de la génération.",
-    "confirmDelete": "Supprimer ce plan ?"
+    "confirmDelete": "Supprimer ce plan ?",
+    "showSnack": "Afficher les collations",
+    "hideSnack": "Masquer les collations",
+    "dragHint": "Glissez une recette ici",
+    "dropHere": "Déposer ici",
+    "backToPlans": "Retour aux plans",
+    "editLabel": "Modifier le nom du plan",
+    "servingsShort": "{{count}} pers.",
+    "noPlans": "Aucun plan de repas...",
+    "newPlanBtn": "Nouveau plan",
+    "planDetail": "Détail du plan",
+    "recipePicker": "Recettes",
+    "searchRecipes": "Rechercher des recettes..."
   },
   "ingredients": {
     "title": "Admin ingrédients",
@@ -306,6 +318,24 @@
       "Dessert": "Dessert",
       "Petit-d\u00e9jeuner": "Petit-d\u00e9jeuner",
       "Batch cooking": "Batch cooking"
+    }
+  },
+  "admin": {
+    "tabs": {
+      "ingredients": "Ingrédients",
+      "tags": "Tags",
+      "duplicates": "Doublons",
+      "database": "Base de données"
+    },
+    "db": {
+      "title": "Base de données",
+      "exportBtn": "Exporter la base",
+      "exportDesc": "Télécharger un backup de la base de données SQLite.",
+      "importBtn": "Importer une base",
+      "importDesc": "Remplacer la base de données par un backup précédent.",
+      "importFileLabel": "Fichier SQLite (.db)",
+      "importSuccess": "Base de données importée avec succès.",
+      "importError": "Erreur lors de l'importation."
     }
   }
 }

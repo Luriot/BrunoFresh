@@ -25,6 +25,7 @@ class Recipe(Base):
     image_local_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     image_original_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     instructions_text: Mapped[str] = mapped_column(Text)
+    instruction_steps_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_servings: Mapped[int] = mapped_column(Integer, default=2)
     prep_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False)

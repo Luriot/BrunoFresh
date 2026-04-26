@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
 
 export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `rounded-lg px-3 py-1 ${isActive ? "bg-accent font-semibold text-white" : "text-gray-700 dark:text-gray-300 dark:hover:text-white"}`;
@@ -24,9 +25,9 @@ export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
         <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
           <nav className="flex flex-wrap rounded-xl border border-gray-200 bg-green-50 p-1 text-sm dark:border-[#3e3e42] dark:bg-[#252526]">
             <NavLink to="/" end className={navLinkClass}>{t("nav.dashboard")}</NavLink>
-            <NavLink to="/history" className={navLinkClass}>{t("nav.history")}</NavLink>
+            <NavLink to="/history" className={({ isActive }) => navLinkClass({ isActive: isActive || location.pathname.startsWith("/lists/") })}>{t("nav.history")}</NavLink>
             <NavLink to="/pantry" className={navLinkClass}>{t("nav.pantry")}</NavLink>
-            <NavLink to="/meal-planner" className={navLinkClass}>{t("nav.mealPlanner")}</NavLink>
+            <NavLink to="/planner" className={({ isActive }) => navLinkClass({ isActive: isActive || location.pathname.startsWith("/planner") })}>{t("nav.mealPlanner")}</NavLink>
             <NavLink to="/admin" className={navLinkClass}>{t("nav.admin")}</NavLink>
           </nav>
 

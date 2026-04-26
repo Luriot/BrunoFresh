@@ -53,6 +53,11 @@ class RecipeIngredientOut(BaseModel):
     category: str | None = None
 
 
+class InstructionStep(BaseModel):
+    text: str
+    image_url: str | None = None
+
+
 class RecipeDetail(BaseModel):
     id: int
     title: str
@@ -66,6 +71,7 @@ class RecipeDetail(BaseModel):
     is_favorite: bool = False
     tags: list["TagOut"] = []
     ingredients: list[RecipeIngredientOut]
+    instruction_steps: list[InstructionStep] = []
 
 
 class ScrapeRequest(BaseModel):
@@ -356,3 +362,12 @@ class MealPlanSummaryOut(BaseModel):
     week_start_date: date | None
     created_at: datetime
     entry_count: int
+    preview_images: list[str | None] = []
+
+
+class MealPlanPatch(BaseModel):
+    label: str | None = Field(default=None, max_length=120)
+
+
+class MealPlanEntryPatch(BaseModel):
+    target_servings: int = Field(ge=1, le=20)
