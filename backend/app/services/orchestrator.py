@@ -208,5 +208,8 @@ async def _auto_tag_recipe(
     all_tags = list((await db.scalars(select(Tag))).all())
     matched = match_tags(all_tags, title, ingredient_names, prep_time_minutes)
     if matched:
+        # Explicitly load the tags collection before assigning to avoid SQLAlchemy async
+        # lazy-loading (MissingGreenlet) on a newly created recipe that has been flushed.
+        await db.refresh(recipe, attribute_names=["tags"])
         recipe.tags = matched
         logger.debug(f"Auto-tags appliqués à la recette #{recipe.id}: {[t.name for t in matched]}")

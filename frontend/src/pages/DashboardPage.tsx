@@ -57,6 +57,15 @@ export function DashboardPage({
     fetchStats().then(setStats).catch(() => {});
   }, []);
 
+  // Refresh stats when a scrape job finishes (loading flips false)
+  const prevLoadingRef = useRef(loading);
+  useEffect(() => {
+    if (prevLoadingRef.current && !loading) {
+      fetchStats().then(setStats).catch(() => {});
+    }
+    prevLoadingRef.current = loading;
+  }, [loading]);
+
   // Debounced server-side filter — runs only after user interacts (skips first render)
   const isFirstRender = useRef(true);
   useEffect(() => {

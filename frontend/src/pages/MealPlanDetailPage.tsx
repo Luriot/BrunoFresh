@@ -176,6 +176,12 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
   const [dragSource, setDragSource] = useState<DragSource | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ day: number; slot: string } | null>(null);
   const dragSourceRef = useRef<DragSource | null>(null);
+  const tempIdRef = useRef(-1);
+
+  const [originalEntries, setOriginalEntries] = useState<MealPlanEntry[]>([]);
+  const [originalLabel, setOriginalLabel] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [recipes, setRecipes] = useState<RecipeListItem[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -188,7 +194,10 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
     try {
       const data = await fetchMealPlan(id);
       setPlan(data);
+      setOriginalEntries(data.entries);
+      setOriginalLabel(data.label);
       setLabelDraft(data.label ?? "");
+      setIsDirty(false);
     } catch {
       setLoadError(true);
     }
@@ -219,21 +228,17 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
     setIsEditingLabel(true);
   }
 
-  async function submitLabel(e: FormEvent) {
+  function submitLabel(e: FormEvent) {
     e.preventDefault();
     if (!plan) return;
-    try {
-      const updated = await patchMealPlan(plan.id, { label: labelDraft.trim() || null });
-      setPlan((prev) => prev ? { ...prev, label: updated.label } : prev);
-    } catch {
-      /* empty */
-    } finally {
-      setIsEditingLabel(false);
-    }
+    setPlan((prev) => prev ? { ...prev, label: labelDraft.trim() || null } : prev);
+    setIsDirty(true);
+    setIsEditingLabel(false);
   }
 
   async function handleGenerateList() {
     if (!plan) return;
+    if (isDirty) await handleSave();
     setGenerating(true);
     setGeneratedMsg(null);
     setGenerateError(null);
@@ -265,44 +270,86 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
     return plan.entries.filter((e) => e.day_of_week === day && e.meal_slot === slot);
   }
 
-  async function addEntryToCell(recipeId: number, day: number, slot: string) {
+  function addEntryToCell(recipeId: number, day: number, slot: string) {
     if (!plan) return;
-    try {
-      const entry = await addMealPlanEntry(plan.id, {
-        recipe_id: recipeId,
-        day_of_week: day,
-        meal_slot: slot,
-        target_servings: 2,
-      });
-      setPlan((prev) => prev ? { ...prev, entries: [...prev.entries, entry] } : prev);
-    } catch {
-      /* empty */
-    }
+    const recipe = recipes.find((r) => r.id === recipeId);
+    const newEntry: MealPlanEntry = {
+      id: tempIdRef.current--,
+      recipe_id: recipeId,
+      recipe_title: recipe?.title ?? `#${recipeId}`,
+      recipe_image_local_path: recipe?.image_local_path ?? null,
+      day_of_week: day,
+      meal_slot: slot,
+      target_servings: 2,
+    };
+    setPlan((prev) => prev ? { ...prev, entries: [...prev.entries, newEntry] } : prev);
+    setIsDirty(true);
   }
 
-  async function handleDeleteEntry(entryId: number) {
-    if (!plan) return;
+  function handleDeleteEntry(entryId: number) {
     setPlan((prev) => prev ? { ...prev, entries: prev.entries.filter((e) => e.id !== entryId) } : prev);
-    try {
-      await deleteMealPlanEntry(plan.id, entryId);
-    } catch {
-      await loadPlan();
-    }
+    setIsDirty(true);
   }
 
-  async function handleServingsChange(entry: MealPlanEntry, delta: number) {
-    if (!plan) return;
+  function handleServingsChange(entry: MealPlanEntry, delta: number) {
     const next = Math.max(1, Math.min(20, entry.target_servings + delta));
     setPlan((prev) =>
       prev
         ? { ...prev, entries: prev.entries.map((e) => e.id === entry.id ? { ...e, target_servings: next } : e) }
         : prev
     );
+    setIsDirty(true);
+  }
+
+  async function handleSave() {
+    if (!plan || isSaving) return;
+    setIsSaving(true);
     try {
-      await patchMealPlanEntry(plan.id, entry.id, { target_servings: next });
+      // Label
+      if ((plan.label ?? null) !== originalLabel) {
+        await patchMealPlan(plan.id, { label: plan.label });
+      }
+      // Deleted real entries
+      const currentRealIds = new Set(plan.entries.filter((e) => e.id > 0).map((e) => e.id));
+      for (const orig of originalEntries) {
+        if (!currentRealIds.has(orig.id)) {
+          await deleteMealPlanEntry(plan.id, orig.id);
+        }
+      }
+      // Moved or servings-changed real entries
+      const toReAdd: MealPlanEntry[] = [];
+      for (const entry of plan.entries.filter((e) => e.id > 0)) {
+        const orig = originalEntries.find((e) => e.id === entry.id);
+        if (!orig) continue;
+        if (orig.day_of_week !== entry.day_of_week || orig.meal_slot !== entry.meal_slot) {
+          await deleteMealPlanEntry(plan.id, entry.id);
+          toReAdd.push(entry);
+        } else if (orig.target_servings !== entry.target_servings) {
+          await patchMealPlanEntry(plan.id, entry.id, { target_servings: entry.target_servings });
+        }
+      }
+      // Re-add moved entries + new temp entries
+      for (const entry of [...toReAdd, ...plan.entries.filter((e) => e.id < 0)]) {
+        await addMealPlanEntry(plan.id, {
+          recipe_id: entry.recipe_id,
+          day_of_week: entry.day_of_week,
+          meal_slot: entry.meal_slot ?? "lunch",
+          target_servings: entry.target_servings,
+        });
+      }
+      await loadPlan();
     } catch {
       await loadPlan();
+    } finally {
+      setIsSaving(false);
     }
+  }
+
+  function handleDiscard() {
+    setPlan((prev) => prev ? { ...prev, entries: originalEntries, label: originalLabel } : prev);
+    setLabelDraft(originalLabel ?? "");
+    setIsDirty(false);
+    setIsEditingLabel(false);
   }
 
   function handleDragStart(source: DragSource) {
@@ -316,12 +363,12 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
     setDragOverCell(null);
   }
 
-  async function handleDrop(day: number, slot: string) {
+  function handleDrop(day: number, slot: string) {
     const src = dragSourceRef.current;
     setDragOverCell(null);
     if (!src || !plan) return;
     if (src.type === "recipe") {
-      await addEntryToCell(src.recipeId, day, slot);
+      addEntryToCell(src.recipeId, day, slot);
     } else if (src.type === "entry") {
       if (src.fromDay === day && src.fromSlot === slot) return;
       setPlan((prev) =>
@@ -329,12 +376,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
           ? { ...prev, entries: prev.entries.map((e) => e.id === src.entryId ? { ...e, day_of_week: day, meal_slot: slot } : e) }
           : prev
       );
-      try {
-        await deleteMealPlanEntry(plan.id, src.entryId);
-        await addEntryToCell(src.recipeId, day, slot);
-      } catch {
-        await loadPlan();
-      }
+      setIsDirty(true);
     }
   }
 
@@ -365,21 +407,29 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
   }
 
   return (
-    <main className="mx-auto max-w-full px-4 py-6 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => navigate("/planner")} className="text-sm text-accent underline hover:no-underline">
-          ← {t("mealPlanner.backToPlans")}
+    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      {/* Header — row 1: back icon | title | delete icon */}
+      <div className="mb-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => { if (!isDirty || confirm(t("mealPlanner.unsavedWarning"))) navigate("/planner"); }}
+          aria-label={t("mealPlanner.backToPlans")}
+          title={t("mealPlanner.backToPlans")}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-[#3e3e42] dark:bg-[#252526] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
+          </svg>
         </button>
 
         {isEditingLabel ? (
-          <form onSubmit={(e) => void submitLabel(e)} className="flex gap-2">
+          <form onSubmit={submitLabel} className="flex flex-1 gap-2">
             <input
               autoFocus
               value={labelDraft}
               onChange={(e) => setLabelDraft(e.target.value)}
               placeholder={t("mealPlanner.labelPlaceholder")}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm dark:border-[#3e3e42] dark:bg-[#252526] dark:text-gray-100"
+              className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm dark:border-[#3e3e42] dark:bg-[#252526] dark:text-gray-100"
             />
             <button type="submit" className="rounded-lg bg-accent px-3 py-1 text-sm text-white">{t("shopping.save")}</button>
             <button type="button" onClick={() => setIsEditingLabel(false)} className="rounded-lg border border-gray-300 px-3 py-1 text-sm dark:border-[#3e3e42] dark:text-gray-300">{t("shopping.cancel")}</button>
@@ -389,37 +439,63 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
             type="button"
             onClick={startEditLabel}
             title={t("mealPlanner.editLabel")}
-            className="group flex items-center gap-1 font-heading text-xl font-bold dark:text-gray-100"
+            className="group flex min-w-0 items-center gap-1 font-heading text-xl font-bold dark:text-gray-100"
           >
-            {plan.label || t("mealPlanner.planDetail")}
-            <span className="ml-1 text-sm text-gray-400 opacity-0 group-hover:opacity-100">✎</span>
+            <span className="truncate">{plan.label || t("mealPlanner.planDetail")}</span>
+            <span className="ml-1 flex-shrink-0 text-sm text-gray-400 opacity-0 group-hover:opacity-100">✎</span>
           </button>
         )}
 
-        <div className="ml-auto flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setShowSnack((v) => !v)}
-            className={`rounded-xl px-3 py-1 text-sm font-semibold ${showSnack ? "bg-amber-400 text-white" : "border border-gray-300 text-gray-600 dark:border-[#3e3e42] dark:text-gray-300"}`}
-          >
-            {showSnack ? t("mealPlanner.hideSnack") : t("mealPlanner.showSnack")}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleGenerateList()}
-            disabled={generating}
-            className="rounded-xl bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
-          >
-            {generating ? t("app.loading") : t("mealPlanner.generateList")}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleDeletePlan()}
-            className="rounded-xl border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-500 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20"
-          >
-            ✕
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => void handleDeletePlan()}
+          aria-label={t("mealPlanner.deletePlan")}
+          title={t("mealPlanner.deletePlan")}
+          className="ml-auto flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-500 hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Header — row 2: snack toggle + generate list (left) | save/discard (right) */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowSnack((v) => !v)}
+          className={`rounded-xl px-3 py-1.5 text-sm font-semibold ${showSnack ? "bg-amber-400 text-white" : "border border-gray-300 text-gray-600 dark:border-[#3e3e42] dark:text-gray-300"}`}
+        >
+          {showSnack ? t("mealPlanner.hideSnack") : t("mealPlanner.showSnack")}
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleGenerateList()}
+          disabled={generating}
+          className="rounded-xl bg-accent px-4 py-1.5 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
+        >
+          {generating ? t("app.loading") : t("mealPlanner.generateList")}
+        </button>
+        {isDirty && (
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className="rounded-xl bg-green-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+            >
+              {isSaving ? t("mealPlanner.saving") : t("mealPlanner.save")}
+            </button>
+            <button
+              type="button"
+              onClick={handleDiscard}
+              disabled={isSaving}
+              className="rounded-xl border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-60 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+            >
+              {t("mealPlanner.discard")}
+            </button>
+          </div>
+        )}
       </div>
 
       {generatedMsg && (
@@ -465,9 +541,9 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
                   servingsShort={(count) => t("mealPlanner.servingsShort", { count })}
                   onDragOver={(day, s) => setDragOverCell({ day, slot: s })}
                   onDragLeave={() => setDragOverCell(null)}
-                  onDrop={(day, s) => void handleDrop(day, s)}
-                  onServingsChange={(entry, delta) => void handleServingsChange(entry, delta)}
-                  onDeleteEntry={(entryId) => void handleDeleteEntry(entryId)}
+                  onDrop={(day, s) => handleDrop(day, s)}
+                  onServingsChange={(entry, delta) => handleServingsChange(entry, delta)}
+                  onDeleteEntry={(entryId) => handleDeleteEntry(entryId)}
                   onDragStartEntry={handleDragStart}
                   onDragEnd={handleDragEnd}
                   isWeekend={weekendDays.has(d)}

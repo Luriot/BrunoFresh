@@ -244,7 +244,12 @@
     "newPlanBtn": "Nouveau plan",
     "planDetail": "Détail du plan",
     "recipePicker": "Recettes",
-    "searchRecipes": "Rechercher des recettes..."
+    "searchRecipes": "Rechercher des recettes...",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "discard": "Annuler",
+    "unsavedWarning": "Annuler les modifications non enregistrées ?",
+    "deletePlan": "Supprimer le plan"
   },
   "ingredients": {
     "title": "Admin ingrédients",
