@@ -58,6 +58,10 @@ def register_spa(app: FastAPI) -> None:
                 raise HTTPException(status_code=400, detail="Bad Request")
             requested_file = frontend_dist_dir / full_path
             if requested_file.exists() and requested_file.is_file():
+                # .webmanifest is not in Python's mimetypes DB; serve it correctly
+                # so Chrome accepts it as a PWA manifest.
+                if requested_file.suffix == ".webmanifest":
+                    return FileResponse(requested_file, media_type="application/manifest+json")
                 return FileResponse(requested_file)
 
         index_file = frontend_dist_dir / "index.html"
