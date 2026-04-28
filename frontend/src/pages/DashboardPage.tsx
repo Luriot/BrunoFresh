@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Heart, SlidersHorizontal, Search } from "lucide-react";
+import { Heart, SlidersHorizontal, Search, LayoutGrid, List } from "lucide-react";
 import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
+import { buildImageUrl, patchRecipe, fetchTags, fetchRecipes } from "../api/client";
 import type { CartEntry } from "../hooks/useCart";
 import type { RecipeListItem, Tag } from "../types";
-import { fetchTags, fetchRecipes } from "../api/client";
 
 type Props = {
   loading: boolean;
@@ -22,6 +22,91 @@ type Props = {
   onGenerateList: () => Promise<void>;
   onRecipesChanged: (recipes: RecipeListItem[]) => void;
 };
+
+type RecipeRowProps = {
+  recipe: RecipeListItem;
+  onAdd: (recipe: RecipeListItem) => void;
+  onClick?: (recipe: RecipeListItem) => void;
+  onFavoriteToggled?: (updated: RecipeListItem) => void;
+};
+
+function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<RecipeRowProps>) {
+  const { t } = useTranslation();
+
+  async function handleFavorite(e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      const updated = await patchRecipe(recipe.id, { is_favorite: !recipe.is_favorite });
+      onFavoriteToggled?.({ ...recipe, is_favorite: updated.is_favorite });
+    } catch {
+      // silently fail
+    }
+  }
+
+  return (
+    <article
+      className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-sm transition hover:shadow-md dark:border-[#3e3e42] dark:bg-[#252526]"
+      onClick={() => onClick?.(recipe)}
+    >
+      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-green-50 dark:bg-[#1e1e1e]">
+        {recipe.image_local_path ? (
+          <img className="h-full w-full object-cover" src={buildImageUrl(recipe.image_local_path)} alt="" />
+        ) : (
+          <div className="flex h-full items-center justify-center text-[9px] text-green-600 dark:text-gray-500">
+            {t("recipe.noImage")}
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-heading text-sm font-semibold text-ink dark:text-gray-100">{recipe.title}</p>
+        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+          {recipe.tags.map((tag) => (
+            <span
+              key={tag.id}
+              className="rounded-full px-1.5 py-0.5 text-[10px] font-medium text-white"
+              style={{ backgroundColor: tag.color ?? "#6b7280" }}
+            >
+              {t(`tags.names.${tag.name}`, { defaultValue: tag.name })}
+            </span>
+          ))}
+        </div>
+      </div>
+      <button
+        type="button"
+        aria-label={recipe.is_favorite ? t("recipe.unfavorite") : t("recipe.favorite")}
+        className="shrink-0 rounded-full p-1 text-gray-400 transition hover:text-red-500 dark:text-gray-500"
+        onClick={handleFavorite}
+      >
+        {recipe.is_favorite ? (
+          <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+          </svg>
+        ) : (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+          </svg>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onAdd(recipe); }}
+        className="shrink-0 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent/90"
+      >
+        {t("recipe.addToCart")}
+      </button>
+    </article>
+  );
+}
+
+function filterButtonClass(tagCount: number, filtersOpen: boolean, selectedCount: number): string {
+  if (tagCount === 0) {
+    return "cursor-not-allowed border-gray-200 text-gray-400 opacity-50 dark:border-[#3e3e42] dark:text-gray-600";
+  }
+  if (filtersOpen || selectedCount > 0) {
+    return "border-accent bg-accent/10 text-accent dark:bg-accent/20";
+  }
+  return "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400";
+}
 
 export function DashboardPage({
   loading,
@@ -40,6 +125,17 @@ export function DashboardPage({
   const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
   const [isCustomRecipeModalOpen, setIsCustomRecipeModalOpen] = useState(false);
   const [selectedRecipeToView, setSelectedRecipeToView] = useState<RecipeListItem | null>(null);
+
+  // View mode toggle (tiles / list)
+  const [viewMode, setViewMode] = useState<"tiles" | "list">(() => {
+    const stored = localStorage.getItem("brunofresh.recipeView");
+    return stored === "list" ? "list" : "tiles";
+  });
+
+  function toggleViewMode(mode: "tiles" | "list") {
+    setViewMode(mode);
+    localStorage.setItem("brunofresh.recipeView", mode);
+  }
 
   // Search + filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,7 +183,7 @@ export function DashboardPage({
   }
 
   async function handleMultiScrape() {
-    const urls = urlInput.split(/\n|,/).map((u) => u.trim()).filter(Boolean);
+    const urls = urlInput.split(/[\n,]/).map((u) => u.trim()).filter(Boolean);
     if (urls.length === 0) return;
     setUrlInput("");
     await onScrape(urls);
@@ -102,7 +198,7 @@ export function DashboardPage({
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
           <div className="flex flex-col gap-2">
             <textarea
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
               placeholder={`${t("app.urlPlaceholder")} (${t("app.urlPerLine")})`}
               rows={2}
               value={urlInput}
@@ -161,7 +257,7 @@ export function DashboardPage({
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
             <input
-              className="w-full rounded-xl border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+              className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
               placeholder={t("app.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -172,7 +268,7 @@ export function DashboardPage({
               onClick={() => allTags.length > 0 && setShowFilters((v) => !v)}
               disabled={allTags.length === 0}
               title={allTags.length === 0 ? t("tags.empty") : undefined}
-              className={`relative flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${allTags.length === 0 ? "cursor-not-allowed border-gray-200 text-gray-400 opacity-50 dark:border-[#3e3e42] dark:text-gray-600" : showFilters || selectedTagIds.length > 0 ? "border-accent bg-accent/10 text-accent dark:bg-accent/20" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
+              className={`relative flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${filterButtonClass(allTags.length, showFilters, selectedTagIds.length)}`}
             >
               <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
               {t("app.filtersLabel")}
@@ -190,6 +286,25 @@ export function DashboardPage({
             <Heart className="h-4 w-4" aria-hidden="true" />
             {t("app.favoritesFilter")}
           </button>
+          {/* View mode toggle */}
+          <div className="flex overflow-hidden rounded-xl border border-gray-200 dark:border-[#3e3e42]">
+            <button
+              type="button"
+              aria-label={t("app.viewTiles")}
+              onClick={() => toggleViewMode("tiles")}
+              className={`flex items-center justify-center px-2.5 py-2 transition ${viewMode === "tiles" ? "bg-accent text-white" : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-[#2d2d30]"}`}
+            >
+              <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label={t("app.viewList")}
+              onClick={() => toggleViewMode("list")}
+              className={`flex items-center justify-center border-l border-gray-200 px-2.5 py-2 transition dark:border-[#3e3e42] ${viewMode === "list" ? "bg-accent text-white" : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-[#2d2d30]"}`}
+            >
+              <List className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         {/* Collapsible tag filter panel */}
@@ -228,19 +343,35 @@ export function DashboardPage({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {recipes.map((recipe) => (
-            <RecipeCard
-               key={recipe.id}
-               recipe={recipe}
-               onAdd={onAddToCart}
-               onClick={setSelectedRecipeToView}
-               onFavoriteToggled={(updated) => {
-                 onRecipesChanged(sortRecipes(recipes.map((r) => r.id === updated.id ? updated : r)));
-               }}
-            />
-          ))}
-        </div>
+        {viewMode === "tiles" ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {recipes.map((recipe) => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                onAdd={onAddToCart}
+                onClick={setSelectedRecipeToView}
+                onFavoriteToggled={(updated) => {
+                  onRecipesChanged(sortRecipes(recipes.map((r) => r.id === updated.id ? updated : r)));
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {recipes.map((recipe) => (
+              <RecipeListRow
+                key={recipe.id}
+                recipe={recipe}
+                onAdd={onAddToCart}
+                onClick={setSelectedRecipeToView}
+                onFavoriteToggled={(updated) => {
+                  onRecipesChanged(sortRecipes(recipes.map((r) => r.id === updated.id ? updated : r)));
+                }}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <aside className="hidden space-y-4 lg:block">
@@ -274,11 +405,10 @@ export function DashboardPage({
               }
             }}
           />
-          <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white p-4">
+          <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-b-0 border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-heading text-xl font-semibold">{t("cart.title")}</h2>
               <button
-                className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                className="rounded-lg border border-gray-200 px-2 py-1 text-sm dark:border-[#3e3e42] dark:text-gray-300"
                 onClick={() => setIsMobilePanelOpen(false)}
                 type="button"
               >

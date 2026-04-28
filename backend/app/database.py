@@ -18,8 +18,13 @@ def _set_sqlite_pragmas(dbapi_conn, _connection_record):
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA cache_size=-16000")  # 16 MB
+    cursor.execute("PRAGMA foreign_keys=ON")     # enforce FK constraints
     cursor.close()
+
+
 SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
+# Alias kept for backwards-compat with any code that imports by this name.
+AsyncSessionLocal = SessionLocal
 Base = declarative_base()
 
 

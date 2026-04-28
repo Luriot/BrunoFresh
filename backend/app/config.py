@@ -38,7 +38,7 @@ class Settings(BaseModel):
     scrape_concurrency_limit: int = int(os.getenv("SCRAPE_CONCURRENCY_LIMIT", "1"))
     app_passcode: str = os.getenv("APP_PASSCODE", DEFAULT_APP_PASSCODE)
     auth_secret: str = os.getenv("AUTH_SECRET", DEFAULT_AUTH_SECRET)
-    auth_token_ttl_minutes: int = int(os.getenv("AUTH_TOKEN_TTL_MINUTES", "10080"))
+    auth_token_ttl_minutes: int = int(os.getenv("AUTH_TOKEN_TTL_MINUTES", "10080"))  # 7 days default
     auth_cookie_name: str = os.getenv("AUTH_COOKIE_NAME", "brunofresh_access_token")
     auth_cookie_secure: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
     auth_cookie_samesite: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").strip().lower()
@@ -65,6 +65,9 @@ def _validate_security_settings(current: Settings) -> None:
 
     if len(current.auth_secret) < 32:
         raise ValueError("AUTH_SECRET must contain at least 32 characters")
+
+    if current.auth_token_ttl_minutes <= 0:
+        raise ValueError("AUTH_TOKEN_TTL_MINUTES must be a positive integer")
 
     in_production = current.environment in PRODUCTION_ENVIRONMENTS
 

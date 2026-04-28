@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
-from ...database import get_db
+from ...database import engine, get_db
 from ...models import Ingredient, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListRecipe
 from ...schemas import (
     IngredientDetail,
@@ -65,7 +65,11 @@ async def import_db(file: UploadFile = File(...)):
             temp_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail="Failed to import database.")
 
-    return {"message": "Database imported successfully."}
+    # Invalidate all pooled connections so the next request opens a fresh
+    # connection to the newly-imported file rather than the stale in-memory handle.
+    await engine.dispose()
+
+    return {"message": "Database imported successfully. Restart the server for full effect."}
 
 
 # ── Ingredient admin ────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import {
   addShoppingListCustomItem,
+  buildImageUrl,
   createShoppingList,
   deleteShoppingList,
   deleteShoppingListItem,
@@ -308,7 +309,7 @@ function App() {
             <div className="mb-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-700/30 dark:bg-amber-900/10">
               {duplicateWarning.similarRecipe.image_local_path && (
                 <img
-                  src={`/images/${duplicateWarning.similarRecipe.image_local_path}`}
+                  src={buildImageUrl(duplicateWarning.similarRecipe.image_local_path)}
                   className="h-16 w-16 rounded-lg object-cover"
                   alt=""
                 />

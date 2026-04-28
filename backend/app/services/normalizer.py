@@ -213,6 +213,26 @@ _SECTION_HEADER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# ── Unicode fraction normalisation (mirrored from scrapers/base.py) ──────────
+_NORM_UNICODE_FRACS: dict[str, str] = {
+    "½": "0.5", "⅓": "0.3333", "⅔": "0.6667", "¼": "0.25", "¾": "0.75",
+    "⅛": "0.125", "⅜": "0.375", "⅝": "0.625", "⅞": "0.875",
+    "⅙": "0.1667", "⅚": "0.8333", "⅕": "0.2", "⅖": "0.4", "⅗": "0.6", "⅘": "0.8",
+}
+_NORM_INT_FRAC_RE = re.compile(r"(\d+)([" + "".join(_NORM_UNICODE_FRACS) + r"])")
+_NORM_FRAC_RE = re.compile("[" + "".join(_NORM_UNICODE_FRACS) + "]")
+
+
+def _normalizer_preprocess_fractions(text: str) -> str:
+    """Replace unicode fractions and ASCII fractions (1/2) with decimal strings."""
+    def _merge(m: re.Match) -> str:
+        return str(float(m.group(1)) + float(_NORM_UNICODE_FRACS[m.group(2)]))
+
+    text = _NORM_INT_FRAC_RE.sub(_merge, text)
+    text = _NORM_FRAC_RE.sub(lambda m: _NORM_UNICODE_FRACS[m.group(0)], text)
+    return text
+
+
 # Matches a leading number (integer, decimal with . or ,, or simple fraction like 1/2)
 _LEADING_QTY_RE = re.compile(r"^\s*(\d+(?:[.,]\d+)?(?:\s*/\s*\d+)?)")
 # Optionally also captures the unit that immediately follows the quantity
@@ -224,7 +244,8 @@ _LEADING_QTY_UNIT_RE = re.compile(
 
 def _parse_qty_from_raw(raw: str) -> float:
     """Extract a leading numeric quantity from a raw ingredient string."""
-    m = _LEADING_QTY_RE.match(raw.strip())
+    preprocessed = _normalizer_preprocess_fractions(raw.strip())
+    m = _LEADING_QTY_RE.match(preprocessed)
     if not m:
         return 0.0
     qty_str = m.group(1)
@@ -239,7 +260,8 @@ def _parse_qty_from_raw(raw: str) -> float:
 
 def _parse_unit_from_raw(raw: str) -> str:
     """Extract the canonical unit that immediately follows the leading number, or empty string."""
-    m = _LEADING_QTY_UNIT_RE.match(raw.strip())
+    preprocessed = _normalizer_preprocess_fractions(raw.strip())
+    m = _LEADING_QTY_UNIT_RE.match(preprocessed)
     if not m:
         return ""
     canonical, _ = normalize_unit(m.group(1).strip(), 1.0)

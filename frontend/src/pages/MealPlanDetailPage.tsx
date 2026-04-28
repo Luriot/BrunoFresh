@@ -59,6 +59,7 @@ function EntryCard({ entry, slot, onServingsChange, onDelete, onDragStart, onDra
           e.currentTarget
         );
       }}
+      style={{ touchAction: 'none' }}
       className={`mb-1 flex cursor-grab flex-col gap-0.5 list-none rounded-lg bg-white px-2 py-1.5 shadow-sm dark:bg-[#2d2d30] ${SLOT_COLORS[slot] ?? ""}`}
     >
       <p className="line-clamp-2 break-words text-xs font-semibold leading-snug text-gray-800 dark:text-gray-100">
@@ -484,7 +485,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8" style={{ overscrollBehaviorY: 'contain' }}>
       {/* Header — row 1: back icon | title | delete icon */}
       <div className="mb-2 flex items-center gap-2">
         <button
@@ -588,8 +589,8 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
       )}
 
       {/* Week grid */}
-      <div className="overflow-x-auto">
-        <div className="min-w-[700px]">
+      <div className="overflow-x-auto pb-4">
+        <div className="min-w-[700px] pb-2">
           <div className="grid" style={{ gridTemplateColumns: "80px repeat(7, minmax(110px, 1fr))" }}>
             <div />
             {DAYS.map((d) => (
@@ -709,6 +710,7 @@ function RecipePickerRow({ recipe, onDragStart, onDragEnd, onTouchDragBegin }: R
         const touch = e.touches[0];
         if (touch) onTouchDragBegin({ type: "recipe", recipeId: recipe.id }, touch, e.currentTarget);
       }}
+      style={{ touchAction: 'none' }}
       className="flex cursor-grab list-none items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm hover:border-accent hover:shadow-sm dark:border-[#3e3e42] dark:bg-[#252526] dark:hover:border-accent"
     >
       {recipe.image_local_path ? (

@@ -131,7 +131,6 @@ async def patch_meal_plan(plan_id: int, payload: MealPlanPatch, db: AsyncSession
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
     plan.label = payload.label
     await db.commit()
-    await db.refresh(plan)
     plan = await db.scalar(
         select(MealPlan)
         .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))

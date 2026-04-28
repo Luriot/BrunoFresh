@@ -13,6 +13,54 @@ from bs4 import BeautifulSoup
 
 from .types import ScrapedIngredient, ScrapedRecipe
 
+# ── Unicode fraction normalisation ────────────────────────────────────────────
+_UNICODE_FRACS: dict[str, str] = {
+    "½": "0.5",
+    "⅓": "0.3333",
+    "⅔": "0.6667",
+    "¼": "0.25",
+    "¾": "0.75",
+    "⅛": "0.125",
+    "⅜": "0.375",
+    "⅝": "0.625",
+    "⅞": "0.875",
+    "⅙": "0.1667",
+    "⅚": "0.8333",
+    "⅕": "0.2",
+    "⅖": "0.4",
+    "⅗": "0.6",
+    "⅘": "0.8",
+}
+
+# Matches an optional leading integer followed immediately by a unicode fraction (e.g. "1½")
+_INT_UNICODE_FRAC_RE = re.compile(r"(\d+)([" + "".join(_UNICODE_FRACS) + r"])")
+# Matches a standalone unicode fraction
+_UNICODE_FRAC_RE = re.compile("[" + "".join(_UNICODE_FRACS) + "]")
+# Matches ASCII fractions like 1/2, 2/3 at the start
+_ASCII_FRAC_RE = re.compile(r"(\d+)\s*/\s*(\d+)")
+
+
+def _preprocess_fractions(text: str) -> str:
+    """Normalise unicode fractions and ASCII fractions to decimal strings."""
+    # Handle "1½" → "1.5"
+    def _merge(m: re.Match) -> str:
+        integer = float(m.group(1))
+        frac = float(_UNICODE_FRACS[m.group(2)])
+        return str(integer + frac)
+
+    text = _INT_UNICODE_FRAC_RE.sub(_merge, text)
+    # Handle standalone "½" → "0.5"
+    text = _UNICODE_FRAC_RE.sub(lambda m: _UNICODE_FRACS[m.group(0)], text)
+    # Handle ASCII "1/2" → "0.5"
+    def _ascii_frac(m: re.Match) -> str:
+        denominator = float(m.group(2))
+        if denominator == 0:
+            return m.group(0)
+        return str(round(float(m.group(1)) / denominator, 4))
+
+    text = _ASCII_FRAC_RE.sub(_ascii_frac, text)
+    return text
+
 
 class BaseScraper(ABC):
     def __init__(self, url: str):
@@ -84,7 +132,8 @@ class BaseScraper(ABC):
         if not cleaned:
             return ScrapedIngredient(raw="", quantity=0, unit="unparsed")
 
-        match = re.match(r"^(\d+(?:[\.,]\d+)?)\s*([a-zA-Z]+)?\s*(.*)$", cleaned)
+        cleaned_for_parse = _preprocess_fractions(cleaned)
+        match = re.match(r"^(\d+(?:[\.,]\d+)?)\s*([a-zA-Z]+)?\s*(.*)$", cleaned_for_parse)
         if not match:
             return ScrapedIngredient(raw=cleaned, quantity=0, unit="unparsed")
 

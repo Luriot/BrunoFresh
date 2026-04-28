@@ -1,87 +1,170 @@
 # BrunoFresh
 
-BrunoFresh is a self-hosted recipe and shopping list app.
-This first implementation provides:
+> **Self-hosted recipe manager & smart grocery list generator**  
+> Scrape recipes from any site, organize them by tag, plan your week, and generate one consolidated shopping list — all from a single private app running on your own hardware.
 
-- A FastAPI backend with SQLite storage
-- Recipe ingestion via a scrape queue endpoint
-- Domain-aware scraper routing for HelloFresh, CuisineAZ, AllRecipes, and Jow
-- Ingredient normalization with Ollama first, then deterministic fallback
-- Cart aggregation with serving-based scaling
-- A React + Vite + Tailwind frontend to scrape URLs, browse recipes, and generate shopping lists
-- EN/FR frontend internationalization with category translations
+---
 
-## Repository Layout
+## Features
 
-- `backend/`: FastAPI API, SQLAlchemy models, scraper/normalizer services
-- `frontend/`: React app for recipe browsing and shopping list generation
+- **Recipe scraping** — paste one or multiple URLs; domain-aware scrapers handle HelloFresh, CuisineAZ, AllRecipes, Jow, and any site publishing JSON-LD Recipe data
+- **Ingredient normalization** — Ollama LLM first, deterministic rule-based fallback; converts imperial ↔ metric, resolves unicode fractions (½, ⅓, ¾…)
+- **Smart deduplication** — title similarity + ingredient overlap check before importing
+- **Cart & servings scaling** — add recipes to cart, adjust servings per recipe, quantities scale automatically
+- **Meal planner** — weekly 7-day drag-and-drop agenda (mouse & touch), with snack slot option
+- **Shopping list history** — generated lists are persisted; mark items as already owned
+- **Pantry management** — track stock to skip owned items when generating lists
+- **Tags & filtering** — custom colour-coded tags with tag-based filtering
+- **Cook mode** — step-by-step instruction view with optional step images
+- **Dark / light theme** — persisted per device, syncs Android PWA status bar
+- **EN / FR interface** — full i18n with category and tag name translations
+- **PWA** — installable on mobile, works offline for browsing cached recipes
+- **Docker-ready** — single-container image with Vite-built frontend served by FastAPI
 
-## Backend Quick Start
+---
 
-1. Open terminal in `backend/`
-2. Create and activate a virtual environment
-3. Install dependencies
-4. Run DB migrations
-5. Run API server
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Python 3.12, FastAPI, SQLAlchemy, Alembic, SQLite |
+| Scraping | httpx, BeautifulSoup4, JSON-LD parsing |
+| AI normalization | Ollama (local LLM, configurable model) |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS |
+| i18n | react-i18next |
+| Auth | HttpOnly cookie session, passcode-based |
+| Container | Docker (multi-stage build) |
+
+---
+
+## Quick Start
+
+### Backend
 
 ```powershell
 cd backend
 python -m venv venv
-venv\Scripts\Activate.ps1
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Set `APP_PASSCODE` before exposing the API. By default the project uses a placeholder passcode for local development only.
-Set a strong `AUTH_SECRET` in production so token signing is stable across restarts.
+> **First run on an existing DB?** If `backend/data/database.db` was created before Alembic was added, run `alembic stamp head` instead of `alembic upgrade head`.
 
-If you already have a local `backend/data/database.db` created before Alembic was added, run `alembic stamp head` once instead of `alembic upgrade head`.
+Backend runs at `http://127.0.0.1:8000`.
 
-Backend will run at `http://127.0.0.1:8000`.
-
-## Frontend Quick Start
-
-1. Open terminal in `frontend/`
-2. Install dependencies
-3. Run dev server
+### Frontend
 
 ```powershell
 cd frontend
 npm install
-copy .env.example .env
+copy .env.example .env   # set VITE_API_URL if needed
 npm run dev
 ```
 
-Frontend will run at `http://127.0.0.1:5173`.
+Frontend runs at `http://127.0.0.1:5173`.
 
-## Implemented API Endpoints
+---
 
-- `GET /api/health`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `GET /api/images/{file_name}`
-- `GET /api/recipes`
-- `GET /api/recipes/{recipe_id}`
-- `POST /api/scrape`
-- `GET /api/jobs/{job_id}/stream` (Server-Sent Events)
-- `PATCH /api/ingredients/{ingredient_id}`
-- `POST /api/cart/generate`
+## Docker
 
-## Current Notes
+```bash
+docker build -t brunofresh .
+docker run -d \
+  -p 8000:8000 \
+  -v ./backend/data:/app/data \
+  -e APP_PASSCODE=changeme \
+  -e AUTH_SECRET=a-long-random-string \
+  brunofresh
+```
 
-- `/api/scrape` now routes scrapers by domain (`hellofresh`, `cuisineaz`, `allrecipes`, `jow`).
-- All API endpoints except `/api/health`, `/api/auth/login`, and `/api/auth/logout` require an authenticated `HttpOnly` cookie.
-- SSE auth no longer uses query-string tokens; `/api/jobs/{job_id}/stream` authenticates via cookie.
-- Images are no longer served through a public static mount. Use `/api/images/{file_name}` with auth.
-- HelloFresh uses Playwright auth via `.env` credentials and persistent state in `backend/data/hf_state.json`.
-- Set `OLLAMA_MODEL=qwen2.5:14b-instruct` for best parsing quality on 16GB VRAM.
-- Deduplication now checks title similarity + ingredient overlap, not only URL equality.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full Unraid / GitHub Actions CI pipeline guide.
 
-## Security Deployment Notes
+---
+
+## Configuration
+
+All settings are environment variables (or a `.env` file in `backend/`):
+
+| Variable | Default | Description |
+|---|---|---|
+| `APP_PASSCODE` | `dev-only` | Login passcode — **change before exposing** |
+| `AUTH_SECRET` | random | JWT signing secret — set to a stable value in production |
+| `AUTH_COOKIE_SECURE` | `false` | Set `true` when served over HTTPS |
+| `ALLOWED_ORIGINS` | `http://localhost:5173` | CORS origins (comma-separated) |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API base URL |
+| `OLLAMA_MODEL` | `llama3` | Model name — `qwen2.5:14b-instruct` recommended for 16 GB VRAM |
+| `DATABASE_URL` | `sqlite:///./data/database.db` | SQLAlchemy DB URL |
+
+---
+
+## Repository Layout
+
+```
+.
+├── backend/
+│   ├── app/
+│   │   ├── api/routers/     # FastAPI route handlers
+│   │   ├── services/        # Scraper, normalizer, orchestrator
+│   │   │   └── scrapers/    # Per-domain & base scrapers
+│   │   ├── models.py        # SQLAlchemy ORM models
+│   │   ├── schemas.py       # Pydantic schemas
+│   │   └── main.py          # App bootstrap
+│   ├── alembic/             # DB migrations
+│   └── data/                # SQLite DB & recipe images (gitignored)
+├── frontend/
+│   └── src/
+│       ├── pages/           # Route-level components
+│       ├── components/      # Shared UI components
+│       ├── api/             # Typed API client
+│       ├── hooks/           # useCart, useScrape
+│       └── i18n/            # EN/FR translation files
+├── Dockerfile
+└── DEPLOYMENT.md
+```
+
+---
+
+## API Overview
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/health` | Health check (no auth) |
+| `POST` | `/api/auth/login` | Passcode login → sets HttpOnly cookie |
+| `POST` | `/api/auth/logout` | Clear session cookie |
+| `GET` | `/api/recipes` | List recipes (filter by tag, search, favorites) |
+| `GET` | `/api/recipes/{id}` | Recipe detail with ingredients & steps |
+| `POST` | `/api/scrape` | Enqueue a scrape job (returns job ID for SSE) |
+| `GET` | `/api/jobs/{id}/stream` | SSE stream for scrape job progress |
+| `POST` | `/api/cart/generate` | Generate shopping list from cart |
+| `GET/POST/PATCH/DELETE` | `/api/lists/…` | Shopping list CRUD |
+| `GET/POST/DELETE` | `/api/meal-plans/…` | Meal plan CRUD |
+| `GET/POST/DELETE` | `/api/pantry/…` | Pantry item management |
+| `GET/POST/DELETE` | `/api/tags/…` | Tag management |
+
+All endpoints (except `/api/health`, `/api/auth/login`, `/api/auth/logout`) require the authenticated HttpOnly session cookie.
+
+---
+
+## Security Notes
 
 - Place BrunoFresh behind an HTTPS reverse proxy (Caddy, Nginx, Traefik) before exposing it beyond LAN.
-- Set `AUTH_COOKIE_SECURE=true` when HTTPS is enabled so auth cookies are never sent over plain HTTP.
+- Set `AUTH_COOKIE_SECURE=true` once HTTPS is enabled so auth cookies are never sent over plain HTTP.
 - Keep `ALLOWED_ORIGINS` minimal and explicit.
-- Keep access logs enabled for auditing, but avoid logging full query strings in reverse proxy logs.
+- The app is designed for **single-household use** with a shared passcode — not multi-user production SaaS.
+
+---
+
+## Contributing
+
+1. Fork the repo and create a feature branch
+2. Run the backend with `uvicorn app.main:app --reload` and the frontend with `npm run dev`
+3. Keep backend changes covered by the existing Alembic migration pattern (add a new version file for schema changes)
+4. Open a PR with a clear description of what changed and why
+
+---
+
+## License
+
+[MIT](LICENSE)

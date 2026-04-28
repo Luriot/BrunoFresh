@@ -24,6 +24,13 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  // Lock background scroll while modal is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   // Cook mode
   const [cookMode, setCookMode] = useState(false);
 

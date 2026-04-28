@@ -80,13 +80,14 @@ async def list_recipes(
     stmt = select(Recipe).options(selectinload(Recipe.tags))
 
     if q:
-        # Search by title OR ingredient name
+        # Escape ILIKE wildcards so user input is treated as a literal substring.
+        q_safe = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         ingredient_recipe_ids = select(RecipeIngredient.recipe_id).join(
             Ingredient, RecipeIngredient.ingredient_id == Ingredient.id
         ).where(
-            Ingredient.name_en.ilike(f"%{q}%") | Ingredient.name_fr.ilike(f"%{q}%")
+            Ingredient.name_en.ilike(f"%{q_safe}%") | Ingredient.name_fr.ilike(f"%{q_safe}%")
         )
-        stmt = stmt.where(Recipe.title.ilike(f"%{q}%") | Recipe.id.in_(ingredient_recipe_ids))
+        stmt = stmt.where(Recipe.title.ilike(f"%{q_safe}%") | Recipe.id.in_(ingredient_recipe_ids))
 
     if source:
         stmt = stmt.where(Recipe.source_domain == source)
@@ -97,10 +98,11 @@ async def list_recipes(
     if ingredients:
         keywords = [kw.strip() for kw in ingredients.split(",") if kw.strip()]
         for kw in keywords:
+            kw_safe = kw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             subq = select(RecipeIngredient.recipe_id).join(
                 Ingredient, RecipeIngredient.ingredient_id == Ingredient.id
             ).where(
-                Ingredient.name_en.ilike(f"%{kw}%") | Ingredient.name_fr.ilike(f"%{kw}%")
+                Ingredient.name_en.ilike(f"%{kw_safe}%") | Ingredient.name_fr.ilike(f"%{kw_safe}%")
             )
             stmt = stmt.where(Recipe.id.in_(subq))
 

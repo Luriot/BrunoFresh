@@ -15,7 +15,7 @@ export function CartPanel({
   onClearCart,
   onGenerateList,
   className = "",
-}: Props) {
+}: Readonly<Props>) {
   const { t } = useTranslation();
 
   return (

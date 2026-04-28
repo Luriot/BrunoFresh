@@ -16,7 +16,9 @@
     "favoritesFilter": "Favorites",
     "filtersLabel": "Filters",
     "filterByTag": "Filter by tag",
-    "clearFilters": "Clear"
+    "clearFilters": "Clear",
+    "viewTiles": "Tile view",
+    "viewList": "List view"
   },
   "recipe": {
     "noImage": "No image yet",
