@@ -194,6 +194,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
   const dragSourceRef = useRef<DragSource | null>(null);
   const ghostRef = useRef<HTMLDivElement | null>(null);
   const tempIdRef = useRef(-1);
+  const gridScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [originalEntries, setOriginalEntries] = useState<MealPlanEntry[]>([]);
   const [originalLabel, setOriginalLabel] = useState<string | null>(null);
@@ -402,6 +403,31 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
     document.body.appendChild(clone);
     ghostRef.current = clone;
 
+    // Auto-scroll constants
+    const SCROLL_EDGE = 80;    // px from edge of screen/container to trigger scroll
+    const SCROLL_MAX = 14;     // max px scrolled per animation frame
+    let scrollRafId: number | null = null;
+
+    function doAutoScroll(cx: number, cy: number) {
+      // Vertical: scroll the page when dragging near top/bottom of viewport
+      const vh = window.innerHeight;
+      if (cy < SCROLL_EDGE) {
+        window.scrollBy(0, -Math.round((1 - cy / SCROLL_EDGE) * SCROLL_MAX));
+      } else if (cy > vh - SCROLL_EDGE) {
+        window.scrollBy(0, Math.round(((cy - (vh - SCROLL_EDGE)) / SCROLL_EDGE) * SCROLL_MAX));
+      }
+      // Horizontal: scroll the grid container when dragging near its left/right edge
+      const grid = gridScrollRef.current;
+      if (grid) {
+        const gr = grid.getBoundingClientRect();
+        if (cx < gr.left + SCROLL_EDGE) {
+          grid.scrollBy(-Math.round((1 - (cx - gr.left) / SCROLL_EDGE) * SCROLL_MAX), 0);
+        } else if (cx > gr.right - SCROLL_EDGE) {
+          grid.scrollBy(Math.round(((cx - (gr.right - SCROLL_EDGE)) / SCROLL_EDGE) * SCROLL_MAX), 0);
+        }
+      }
+    }
+
     function onMove(e: TouchEvent) {
       const t = e.touches[0];
       if (!t) return;
@@ -410,6 +436,12 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
         ghostRef.current.style.left = `${t.clientX - offsetX}px`;
         ghostRef.current.style.top = `${t.clientY - offsetY}px`;
       }
+      // Kick off auto-scroll for this frame
+      if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
+      const cx = t.clientX;
+      const cy = t.clientY;
+      scrollRafId = requestAnimationFrame(() => doAutoScroll(cx, cy));
+      // Hit-test cell under the finger
       if (ghostRef.current) ghostRef.current.style.visibility = "hidden";
       const below = document.elementFromPoint(t.clientX, t.clientY);
       if (ghostRef.current) ghostRef.current.style.visibility = "";
@@ -424,6 +456,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
     function onEnd(e: TouchEvent) {
       document.removeEventListener("touchmove", onMove);
       document.removeEventListener("touchend", onEnd);
+      if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
       ghostRef.current?.remove();
       ghostRef.current = null;
       const t = e.changedTouches[0];
@@ -589,7 +622,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
       )}
 
       {/* Week grid */}
-      <div className="overflow-x-auto pb-4">
+      <div ref={gridScrollRef} className="overflow-x-auto pb-4">
         <div className="min-w-[700px] pb-2">
           <div className="grid" style={{ gridTemplateColumns: "80px repeat(7, minmax(110px, 1fr))" }}>
             <div />

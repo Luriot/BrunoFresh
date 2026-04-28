@@ -54,7 +54,7 @@ export function ShoppingListViewPage({
   const editForm = (
     <form className="flex items-center gap-2" onSubmit={(event) => void onLabelSubmit(event)}>
       <input
-        className="w-56 rounded-lg border border-gray-200 px-3 py-1 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+        className="w-56 rounded-lg border border-gray-200 bg-white px-3 py-1 text-sm text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
         maxLength={160}
         value={labelDraft}
         onChange={(event) => setLabelDraft(event.target.value)}

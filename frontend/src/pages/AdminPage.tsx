@@ -275,7 +275,7 @@ export function AdminPage() {
       {/* Filters */}
       <div className="mb-4 flex flex-wrap gap-3">
         <input
-          className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+          className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
           placeholder={t("ingredients.search")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -305,7 +305,7 @@ export function AdminPage() {
         </div>
         <div className="flex items-center gap-2">
           <select
-            className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
             value={mergeSourceId ?? ""}
             onChange={(e) => setMergeSourceId(Number(e.target.value) || null)}
           >
@@ -314,7 +314,7 @@ export function AdminPage() {
           </select>
           <ArrowRight className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
           <select
-            className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
             value={mergeTargetId ?? ""}
             onChange={(e) => setMergeTargetId(Number(e.target.value) || null)}
           >
@@ -423,14 +423,14 @@ export function AdminPage() {
                     <td className="px-4 py-2" colSpan={2}>
                       <div className="flex gap-2">
                         <input
-                          className="flex-1 rounded border border-gray-200 px-2 py-1 text-sm dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+                          className="flex-1 rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                           value={editDraft.name}
                           onChange={(e) => setEditDraft((d) => d ? { ...d, name: e.target.value } : d)}
                           maxLength={200}
                           placeholder={t("ingredients.name")}
                         />
                         <select
-                          className="rounded border border-gray-200 px-2 py-1 text-sm dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+                          className="rounded border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                           value={editDraft.category}
                           onChange={(e) => setEditDraft((d) => d ? { ...d, category: e.target.value } : d)}
                         >
@@ -564,7 +564,7 @@ export function AdminPage() {
             value={newTagName}
             onChange={(e) => setNewTagName(e.target.value)}
             placeholder={t("tags.namePlaceholder")}
-            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
             required
           />
           <input

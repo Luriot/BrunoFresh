@@ -173,7 +173,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
             <div>
               <label className="mb-1 block text-sm font-medium">{t("customRecipe.fields.title")}</label>
               <input
-                className="w-full rounded-xl border border-gray-300 p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                className="w-full rounded-xl border border-gray-300 bg-white p-2 text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={MAX_TITLE_LENGTH}
@@ -187,7 +187,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
                   type="number"
                   min="1"
                   max="100"
-                  className="w-full rounded-xl border border-gray-300 p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                  className="w-full rounded-xl border border-gray-300 bg-white p-2 text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                   value={servings}
                   onChange={(e) => setServings(Math.max(1, Number(e.target.value) || 1))}
                   required
@@ -199,7 +199,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
                   type="number"
                   min="0"
                   max="1440"
-                  className="w-full rounded-xl border border-gray-300 p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                  className="w-full rounded-xl border border-gray-300 bg-white p-2 text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                   value={prepTime}
                   onChange={(e) => setPrepTime(e.target.value ? Number(e.target.value) : "")}
                 />
@@ -209,7 +209,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
               <label className="mb-1 block text-sm font-medium">{t("customRecipe.fields.instructions")}</label>
               <textarea
                 ref={instructionsRef}
-                className="w-full min-h-[8rem] resize-none overflow-hidden rounded-xl border border-gray-300 p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                className="w-full min-h-[8rem] resize-none overflow-hidden rounded-xl border border-gray-300 bg-white p-2 text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
                 onInput={handleInstructionsInput}
@@ -238,7 +238,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <input
                   placeholder={t("customRecipe.fields.ingredientName")}
-                  className="rounded border p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                  className="rounded border bg-white p-2 text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                   value={ingName}
                   onChange={(e) => setIngName(e.target.value)}
                 />
@@ -247,14 +247,14 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
                   step="0.1"
                   min="0"
                   placeholder={t("customRecipe.fields.quantity")}
-                  className="rounded border p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                  className="rounded border bg-white p-2 text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                   value={ingQty}
                   onChange={(e) => setIngQty(e.target.value ? Number(e.target.value) : "")}
                 />
                 <UnitSelector
                   value={ingUnit}
                   onChange={setIngUnit}
-                  className="rounded border p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+                  className="rounded border bg-white p-2 text-gray-900 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
                 />
                 <button
                   type="button"

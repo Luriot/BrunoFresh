@@ -6,7 +6,7 @@ type LoginProps = {
   error: string | null;
 };
 
-export function Login({ onLogin, error }: LoginProps) {
+export function Login({ onLogin, error }: Readonly<LoginProps>) {
   const { t } = useTranslation();
   const [passcode, setPasscode] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -38,7 +38,7 @@ export function Login({ onLogin, error }: LoginProps) {
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
             placeholder={t("auth.passcodePlaceholder")}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
             autoComplete="current-password"
           />
           {error && <p className="text-xs text-red-600">{error}</p>}
