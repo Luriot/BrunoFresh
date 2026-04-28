@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { Heart, SlidersHorizontal, Search } from "lucide-react";
 import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
 import type { CartEntry } from "../hooks/useCart";
-import type { RecipeListItem, StatsOut, Tag } from "../types";
-import { fetchStats, fetchTags, fetchRecipes } from "../api/client";
+import type { RecipeListItem, Tag } from "../types";
+import { fetchTags, fetchRecipes } from "../api/client";
 
 type Props = {
   loading: boolean;
@@ -46,7 +47,6 @@ export function DashboardPage({
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [stats, setStats] = useState<StatsOut | null>(null);
 
   // URL input (managed locally — no need to lift to App)
   const [urlInput, setUrlInput] = useState("");
@@ -54,17 +54,7 @@ export function DashboardPage({
 
   useEffect(() => {
     fetchTags().then(setAllTags).catch(() => {});
-    fetchStats().then(setStats).catch(() => {});
   }, []);
-
-  // Refresh stats when a scrape job finishes (loading flips false)
-  const prevLoadingRef = useRef(loading);
-  useEffect(() => {
-    if (prevLoadingRef.current && !loading) {
-      fetchStats().then(setStats).catch(() => {});
-    }
-    prevLoadingRef.current = loading;
-  }, [loading]);
 
   // Debounced server-side filter — runs only after user interacts (skips first render)
   const isFirstRender = useRef(true);
@@ -108,26 +98,6 @@ export function DashboardPage({
   return (
     <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 pb-28 sm:px-6 lg:grid-cols-3 lg:px-8 lg:pb-10">
       <section className="space-y-4 lg:col-span-2">
-        {/* Stats mini-widget */}
-        {stats && (
-          <div className="flex flex-wrap gap-3">
-            <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
-              <p className="text-2xl font-bold text-accent">{stats.total_recipes}</p>
-              <p className="text-xs text-gray-500">{t("stats.totalRecipes")}</p>
-            </div>
-            <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
-              <p className="text-2xl font-bold text-accent">{stats.total_lists}</p>
-              <p className="text-xs text-gray-500">{t("stats.totalLists")}</p>
-            </div>
-            {stats.recipes_by_source[0] && (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-center shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
-                <p className="text-sm font-bold text-ink dark:text-gray-100">{stats.recipes_by_source[0].source_domain}</p>
-                <p className="text-xs text-gray-500">{t("stats.topSource")} ({stats.recipes_by_source[0].count})</p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Scrape input card */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
           <div className="flex flex-col gap-2">
@@ -188,20 +158,24 @@ export function DashboardPage({
 
         {/* Search + filter bar */}
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
-            placeholder={`🔍 ${t("app.searchPlaceholder")}`}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+            <input
+              className="w-full rounded-xl border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+              placeholder={t("app.searchPlaceholder")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
           <button
               type="button"
               onClick={() => allTags.length > 0 && setShowFilters((v) => !v)}
               disabled={allTags.length === 0}
               title={allTags.length === 0 ? t("tags.empty") : undefined}
-              className={`relative rounded-xl border px-3 py-2 text-sm font-semibold transition ${allTags.length === 0 ? "cursor-not-allowed border-gray-200 text-gray-400 opacity-50 dark:border-[#3e3e42] dark:text-gray-600" : showFilters || selectedTagIds.length > 0 ? "border-accent bg-accent/10 text-accent dark:bg-accent/20" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
+              className={`relative flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${allTags.length === 0 ? "cursor-not-allowed border-gray-200 text-gray-400 opacity-50 dark:border-[#3e3e42] dark:text-gray-600" : showFilters || selectedTagIds.length > 0 ? "border-accent bg-accent/10 text-accent dark:bg-accent/20" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
             >
-              🏷 {t("app.filtersLabel")}
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              {t("app.filtersLabel")}
               {selectedTagIds.length > 0 && (
                 <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
                   {selectedTagIds.length}
@@ -211,9 +185,10 @@ export function DashboardPage({
           <button
             type="button"
             onClick={() => setShowFavoritesOnly((v) => !v)}
-            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${showFavoritesOnly ? "border-red-300 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${showFavoritesOnly ? "border-red-300 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
           >
-            ♥ {t("app.favoritesFilter")}
+            <Heart className="h-4 w-4" aria-hidden="true" />
+            {t("app.favoritesFilter")}
           </button>
         </div>
 
@@ -278,7 +253,8 @@ export function DashboardPage({
       </aside>
 
       <button
-        className="fixed bottom-4 left-4 right-4 z-40 rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-xl lg:hidden"
+        className="fixed left-4 right-4 z-40 rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-xl lg:hidden"
+        style={{ bottom: "max(1rem, calc(0.5rem + var(--sab, 0px)))" }}
         onClick={() => setIsMobilePanelOpen(true)}
         type="button"
       >

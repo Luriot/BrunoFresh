@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { X } from "lucide-react";
 import { formatRecipeInstructions } from "../api/client";
 import type { RecipeDetail } from "../types";
 
@@ -92,9 +93,10 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-600 px-3 py-1.5 text-sm text-gray-300 transition hover:bg-gray-700"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-600 px-3 py-1.5 text-sm text-gray-300 transition hover:bg-gray-700"
           >
-            ✕ {t("app.close")}
+            <X className="h-4 w-4" aria-hidden="true" />
+            {t("app.close")}
           </button>
         </div>
       </div>

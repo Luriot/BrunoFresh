@@ -43,7 +43,7 @@
     "title": "Cart",
     "empty": "No recipes selected yet.",
     "servings": "Servings",
-    "generate": "Generate List",
+    "generate": "Generate list",
     "clear": "Clear cart",
     "decreaseServings": "Decrease servings",
     "increaseServings": "Increase servings",
@@ -207,7 +207,7 @@
     "newPlan": "New plan",
     "labelPlaceholder": "Plan name (optional)",
     "weekStart": "Week start",
-    "generateList": "Generate List",
+    "generateList": "Generate list",
     "emptyDay": "Drop a recipe",
     "days": {
       "0": "Monday",

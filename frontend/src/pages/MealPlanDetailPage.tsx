@@ -1,6 +1,7 @@
 ﻿import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Check, Heart, Pencil, X } from "lucide-react";
 import {
   addMealPlanEntry,
   deleteMealPlanEntry,
@@ -38,10 +39,11 @@ type EntryCardProps = {
   onDelete: (entryId: number) => void;
   onDragStart: (source: DragSource) => void;
   onDragEnd: () => void;
+  onTouchDragBegin: (source: DragSource, touch: React.Touch, el: HTMLElement) => void;
   servingsLabel: string;
 };
 
-function EntryCard({ entry, slot, onServingsChange, onDelete, onDragStart, onDragEnd, servingsLabel }: Readonly<EntryCardProps>) {
+function EntryCard({ entry, slot, onServingsChange, onDelete, onDragStart, onDragEnd, onTouchDragBegin, servingsLabel }: Readonly<EntryCardProps>) {
   return (
     <li
       draggable
@@ -49,6 +51,14 @@ function EntryCard({ entry, slot, onServingsChange, onDelete, onDragStart, onDra
         onDragStart({ type: "entry", recipeId: entry.recipe_id, entryId: entry.id, fromDay: entry.day_of_week, fromSlot: slot })
       }
       onDragEnd={onDragEnd}
+      onTouchStart={(e) => {
+        const touch = e.touches[0];
+        if (touch) onTouchDragBegin(
+          { type: "entry", recipeId: entry.recipe_id, entryId: entry.id, fromDay: entry.day_of_week, fromSlot: slot },
+          touch,
+          e.currentTarget
+        );
+      }}
       className={`mb-1 flex cursor-grab flex-col gap-0.5 list-none rounded-lg bg-white px-2 py-1.5 shadow-sm dark:bg-[#2d2d30] ${SLOT_COLORS[slot] ?? ""}`}
     >
       <p className="line-clamp-2 break-words text-xs font-semibold leading-snug text-gray-800 dark:text-gray-100">
@@ -76,9 +86,9 @@ function EntryCard({ entry, slot, onServingsChange, onDelete, onDragStart, onDra
           type="button"
           aria-label="delete entry"
           onClick={() => onDelete(entry.id)}
-          className="ml-auto text-xs text-gray-300 hover:text-red-500 dark:text-gray-600"
+          className="ml-auto text-xs text-gray-400 hover:text-red-500 dark:text-gray-500"
         >
-          ✕
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </div>
     </li>
@@ -100,6 +110,7 @@ type GridCellProps = {
   onDeleteEntry: (entryId: number) => void;
   onDragStartEntry: (source: DragSource) => void;
   onDragEnd: () => void;
+  onTouchDragBeginEntry: (source: DragSource, touch: React.Touch, el: HTMLElement) => void;
   isWeekend: boolean;
 };
 
@@ -118,11 +129,14 @@ function GridCell({
   onDeleteEntry,
   onDragStartEntry,
   onDragEnd,
+  onTouchDragBeginEntry,
   isWeekend,
 }: Readonly<GridCellProps>) {
   return (
     <section
       aria-label={`${slot} day ${day}`}
+      data-day={day}
+      data-slot={slot}
       onDragOver={(e) => { e.preventDefault(); onDragOver(day, slot); }}
       onDragLeave={onDragLeave}
       onDrop={() => onDrop(day, slot)}
@@ -139,11 +153,12 @@ function GridCell({
           onDelete={onDeleteEntry}
           onDragStart={onDragStartEntry}
           onDragEnd={onDragEnd}
+          onTouchDragBegin={onTouchDragBeginEntry}
           servingsLabel={servingsShort(entry.target_servings)}
         />
       ))}
       {entries.length === 0 && !hasDrag && (
-        <p className="pt-2 text-center text-[10px] text-gray-300 dark:text-gray-600">{dropHint}</p>
+        <p className="pt-2 text-center text-[10px] text-gray-400 dark:text-gray-500">{dropHint}</p>
       )}
     </section>
   );
@@ -176,6 +191,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
   const [dragSource, setDragSource] = useState<DragSource | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ day: number; slot: string } | null>(null);
   const dragSourceRef = useRef<DragSource | null>(null);
+  const ghostRef = useRef<HTMLDivElement | null>(null);
   const tempIdRef = useRef(-1);
 
   const [originalEntries, setOriginalEntries] = useState<MealPlanEntry[]>([]);
@@ -198,6 +214,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
       setOriginalLabel(data.label);
       setLabelDraft(data.label ?? "");
       setIsDirty(false);
+      if (data.entries.some((e) => e.meal_slot === "snack")) setShowSnack(true);
     } catch {
       setLoadError(true);
     }
@@ -363,6 +380,66 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
     setDragOverCell(null);
   }
 
+  function handleTouchDragBegin(source: DragSource, startTouch: React.Touch, el: HTMLElement) {
+    handleDragStart(source);
+    const rect = el.getBoundingClientRect();
+    const offsetX = startTouch.clientX - rect.left;
+    const offsetY = startTouch.clientY - rect.top;
+    const clone = el.cloneNode(true) as HTMLDivElement;
+    Object.assign(clone.style, {
+      position: "fixed",
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.width}px`,
+      opacity: "0.85",
+      pointerEvents: "none",
+      zIndex: "9999",
+      transform: "scale(1.05) rotate(1deg)",
+      boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+      transition: "none",
+    });
+    document.body.appendChild(clone);
+    ghostRef.current = clone;
+
+    function onMove(e: TouchEvent) {
+      const t = e.touches[0];
+      if (!t) return;
+      e.preventDefault();
+      if (ghostRef.current) {
+        ghostRef.current.style.left = `${t.clientX - offsetX}px`;
+        ghostRef.current.style.top = `${t.clientY - offsetY}px`;
+      }
+      if (ghostRef.current) ghostRef.current.style.visibility = "hidden";
+      const below = document.elementFromPoint(t.clientX, t.clientY);
+      if (ghostRef.current) ghostRef.current.style.visibility = "";
+      const cell = below?.closest("[data-day][data-slot]");
+      if (cell) {
+        setDragOverCell({ day: Number(cell.getAttribute("data-day")), slot: cell.getAttribute("data-slot") ?? "" });
+      } else {
+        setDragOverCell(null);
+      }
+    }
+
+    function onEnd(e: TouchEvent) {
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      ghostRef.current?.remove();
+      ghostRef.current = null;
+      const t = e.changedTouches[0];
+      if (t) {
+        const below = document.elementFromPoint(t.clientX, t.clientY);
+        const cell = below?.closest("[data-day][data-slot]");
+        if (cell) {
+          handleDrop(Number(cell.getAttribute("data-day")), cell.getAttribute("data-slot") ?? "");
+        }
+      }
+      handleDragEnd();
+    }
+
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd);
+  }
+
   function handleDrop(day: number, slot: string) {
     const src = dragSourceRef.current;
     setDragOverCell(null);
@@ -442,7 +519,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
             className="group flex min-w-0 items-center gap-1 font-heading text-xl font-bold dark:text-gray-100"
           >
             <span className="truncate">{plan.label || t("mealPlanner.planDetail")}</span>
-            <span className="ml-1 flex-shrink-0 text-sm text-gray-400 opacity-0 group-hover:opacity-100">✎</span>
+            <span className="ml-1 flex-shrink-0 text-gray-400 opacity-0 group-hover:opacity-100"><Pencil className="h-3.5 w-3.5" aria-hidden="true" /></span>
           </button>
         )}
 
@@ -499,8 +576,9 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
       </div>
 
       {generatedMsg && (
-        <div className="mb-3 rounded-xl bg-green-100 px-4 py-2 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300">
-          ✓ {generatedMsg}
+        <div className="mb-3 flex items-center gap-1.5 rounded-xl bg-green-100 px-4 py-2 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-300">
+          <Check className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+          {generatedMsg}
         </div>
       )}
       {generateError && (
@@ -546,6 +624,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
                   onDeleteEntry={(entryId) => handleDeleteEntry(entryId)}
                   onDragStartEntry={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onTouchDragBeginEntry={handleTouchDragBegin}
                   isWeekend={weekendDays.has(d)}
                 />
               ))}
@@ -571,9 +650,10 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
           <button
             type="button"
             onClick={() => setPickerFavOnly((v) => !v)}
-            className={`rounded-xl px-3 py-1.5 text-sm font-semibold ${pickerFavOnly ? "bg-yellow-400 text-white" : "border border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-300"}`}
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-semibold ${pickerFavOnly ? "bg-yellow-400 text-white" : "border border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-300"}`}
           >
-            ★ {t("app.favoritesFilter")}
+            <Heart className="h-4 w-4" aria-hidden="true" />
+            {t("app.favoritesFilter")}
           </button>
         </div>
 
@@ -603,6 +683,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
               recipe={recipe}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onTouchDragBegin={handleTouchDragBegin}
             />
           ))}
         </div>
@@ -615,14 +696,19 @@ type RecipePickerRowProps = {
   recipe: RecipeListItem;
   onDragStart: (source: DragSource) => void;
   onDragEnd: () => void;
+  onTouchDragBegin: (source: DragSource, touch: React.Touch, el: HTMLElement) => void;
 };
 
-function RecipePickerRow({ recipe, onDragStart, onDragEnd }: Readonly<RecipePickerRowProps>) {
+function RecipePickerRow({ recipe, onDragStart, onDragEnd, onTouchDragBegin }: Readonly<RecipePickerRowProps>) {
   return (
     <li
       draggable
       onDragStart={() => onDragStart({ type: "recipe", recipeId: recipe.id })}
       onDragEnd={onDragEnd}
+      onTouchStart={(e) => {
+        const touch = e.touches[0];
+        if (touch) onTouchDragBegin({ type: "recipe", recipeId: recipe.id }, touch, e.currentTarget);
+      }}
       className="flex cursor-grab list-none items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm hover:border-accent hover:shadow-sm dark:border-[#3e3e42] dark:bg-[#252526] dark:hover:border-accent"
     >
       {recipe.image_local_path ? (
@@ -640,7 +726,7 @@ function RecipePickerRow({ recipe, onDragStart, onDragEnd }: Readonly<RecipePick
           <p className="truncate text-xs text-gray-400">{recipe.source_domain}</p>
         )}
       </div>
-      <span className="select-none text-gray-300 dark:text-gray-600">&#x2807;</span>
+      <span className="select-none text-gray-400 dark:text-gray-500">&#x2807;</span>
     </li>
   );
 }

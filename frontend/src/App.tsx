@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 import {
   addShoppingListCustomItem,
   createShoppingList,
@@ -52,7 +53,7 @@ function App() {
     localStorage.setItem("brunofresh.theme", isDark ? "dark" : "light");
     // Keep Android PWA status bar in sync with the user's chosen theme
     document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((m) => {
-      m.content = isDark ? "#1e1e1e" : "#ffffff";
+      m.content = isDark ? "#1e1e1e" : "#faf8f5";
     });
   }, [isDark]);
 
@@ -297,8 +298,9 @@ function App() {
       {duplicateWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1e1e1e]">
-            <h2 className="mb-1 font-heading text-lg font-bold text-amber-600 dark:text-amber-400">
-              ⚠️ {t("scrape.duplicateTitle")}
+            <h2 className="mb-1 flex items-center gap-2 font-heading text-lg font-bold text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+              {t("scrape.duplicateTitle")}
             </h2>
             <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
               {t("scrape.duplicateMessage")}

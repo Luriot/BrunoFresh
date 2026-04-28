@@ -6,12 +6,18 @@
 
 :root {
   min-height: 100vh;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 body {
   margin: 0;
   font-family: "Manrope", sans-serif;
-  @apply bg-slate-50 text-ink dark:bg-[#1e1e1e] dark:text-gray-200;
+  @apply bg-paper text-ink dark:bg-[#1e1e1e] dark:text-gray-200;
+  padding-left: var(--sal);
+  padding-right: var(--sar);
 }
 
 /* Reset browser UA styles on <dialog> so Tailwind classes work correctly */

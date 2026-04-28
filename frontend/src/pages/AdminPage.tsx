@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from
 import { useTranslation } from "react-i18next";
 import { createTag, deleteTag, deleteRecipe, exportDb, fetchIngredientsAdmin, fetchTags, findDuplicateRecipes, importDb, mergeIngredients, patchIngredient, suggestIngredientMerges } from "../api/client";
 import type { IngredientDetail, MergeSuggestion, RecipeSimilarPair, Tag } from "../types";
+import { Database, Pencil, Search, Sparkles, Tag as TagIcon, X, ArrowRight } from "lucide-react";
 
 type AdminTab = "ingredients" | "tags" | "duplicates" | "database";
 
@@ -248,21 +249,23 @@ export function AdminPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 pb-10 pt-4 sm:px-6 lg:px-8">
       {/* Tab bar */}
-      <div className="mb-6 flex flex-wrap gap-1 rounded-2xl border border-gray-200 bg-gray-50 p-1 dark:border-[#3e3e42] dark:bg-[#252526]">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              activeTab === tab.key
-                ? "bg-accent text-white shadow"
-                : "text-gray-600 hover:text-ink dark:text-gray-400 dark:hover:text-gray-200"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="mb-6 flex justify-center">
+          <div className="grid grid-cols-2 gap-1 rounded-2xl border border-gray-200 bg-gray-50 p-1 dark:border-[#3e3e42] dark:bg-[#252526] sm:flex sm:flex-nowrap">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                activeTab === tab.key
+                  ? "bg-accent text-white shadow"
+                  : "text-gray-600 hover:text-ink dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Ingredients tab ──────────────────────────────────────────────── */}
@@ -288,51 +291,56 @@ export function AdminPage() {
       </div>
 
       {/* Manual merge tool */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-700/30 dark:bg-amber-900/10">
-        <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">{t("ingredients.mergeLabel")}</span>
-        <select
-          className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
-          value={mergeSourceId ?? ""}
-          onChange={(e) => setMergeSourceId(Number(e.target.value) || null)}
-        >
-          <option value="">{t("ingredients.sourcePlaceholder")}</option>
-          {ingredients.map((i) => <option key={i.id} value={i.id}>{getDisplayName(i)}</option>)}
-        </select>
-        <span className="text-sm text-gray-500">→</span>
-        <select
-          className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
-          value={mergeTargetId ?? ""}
-          onChange={(e) => setMergeTargetId(Number(e.target.value) || null)}
-        >
-          <option value="">{t("ingredients.targetPlaceholder")}</option>
-          {ingredients.map((i) => <option key={i.id} value={i.id}>{getDisplayName(i)}</option>)}
-        </select>
-        <button
-          type="button"
-          disabled={!mergeSourceId || !mergeTargetId || mergeSourceId === mergeTargetId}
-          onClick={() => void handleMerge()}
-          className="rounded-xl bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-amber-400 disabled:opacity-40"
-        >
-          {t("ingredients.mergeInto")}
-        </button>
-        <button
-          type="button"
-          disabled={aiLoading}
-          onClick={() => void handleAiSuggest()}
-          className="ml-auto rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-40 dark:border-amber-700/40 dark:bg-[#252526] dark:text-amber-400"
-        >
-          {aiLoading ? t("ingredients.aiMerging") : `✨ ${t("ingredients.aiSuggestMerges")}`}
-        </button>
+      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-700/30 dark:bg-amber-900/10">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">{t("ingredients.mergeLabel")}</span>
+          <button
+            type="button"
+            disabled={aiLoading}
+            onClick={() => void handleAiSuggest()}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-40 dark:border-amber-700/40 dark:bg-[#252526] dark:text-amber-400"
+          >
+            {aiLoading ? t("ingredients.aiMerging") : <><Sparkles className="h-4 w-4" aria-hidden="true" /> {t("ingredients.aiSuggestMerges")}</>}
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            value={mergeSourceId ?? ""}
+            onChange={(e) => setMergeSourceId(Number(e.target.value) || null)}
+          >
+            <option value="">{t("ingredients.sourcePlaceholder")}</option>
+            {ingredients.map((i) => <option key={i.id} value={i.id}>{getDisplayName(i)}</option>)}
+          </select>
+          <ArrowRight className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+          <select
+            className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            value={mergeTargetId ?? ""}
+            onChange={(e) => setMergeTargetId(Number(e.target.value) || null)}
+          >
+            <option value="">{t("ingredients.targetPlaceholder")}</option>
+            {ingredients.map((i) => <option key={i.id} value={i.id}>{getDisplayName(i)}</option>)}
+          </select>
+          <button
+            type="button"
+            disabled={!mergeSourceId || !mergeTargetId || mergeSourceId === mergeTargetId}
+            onClick={() => void handleMerge()}
+            className="shrink-0 rounded-xl bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-amber-400 disabled:opacity-40"
+          >
+            {t("ingredients.mergeInto")}
+          </button>
+        </div>
       </div>
 
       {/* AI merge suggestions panel */}
       {showAiPanel && (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/30 dark:bg-amber-900/10">
           <div className="mb-3 flex items-center justify-between">
-            <span className="font-semibold text-amber-800 dark:text-amber-300">
-              ✨ {t("ingredients.aiSuggestMergesTitle")}
+            <span className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              {t("ingredients.aiSuggestMergesTitle")}
             </span>
-            <button type="button" onClick={() => setShowAiPanel(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">✕</button>
+            <button type="button" onClick={() => setShowAiPanel(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="h-4 w-4" aria-hidden="true" /></button>
           </div>
           {aiSuggestions.length === 0 ? (
             <p className="text-sm text-gray-500">{t("ingredients.noSuggestions")}</p>
@@ -437,7 +445,7 @@ export function AdminPage() {
                           {t("ingredients.save")}
                         </button>
                         <button type="button" onClick={() => setEditDraft(null)} className="rounded-lg border border-gray-200 px-2 py-1 text-xs dark:border-[#3e3e42] dark:text-gray-300">
-                          ✕
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
                       </form>
                     </td>
@@ -456,9 +464,10 @@ export function AdminPage() {
                       <button
                         type="button"
                         onClick={() => startEdit(ing)}
-                        className="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
+                        className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
                       >
-                        ✏️ {t("ingredients.edit")}
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        {t("ingredients.edit")}
                       </button>
                     </td>
                   </tr>
@@ -475,8 +484,9 @@ export function AdminPage() {
       {activeTab === "duplicates" && (
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-heading text-base font-bold text-ink dark:text-gray-100">
-            🔍 {t("recipes.findDuplicates")}
+          <h2 className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
+            <Search className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            {t("recipes.findDuplicates")}
           </h2>
           <button
             type="button"
@@ -544,8 +554,9 @@ export function AdminPage() {
       {/* ── Tags tab ─────────────────────────────────────────────────────── */}
       {activeTab === "tags" && (
       <section>
-        <h2 className="mb-4 font-heading text-base font-bold text-ink dark:text-gray-100">
-          🏷 {t("tags.manage")}
+        <h2 className="mb-4 flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
+          <TagIcon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+          {t("tags.manage")}
         </h2>
         <form onSubmit={(e) => void handleCreateTag(e)} className="mb-4 flex flex-wrap items-center gap-2">
           <input
@@ -589,7 +600,7 @@ export function AdminPage() {
                   className="ml-0.5 opacity-70 hover:opacity-100"
                   aria-label={t("tags.delete")}
                 >
-                  ✕
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </span>
             ))}
@@ -601,8 +612,9 @@ export function AdminPage() {
       {/* ── Database tab ─────────────────────────────────────────────────── */}
       {activeTab === "database" && (
         <div className="space-y-6">
-          <h2 className="font-heading text-base font-bold text-ink dark:text-gray-100">
-            🗄 {t("admin.db.title")}
+          <h2 className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
+            <Database className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            {t("admin.db.title")}
           </h2>
 
           {dbStatus && (

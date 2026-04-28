@@ -36,7 +36,7 @@ api.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     const endpoint = String(error?.config?.url ?? "");
-    if (status === 401 && !endpoint.includes("/auth/login")) {
+    if (status === 401 && !endpoint.includes("/auth/login") && !endpoint.includes("/auth/me")) {
       unauthorizedHandler?.();
     }
     return Promise.reject(error);
