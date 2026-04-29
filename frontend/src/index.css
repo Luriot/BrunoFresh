@@ -4,6 +4,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fill system safe-area zones (notch, home indicator) with the app background */
+html {
+  background-color: #faf8f5;
+}
+html.dark {
+  background-color: #1e1e1e;
+}
+
 :root {
   min-height: 100vh;
   color-scheme: light;

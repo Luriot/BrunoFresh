@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw, ChefHat } from "lucide-react";
 import {
   buildImageUrl,
+  buildJobStreamUrl,
   fetchRecipeDetail,
   fetchSimilarRecipes,
   rescrapeRecipe,
@@ -44,6 +45,15 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
   // Re-scrape
   const [rescraping, setRescraping] = useState(false);
   const [rescrapeMsg, setRescrapeMsg] = useState<string | null>(null);
+  const rescrapeStreamRef = useRef<EventSource | null>(null);
+
+  // Close the SSE stream when the modal unmounts
+  useEffect(() => {
+    return () => {
+      rescrapeStreamRef.current?.close();
+      rescrapeStreamRef.current = null;
+    };
+  }, []);
 
   const loadRecipe = useCallback((id: number) => {
     setLoading(true);
@@ -87,17 +97,60 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
 
   async function handleRescrape() {
     if (!recipe) return;
+    rescrapeStreamRef.current?.close();
+    rescrapeStreamRef.current = null;
     setRescraping(true);
     setRescrapeMsg(t("recipe.rescrapingInProgress"));
     try {
-      await rescrapeRecipe(recipe.id);
-      setRescrapeMsg(t("recipe.rescrapeQueued"));
-      await new Promise((r) => setTimeout(r, 4000));
-      loadRecipe(recipe.id);
-      setRescrapeMsg(null);
+      const response = await rescrapeRecipe(recipe.id);
+      const jobId = response.job_id;
+      if (!jobId) {
+        // Fallback: no job_id returned, reload after short delay
+        setRescrapeMsg(t("recipe.rescrapeQueued"));
+        await new Promise((r) => setTimeout(r, 3000));
+        loadRecipe(recipe.id);
+        setRescrapeMsg(null);
+        setRescraping(false);
+        return;
+      }
+
+      const stream = new EventSource(buildJobStreamUrl(jobId), { withCredentials: true });
+      rescrapeStreamRef.current = stream;
+
+      stream.addEventListener("status", (rawEvent) => {
+        const evt = rawEvent as MessageEvent<string>;
+        let payload: { status: string; message?: string | null; error_message?: string | null };
+        try { payload = JSON.parse(evt.data) as typeof payload; } catch { return; }
+
+        if (payload.status === "completed") {
+          stream.close();
+          rescrapeStreamRef.current = null;
+          setRescrapeMsg(payload.message || t("scrape.success") || "✓ Done");
+          loadRecipe(recipe.id);
+          setRescraping(false);
+          return;
+        }
+        if (payload.status === "failed") {
+          stream.close();
+          rescrapeStreamRef.current = null;
+          setRescrapeMsg(payload.error_message || t("recipe.rescrapeError"));
+          setRescraping(false);
+          return;
+        }
+        // running — show the current step message
+        if (payload.message) {
+          setRescrapeMsg(payload.message);
+        }
+      });
+
+      stream.onerror = () => {
+        stream.close();
+        rescrapeStreamRef.current = null;
+        setRescrapeMsg(t("recipe.rescrapeError"));
+        setRescraping(false);
+      };
     } catch {
       setRescrapeMsg(t("recipe.rescrapeError"));
-    } finally {
       setRescraping(false);
     }
   }
@@ -229,9 +282,15 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
 
                 {/* Re-scrape notice */}
                 {rescrapeMsg && (
-                  <p className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
-                    {rescrapeMsg}
-                  </p>
+                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-2 dark:border-accent/30 dark:bg-accent/10">
+                    {rescraping && (
+                      <svg className="h-4 w-4 shrink-0 animate-spin text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    )}
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{rescrapeMsg}</p>
+                  </div>
                 )}
 
                 {/* Ingredients */}

@@ -72,6 +72,7 @@ export type ShoppingListItem = {
   category: string;
   is_custom: boolean;
   is_already_owned: boolean;
+  is_excluded: boolean;
 };
 
 export type ShoppingListRecipe = {

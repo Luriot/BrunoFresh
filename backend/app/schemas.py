@@ -157,7 +157,8 @@ class ShoppingListCreateRequest(BaseModel):
 
 
 class ShoppingListItemPatch(BaseModel):
-    is_already_owned: bool
+    is_already_owned: bool | None = None
+    is_excluded: bool | None = None
 
 
 class ShoppingListPatch(BaseModel):
@@ -173,6 +174,7 @@ class ShoppingListItemOut(BaseModel):
     category: str
     is_custom: bool
     is_already_owned: bool
+    is_excluded: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

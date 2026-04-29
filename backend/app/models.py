@@ -144,6 +144,7 @@ class ShoppingListItem(Base):
     category: Mapped[str] = mapped_column(String(80), default="Other", index=True)
     is_custom: Mapped[bool] = mapped_column(Boolean, default=False)
     is_already_owned: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_excluded: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     shopping_list: Mapped[ShoppingList] = relationship("ShoppingList", back_populates="items")

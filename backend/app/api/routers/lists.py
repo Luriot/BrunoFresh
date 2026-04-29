@@ -312,7 +312,8 @@ async def patch_shopping_list_item(
     if not item:
         raise HTTPException(status_code=404, detail=_ITEM_NOT_FOUND)
 
-    item.is_already_owned = payload.is_already_owned
+    item.is_already_owned = payload.is_already_owned if payload.is_already_owned is not None else item.is_already_owned
+    item.is_excluded = payload.is_excluded if payload.is_excluded is not None else item.is_excluded
     await db.commit()
     await db.refresh(item)
     return ShoppingListItemOut.model_validate(item)

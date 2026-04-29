@@ -8,11 +8,12 @@ type CustomItemPayload = { name: string; quantity: number; unit: string };
 type Props = {
   data: ShoppingListType | null;
   onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
+  onToggleExcluded: (itemId: number, isExcluded: boolean) => void;
   onAddCustomItem: (payload: CustomItemPayload) => Promise<void>;
   onDeleteItem?: (itemId: number) => void;
 };
 
-export function ShoppingList({ data, onToggleOwned, onAddCustomItem, onDeleteItem }: Readonly<Props>) {
+export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCustomItem, onDeleteItem }: Readonly<Props>) {
   const { t, i18n } = useTranslation();
   const [customName, setCustomName] = useState("");
   const [customQty, setCustomQty] = useState<number>(1);
@@ -23,8 +24,9 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem, onDeleteIte
     return <p className="text-sm text-gray-600 dark:text-gray-400">{t("shopping.empty")}</p>;
   }
 
-  const toBuy = data.items.filter((item) => !item.is_already_owned);
+  const toBuy = data.items.filter((item) => !item.is_already_owned && !item.is_excluded);
   const alreadyOwned = data.items.filter((item) => item.is_already_owned);
+  const excluded = data.items.filter((item) => item.is_excluded);
 
   async function onCustomSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,7 +67,7 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem, onDeleteIte
     }
   }
 
-  function renderItems(items: ShoppingListType["items"], isOwnedTarget: boolean) {
+  function renderItems(items: ShoppingListType["items"], isOwnedTarget: boolean, showExcludeBtn = false) {
     if (items.length === 0) {
       return <p className="text-sm text-gray-500 dark:text-gray-400">{t("shopping.none")}</p>;
     }
@@ -86,22 +88,57 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem, onDeleteIte
                 {item.quantity} {item.unit}
               </span>
             </button>
-            {onDeleteItem && (
+            {showExcludeBtn && (
               <button
                 type="button"
-                aria-label={t("shopping.deleteItem")}
-                title={t("shopping.deleteItem")}
-                onClick={() => onDeleteItem(item.id)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-red-300 hover:text-red-500 dark:border-[#3e3e42] dark:hover:border-red-700 dark:hover:text-red-400"
+                aria-label={t("shopping.excludeItem")}
+                title={t("shopping.excludeItem")}
+                onClick={() => onToggleExcluded(item.id, true)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-orange-300 hover:text-orange-500 dark:border-[#3e3e42] dark:hover:border-orange-700 dark:hover:text-orange-400"
               >
+                {/* Ban / slash-circle icon */}
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6l-1 14H6L5 6" />
-                  <path d="M10 11v6M14 11v6" />
-                  <path d="M9 6V4h6v2" />
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                 </svg>
               </button>
             )}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  function renderExcludedItems(items: ShoppingListType["items"]) {
+    if (items.length === 0) {
+      return <p className="text-sm text-gray-500 dark:text-gray-400">{t("shopping.none")}</p>;
+    }
+
+    return (
+      <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+        {items.map((item) => (
+          <li key={item.id} className="flex items-center gap-2">
+            <span className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 opacity-60 dark:border-[#3e3e42] dark:bg-[#1e1e1e]">
+              <span className="font-medium line-through text-gray-500 dark:text-gray-500">
+                {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {item.quantity} {item.unit}
+              </span>
+            </span>
+            <button
+              type="button"
+              aria-label={t("shopping.restoreItem")}
+              title={t("shopping.restoreItem")}
+              onClick={() => onToggleExcluded(item.id, false)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-green-300 hover:text-green-600 dark:border-[#3e3e42] dark:hover:border-green-700 dark:hover:text-green-400"
+            >
+              {/* Undo / restore icon */}
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 .49-4" />
+              </svg>
+            </button>
           </li>
         ))}
       </ul>
@@ -132,7 +169,7 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem, onDeleteIte
               )}
             </button>
           </div>
-          {renderItems(toBuy, true)}
+          {renderItems(toBuy, true, true)}
         </section>
 
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/10">
@@ -142,6 +179,15 @@ export function ShoppingList({ data, onToggleOwned, onAddCustomItem, onDeleteIte
           {renderItems(alreadyOwned, false)}
         </section>
       </div>
+
+      {excluded.length > 0 && (
+        <section className="rounded-2xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/30 dark:bg-orange-900/10">
+          <h4 className="mb-2 font-heading text-lg font-semibold text-orange-900 dark:text-orange-400">
+            {t("shopping.excluded")}
+          </h4>
+          {renderExcludedItems(excluded)}
+        </section>
+      )}
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
         <h4 className="mb-2 font-heading text-lg font-semibold text-ink dark:text-gray-100">{t("shopping.addManual")}</h4>

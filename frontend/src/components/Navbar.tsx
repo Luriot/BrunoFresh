@@ -44,13 +44,13 @@ export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
     <header className="mx-auto max-w-7xl px-4 pb-4 pt-safe-or-8 sm:px-6 lg:px-8" style={{ paddingTop: "max(2rem, calc(0.5rem + env(safe-area-inset-top, 0px)))" }}>
       {/* ── Desktop navbar ──────────────────────────────────────────── */}
       <div className="hidden nav:flex items-center gap-4 rounded-2xl border border-gray-200 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-[#3e3e42] dark:bg-[#1e1e1e]/80">
-        <div className="min-w-0 shrink-0 flex items-center gap-3">
+        <NavLink to="/" end className="min-w-0 shrink-0 flex items-center gap-3 rounded-xl hover:opacity-80 transition-opacity">
           <img src="/pwa-192x192.png" alt="" aria-hidden="true" className="h-10 w-10 shrink-0 rounded-xl" />
           <div>
             <h1 className="font-heading text-3xl font-bold sm:text-4xl dark:text-gray-100">{t("app.title")}</h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{t("app.subtitle")}</p>
           </div>
-        </div>
+        </NavLink>
 
         <div className="ml-auto flex flex-wrap items-center gap-2 lg:flex-nowrap">
           <nav className="flex flex-wrap rounded-xl border border-gray-200 bg-green-50 p-1 text-sm dark:border-[#3e3e42] dark:bg-[#252526]">
@@ -94,10 +94,10 @@ export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
       <div className="nav:hidden rounded-2xl border border-gray-200 bg-white/90 shadow-sm backdrop-blur dark:border-[#3e3e42] dark:bg-[#1e1e1e]/90">
         {/* Top bar: title + actions + hamburger */}
         <div className="flex items-center gap-3 px-4 py-3">
-          <div className="min-w-0 flex-1 flex items-center gap-2">
+          <NavLink to="/" end className="min-w-0 flex-1 flex items-center gap-2 rounded-lg hover:opacity-80 transition-opacity">
             <img src="/pwa-192x192.png" alt="" aria-hidden="true" className="h-8 w-8 shrink-0 rounded-lg" />
             <h1 className="font-heading text-2xl font-bold dark:text-gray-100">{t("app.title")}</h1>
-          </div>
+          </NavLink>
           <DarkToggle />
           <button
             type="button"

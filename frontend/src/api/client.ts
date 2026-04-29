@@ -132,10 +132,12 @@ export async function deleteShoppingList(listId: number) {
   await api.delete(`/lists/${listId}`);
 }
 
-export async function patchShoppingListItem(listId: number, itemId: number, isAlreadyOwned: boolean) {
-  const { data } = await api.patch<ShoppingListItem>(`/lists/${listId}/items/${itemId}`, {
-    is_already_owned: isAlreadyOwned,
-  });
+export async function patchShoppingListItem(
+  listId: number,
+  itemId: number,
+  patch: { is_already_owned?: boolean; is_excluded?: boolean },
+) {
+  const { data } = await api.patch<ShoppingListItem>(`/lists/${listId}/items/${itemId}`, patch);
   return data;
 }
 

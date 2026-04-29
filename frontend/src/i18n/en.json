@@ -4,14 +4,14 @@
     "subtitle": "Scrape recipes, build a smart grocery list.",
     "urlPlaceholder": "Paste recipe URL",
     "urlPerLine": "one URL per line",
-    "scrape": "Scrape",
+    "scrape": "Scrape Recipes",
     "scraping": "Scraping...",
     "refresh": "Refresh",
     "recipesLoaded": "Recipes loaded: {{count}}",
     "checkingSession": "Checking session...",
     "loading": "Loading...",
     "close": "Close",
-    "customRecipe": "Create Custom Recipe",
+    "customRecipe": "Create Recipe",
     "searchPlaceholder": "Search recipes...",
     "favoritesFilter": "Favorites",
     "filtersLabel": "Filters",
@@ -72,7 +72,10 @@
     "weekLabel": "Week {{week}}",
     "copy": "Copy list",
     "copied": "Copied!",
-    "deleteItem": "Remove item"
+    "deleteItem": "Remove item",
+    "excluded": "Excluded",
+    "excludeItem": "Exclude item",
+    "restoreItem": "Restore item"
   },
   "history": {
     "title": "History",

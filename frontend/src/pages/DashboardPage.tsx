@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Heart, SlidersHorizontal, Search, LayoutGrid, List } from "lucide-react";
+import { Heart, SlidersHorizontal, Search, LayoutGrid, List, Plus } from "lucide-react";
 import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
@@ -126,6 +126,14 @@ export function DashboardPage({
   const [isCustomRecipeModalOpen, setIsCustomRecipeModalOpen] = useState(false);
   const [selectedRecipeToView, setSelectedRecipeToView] = useState<RecipeListItem | null>(null);
 
+  // Infinite scroll
+  const [visibleCount, setVisibleCount] = useState(20);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(20);
+  }, [recipes]);
+
   // View mode toggle (tiles / list)
   const [viewMode, setViewMode] = useState<"tiles" | "list">(() => {
     const stored = localStorage.getItem("brunofresh.recipeView");
@@ -174,6 +182,21 @@ export function DashboardPage({
     setSelectedTagIds((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
   }
 
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((c) => c + 20);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [recipes]);
+
   function sortRecipes(list: RecipeListItem[]): RecipeListItem[] {
     return [...list].sort((a, b) => {
       // Favorites first, then alphabetical
@@ -214,17 +237,11 @@ export function DashboardPage({
                 {loading ? t("app.scraping") : t("app.scrape")}
               </button>
               <button
-                className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 px-4 py-2 dark:border-[#3e3e42] dark:text-gray-200"
-                onClick={() => void onRefreshRecipes()}
-                type="button"
-              >
-                {t("app.refresh")}
-              </button>
-              <button
-                className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 font-medium hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#2d2d30] dark:hover:bg-[#3e3e42] dark:text-gray-200"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 font-medium hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#2d2d30] dark:hover:bg-[#3e3e42] dark:text-gray-200"
                 onClick={() => setIsCustomRecipeModalOpen(true)}
                 type="button"
               >
+                <Plus className="h-4 w-4" aria-hidden="true" />
                 {t("app.customRecipe")}
               </button>
             </div>
@@ -345,7 +362,7 @@ export function DashboardPage({
 
         {viewMode === "tiles" ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {recipes.map((recipe) => (
+            {recipes.slice(0, visibleCount).map((recipe) => (
               <RecipeCard
                 key={recipe.id}
                 recipe={recipe}
@@ -359,7 +376,7 @@ export function DashboardPage({
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {recipes.map((recipe) => (
+            {recipes.slice(0, visibleCount).map((recipe) => (
               <RecipeListRow
                 key={recipe.id}
                 recipe={recipe}
@@ -372,6 +389,16 @@ export function DashboardPage({
             ))}
           </div>
         )}
+
+        {/* Infinite scroll sentinel */}
+        <div ref={sentinelRef} className="flex justify-center py-4">
+          {visibleCount < recipes.length && (
+            <svg className="h-5 w-5 animate-spin text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-label="Loading more recipes">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          )}
+        </div>
       </section>
 
       <aside className="hidden space-y-4 lg:block">

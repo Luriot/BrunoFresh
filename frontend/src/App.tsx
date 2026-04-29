@@ -215,13 +215,38 @@ function App() {
       return {
         ...previous,
         items: previous.items.map((item) =>
-          item.id === itemId ? { ...item, is_already_owned: isAlreadyOwned } : item
+          item.id === itemId ? { ...item, is_already_owned: isAlreadyOwned, is_excluded: false } : item
         ),
       };
     });
 
     try {
-      await patchShoppingListItem(list.id, itemId, isAlreadyOwned);
+      await patchShoppingListItem(list.id, itemId, { is_already_owned: isAlreadyOwned, is_excluded: false });
+      await loadShoppingListHistory();
+    } catch {
+      await openShoppingList(list.id);
+    }
+  }
+
+  async function onToggleExcluded(itemId: number, isExcluded: boolean) {
+    if (!list) {
+      return;
+    }
+
+    setList((previous) => {
+      if (!previous) {
+        return previous;
+      }
+      return {
+        ...previous,
+        items: previous.items.map((item) =>
+          item.id === itemId ? { ...item, is_excluded: isExcluded, is_already_owned: false } : item
+        ),
+      };
+    });
+
+    try {
+      await patchShoppingListItem(list.id, itemId, { is_excluded: isExcluded, is_already_owned: false });
       await loadShoppingListHistory();
     } catch {
       await openShoppingList(list.id);
@@ -371,6 +396,7 @@ function App() {
               onOpenShoppingList={openShoppingList}
               onRenameList={onRenameList}
               onToggleOwned={onToggleOwned}
+              onToggleExcluded={onToggleExcluded}
               onAddCustomItem={onAddCustomItem}
               onDeleteItem={onDeleteItem}
             />

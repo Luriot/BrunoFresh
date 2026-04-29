@@ -127,12 +127,12 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
           )}
 
           {/* Step text */}
-          <p className="max-w-2xl text-3xl font-medium leading-snug sm:text-4xl">
+          <p className="max-w-2xl text-xl font-medium leading-snug sm:text-3xl">
             {steps[currentStep]}
           </p>
 
           {/* Progress dots */}
-          <div className="mt-10 flex gap-2">
+          <div className="mt-10 flex flex-wrap justify-center gap-2">
             {steps.map((step, i) => (
               <button
                 key={step.slice(0, 40)}
@@ -149,7 +149,7 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
       )}
 
       {/* Bottom navigation */}
-      <div className="flex items-center justify-between px-6 py-6">
+      <div className="flex items-center justify-between px-6 pt-6" style={{ paddingBottom: "max(1.5rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))" }}>
         <button
           type="button"
           onClick={goPrev}

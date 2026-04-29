@@ -9,6 +9,7 @@ type Props = {
   onOpenShoppingList: (listId: number) => Promise<void>;
   onRenameList: (listId: number, label: string) => Promise<void>;
   onToggleOwned: (itemId: number, isAlreadyOwned: boolean) => void;
+  onToggleExcluded: (itemId: number, isExcluded: boolean) => void;
   onAddCustomItem: (payload: { name: string; quantity: number; unit: string }) => Promise<void>;
   onDeleteItem?: (itemId: number) => void;
 };
@@ -18,6 +19,7 @@ export function ShoppingListViewPage({
   onOpenShoppingList,
   onRenameList,
   onToggleOwned,
+  onToggleExcluded,
   onAddCustomItem,
   onDeleteItem,
 }: Readonly<Props>) {
@@ -134,7 +136,7 @@ export function ShoppingListViewPage({
         </div>
 
         {isCurrentList ? (
-          <ShoppingList data={list} onAddCustomItem={onAddCustomItem} onToggleOwned={onToggleOwned} onDeleteItem={onDeleteItem} />
+          <ShoppingList data={list} onAddCustomItem={onAddCustomItem} onToggleOwned={onToggleOwned} onToggleExcluded={onToggleExcluded} onDeleteItem={onDeleteItem} />
         ) : (
           <p className="text-sm text-gray-600 dark:text-gray-400">{t("shopping.loading")}</p>
         )}
