@@ -75,7 +75,9 @@
     "deleteItem": "Remove item",
     "excluded": "Excluded",
     "excludeItem": "Exclude item",
-    "restoreItem": "Restore item"
+    "restoreItem": "Restore item",
+    "markOwned": "Mark as owned",
+    "moveToBuy": "Move to To Buy"
   },
   "history": {
     "title": "History",

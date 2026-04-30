@@ -75,7 +75,9 @@
     "deleteItem": "Retirer l'article",
     "excluded": "Exclus",
     "excludeItem": "Exclure l'article",
-    "restoreItem": "Restaurer l'article"
+    "restoreItem": "Restaurer l'article",
+    "markOwned": "Marquer comme possédé",
+    "moveToBuy": "Déplacer vers À acheter"
   },
   "history": {
     "title": "Historique",

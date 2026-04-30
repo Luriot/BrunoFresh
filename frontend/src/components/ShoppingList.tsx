@@ -67,7 +67,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
     }
   }
 
-  function renderItems(items: ShoppingListType["items"], isOwnedTarget: boolean, showExcludeBtn = false) {
+  function renderItems(items: ShoppingListType["items"], isOwnedTarget: boolean) {
     if (items.length === 0) {
       return <p className="text-sm text-gray-500 dark:text-gray-400">{t("shopping.none")}</p>;
     }
@@ -76,30 +76,54 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
       <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
         {items.map((item) => (
           <li key={item.id} className="flex items-center gap-2">
-            <button
-              className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-left transition hover:bg-green-50 dark:border-[#3e3e42] dark:hover:bg-[#2d2d30]"
-              onClick={() => onToggleOwned(item.id, isOwnedTarget)}
-              type="button"
-            >
+            <span className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-[#3e3e42] dark:bg-[#252526]">
               <span className="font-medium text-ink dark:text-gray-200">
                 {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
               </span>
               <span className="text-xs text-gray-600 dark:text-gray-400">
                 {item.quantity} {item.unit}
               </span>
-            </button>
-            {showExcludeBtn && (
+            </span>
+            {isOwnedTarget ? (
+              <>
+                {/* Move to Already Owned */}
+                <button
+                  type="button"
+                  aria-label={t("shopping.markOwned")}
+                  title={t("shopping.markOwned")}
+                  onClick={() => onToggleOwned(item.id, true)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-green-300 hover:text-green-600 dark:border-[#3e3e42] dark:hover:border-green-700 dark:hover:text-green-400"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
+                {/* Exclude */}
+                <button
+                  type="button"
+                  aria-label={t("shopping.excludeItem")}
+                  title={t("shopping.excludeItem")}
+                  onClick={() => onToggleExcluded(item.id, true)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-orange-300 hover:text-orange-500 dark:border-[#3e3e42] dark:hover:border-orange-700 dark:hover:text-orange-400"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                  </svg>
+                </button>
+              </>
+            ) : (
+              /* Move back to To Buy */
               <button
                 type="button"
-                aria-label={t("shopping.excludeItem")}
-                title={t("shopping.excludeItem")}
-                onClick={() => onToggleExcluded(item.id, true)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-orange-300 hover:text-orange-500 dark:border-[#3e3e42] dark:hover:border-orange-700 dark:hover:text-orange-400"
+                aria-label={t("shopping.moveToBuy")}
+                title={t("shopping.moveToBuy")}
+                onClick={() => onToggleOwned(item.id, false)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition hover:border-gray-400 hover:text-gray-600 dark:border-[#3e3e42] dark:hover:border-gray-500 dark:hover:text-gray-300"
               >
-                {/* Ban / slash-circle icon */}
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 .49-4" />
                 </svg>
               </button>
             )}
@@ -169,7 +193,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
               )}
             </button>
           </div>
-          {renderItems(toBuy, true, true)}
+          {renderItems(toBuy, true)}
         </section>
 
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/10">
