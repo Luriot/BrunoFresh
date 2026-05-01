@@ -1,20 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Heart, SlidersHorizontal, Search, LayoutGrid, List, Plus } from "lucide-react";
+import { Heart, SlidersHorizontal, Search, LayoutGrid, List, Plus, Clock, Link } from "lucide-react";
 import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
-import { buildImageUrl, patchRecipe, fetchTags, fetchRecipes } from "../api/client";
+import { buildImageUrl, patchRecipe, fetchTags, fetchRecipes, searchHelloFresh } from "../api/client";
 import type { CartEntry } from "../hooks/useCart";
-import type { RecipeListItem, Tag } from "../types";
+import type { HFSearchResult, RecipeListItem, Tag } from "../types";
 
 type Props = {
   loading: boolean;
   scrapeState: string | null;
   recipes: RecipeListItem[];
   cart: CartEntry[];
-  onScrape: (urls: string[]) => Promise<void>;
+  onScrape: (urls: string[]) => Promise<boolean>;
   onRefreshRecipes: () => Promise<void>;
   onAddToCart: (recipe: RecipeListItem) => void;
   onUpdateServings: (recipeId: number, servings: number) => void;
@@ -98,6 +98,15 @@ function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<R
   );
 }
 
+function SpinnerIcon() {
+  return (
+    <svg className="h-4 w-4 animate-spin text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    </svg>
+  );
+}
+
 function filterButtonClass(tagCount: number, filtersOpen: boolean, selectedCount: number): string {
   if (tagCount === 0) {
     return "cursor-not-allowed border-gray-200 text-gray-400 opacity-50 dark:border-[#3e3e42] dark:text-gray-600";
@@ -155,6 +164,51 @@ export function DashboardPage({
   // URL input (managed locally — no need to lift to App)
   const [urlInput, setUrlInput] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Import card tab
+  const [importTab, setImportTab] = useState<"hf" | "url">("hf");
+
+  // HF discovery state
+  const [hfQuery, setHfQuery] = useState("");
+  const [hfResults, setHfResults] = useState<HFSearchResult[]>([]);
+  const [hfLoading, setHfLoading] = useState(false);
+  const [hfError, setHfError] = useState<string | null>(null);
+  const [importingUrls, setImportingUrls] = useState<Set<string>>(new Set());
+  const [importedUrls, setImportedUrls] = useState<Set<string>>(new Set());
+
+  async function runHfSearch() {
+    if (!hfQuery.trim()) {
+      setHfResults([]);
+      setHfError(null);
+      return;
+    }
+    setHfLoading(true);
+    setHfError(null);
+    try {
+      const results = await searchHelloFresh(hfQuery.trim());
+      setHfResults(results);
+    } catch {
+      setHfError(t("hfDiscovery.searchError"));
+      setHfResults([]);
+    } finally {
+      setHfLoading(false);
+    }
+  }
+
+  async function handleHfImport(hfUrl: string) {
+    setImportingUrls((prev) => new Set(prev).add(hfUrl));
+    try {
+      const success = await onScrape([hfUrl]);
+      if (success) {
+        setImportedUrls((prev) => new Set(prev).add(hfUrl));
+        setHfResults((prev) =>
+          prev.map((r) => r.hf_url === hfUrl ? { ...r, already_imported: true } : r)
+        );
+      }
+    } finally {
+      setImportingUrls((prev) => { const s = new Set(prev); s.delete(hfUrl); return s; });
+    }
+  }
 
   useEffect(() => {
     fetchTags().then(setAllTags).catch(() => {});
@@ -217,54 +271,190 @@ export function DashboardPage({
   return (
     <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 pb-28 sm:px-6 lg:grid-cols-3 lg:px-8 lg:pb-10">
       <section className="space-y-4 lg:col-span-2">
-        {/* Scrape input card */}
+        {/* Import card — 2 tabs */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
-          <div className="flex flex-col gap-2">
-            <textarea
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
-              placeholder={`${t("app.urlPlaceholder")} (${t("app.urlPerLine")})`}
-              rows={2}
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-            />
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="shrink-0 whitespace-nowrap rounded-xl bg-accent px-4 py-2 font-semibold text-white"
-                onClick={() => void handleMultiScrape()}
-                disabled={loading}
-                type="button"
-              >
-                {loading ? t("app.scraping") : t("app.scrape")}
-              </button>
-              <button
-                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 font-medium hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#2d2d30] dark:hover:bg-[#3e3e42] dark:text-gray-200"
-                onClick={() => setIsCustomRecipeModalOpen(true)}
-                type="button"
-              >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                {t("app.customRecipe")}
-              </button>
-            </div>
+          {/* Tab bar */}
+          <div className="mb-3 flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-[#1e1e1e]">
+            <button
+              type="button"
+              onClick={() => setImportTab("hf")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm font-semibold transition ${
+                importTab === "hf"
+                  ? "bg-white shadow text-ink dark:bg-[#252526] dark:text-gray-100"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+            >
+              <Search className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("hfDiscovery.tabLabel")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setImportTab("url")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm font-semibold transition ${
+                importTab === "url"
+                  ? "bg-white shadow text-ink dark:bg-[#252526] dark:text-gray-100"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+            >
+              <Link className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("hfDiscovery.tabUrl")}
+            </button>
           </div>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t("app.recipesLoaded", { count: recipeCount })}</p>
-          {scrapeState && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 p-2 dark:border-accent/30 dark:bg-accent/10">
-              {loading && (
-                <svg
-                  className="h-4 w-4 animate-spin text-accent"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
+
+          {importTab === "hf" ? (
+            <div className="flex flex-col gap-3">
+              {/* HF search input */}
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => { e.preventDefault(); void runHfSearch(); }}
+              >
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                  <input
+                    className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+                    placeholder={t("hfDiscovery.searchPlaceholder")}
+                    value={hfQuery}
+                    onChange={(e) => {
+                      setHfQuery(e.target.value);
+                      if (!e.target.value.trim()) { setHfResults([]); setHfError(null); }
+                    }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={hfLoading || !hfQuery.trim()}
+                  className="shrink-0 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
                 >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
+                  {t("hfDiscovery.search")}
+                </button>
+              </form>
+
+              {/* Status */}
+              {hfLoading && (
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <SpinnerIcon />
+                  {t("hfDiscovery.searching")}
+                </div>
               )}
-              <p className="text-sm font-medium text-gray-700">{scrapeState}</p>
+              {hfError && <p className="text-sm text-red-500">{hfError}</p>}
+              {!hfLoading && !hfError && hfQuery.trim() && hfResults.length === 0 && (
+                <p className="text-sm text-gray-400 dark:text-gray-500">{t("hfDiscovery.noResults")}</p>
+              )}
+
+              {/* Results */}
+              {hfResults.length > 0 && (
+                <div className="flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
+                  {hfResults.map((hit) => {
+                    const isAlreadyImported = hit.already_imported || importedUrls.has(hit.hf_url);
+                    const isImporting = importingUrls.has(hit.hf_url);
+                    return (
+                      <div
+                        key={hit.id}
+                        className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                      >
+                        {/* Thumbnail */}
+                        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-green-50 dark:bg-[#252526]">
+                          {hit.image_url ? (
+                            <img
+                              src={hit.image_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-[9px] text-green-600 dark:text-gray-500">
+                              {t("recipe.noImage")}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-ink dark:text-gray-100">{hit.name}</p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                            {hit.total_time_minutes != null && (
+                              <span className="flex items-center gap-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                                <Clock className="h-3 w-3" aria-hidden="true" />
+                                {hit.total_time_minutes} {t("recipe.minutes")}
+                              </span>
+                            )}
+                            {hit.tags.slice(0, 3).map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Action */}
+                        <div className="shrink-0">
+                          {isAlreadyImported ? (
+                            <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                              {t("hfDiscovery.alreadyImported")}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isImporting}
+                              onClick={() => void handleHfImport(hit.hf_url)}
+                              className="rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
+                            >
+                              {isImporting ? t("hfDiscovery.importing") : t("hfDiscovery.import")}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t("app.recipesLoaded", { count: recipeCount })}</p>
+              {scrapeState && (
+                <div className="flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 p-2 dark:border-accent/30 dark:bg-accent/10">
+                  {loading && <SpinnerIcon />}
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{scrapeState}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* URL directe tab */
+            <div className="flex flex-col gap-2">
+              <textarea
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+                placeholder={`${t("app.urlPlaceholder")} (${t("app.urlPerLine")})`}
+                rows={2}
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="shrink-0 whitespace-nowrap rounded-xl bg-accent px-4 py-2 font-semibold text-white"
+                  onClick={() => void handleMultiScrape()}
+                  disabled={loading}
+                  type="button"
+                >
+                  {loading ? t("app.scraping") : t("app.scrape")}
+                </button>
+                <button
+                  className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 font-medium hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#2d2d30] dark:hover:bg-[#3e3e42] dark:text-gray-200"
+                  onClick={() => setIsCustomRecipeModalOpen(true)}
+                  type="button"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  {t("app.customRecipe")}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("app.recipesLoaded", { count: recipeCount })}</p>
+              {scrapeState && (
+                <div className="mt-1 flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 p-2 dark:border-accent/30 dark:bg-accent/10">
+                  {loading && <SpinnerIcon />}
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{scrapeState}</p>
+                </div>
+              )}
             </div>
           )}
         </div>

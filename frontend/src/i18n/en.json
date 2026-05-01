@@ -349,5 +349,17 @@
       "importSuccess": "Database imported successfully.",
       "importError": "Import failed."
     }
+  },
+  "hfDiscovery": {
+    "tabLabel": "HF Discovery",
+    "tabUrl": "Direct URL",
+    "searchPlaceholder": "Search a HelloFresh recipe...",
+    "search": "Search",
+    "searching": "Searching...",
+    "noResults": "No results. Try a different term.",
+    "searchError": "Search failed. Please retry.",
+    "alreadyImported": "Already imported",
+    "import": "Import",
+    "importing": "Importing..."
   }
 }

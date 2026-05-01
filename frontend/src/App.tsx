@@ -295,13 +295,15 @@ function App() {
     }
   }
 
-  async function onScrape(urls: string[]) {
-    if (!isAuthenticated) return;
+  async function onScrape(urls: string[]): Promise<boolean> {
+    if (!isAuthenticated) return false;
+    let success = false;
     for (const u of urls) {
       if (u.trim()) {
-        await startScrape(u.trim(), loadRecipes);
+        success = await startScrape(u.trim(), loadRecipes);
       }
     }
+    return success;
   }
 
   if (isAuthenticated === null) {

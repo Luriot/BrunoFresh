@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import shutil
+import uuid
 from collections import defaultdict
 from pathlib import Path
 
@@ -61,7 +62,7 @@ async def import_db(file: UploadFile = File(...)):
     if not content.startswith(_SQLITE_MAGIC):
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid SQLite database.")
 
-    temp_path = settings.db_file.with_suffix(".temp")
+    temp_path = settings.db_file.with_name(f"import_{uuid.uuid4().hex}.temp")
     try:
         await asyncio.to_thread(temp_path.write_bytes, content)
         await asyncio.to_thread(shutil.move, str(temp_path), str(settings.db_file))

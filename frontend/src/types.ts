@@ -4,6 +4,16 @@ export type Tag = {
   color: string | null;
 };
 
+export type HFSearchResult = {
+  id: string;
+  name: string;
+  image_url: string | null;
+  tags: string[];
+  total_time_minutes: number | null;
+  hf_url: string;
+  already_imported: boolean;
+};
+
 export type RecipeListItem = {
   id: number;
   title: string;

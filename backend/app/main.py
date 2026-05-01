@@ -18,6 +18,7 @@ from .api.routers import (
     auth_router,
     cart_router,
     health_router,
+    hellofresh_router,
     images_router,
     lists_router,
     meal_plans_router,
@@ -96,6 +97,7 @@ app.include_router(auth_router)
 app.include_router(images_router, dependencies=[Depends(require_auth)])
 app.include_router(recipes_router, dependencies=[Depends(require_auth)])
 app.include_router(scrape_router, dependencies=[Depends(require_auth)])
+app.include_router(hellofresh_router, dependencies=[Depends(require_auth)])
 app.include_router(cart_router, dependencies=[Depends(require_auth)])
 app.include_router(lists_router, dependencies=[Depends(require_auth)])
 app.include_router(tags_router, dependencies=[Depends(require_auth)])

@@ -349,5 +349,17 @@
       "importSuccess": "Base de données importée avec succès.",
       "importError": "Erreur lors de l'importation."
     }
+  },
+  "hfDiscovery": {
+    "tabLabel": "Découverte HF",
+    "tabUrl": "URL directe",
+    "searchPlaceholder": "Rechercher une recette HelloFresh...",
+    "search": "Rechercher",
+    "searching": "Recherche en cours...",
+    "noResults": "Aucun résultat. Essayez un autre terme.",
+    "searchError": "Erreur lors de la recherche. Réessayez.",
+    "alreadyImported": "Déjà importée",
+    "import": "Importer",
+    "importing": "Import..."
   }
 }

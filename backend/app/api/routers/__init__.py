@@ -1,6 +1,7 @@
 from .auth import router as auth_router
 from .cart import router as cart_router
 from .health import router as health_router
+from .hellofresh import router as hellofresh_router
 from .images import router as images_router
 from .lists import router as lists_router
 from .meal_plans import router as meal_plans_router
@@ -14,6 +15,7 @@ __all__ = [
     "auth_router",
     "cart_router",
     "health_router",
+    "hellofresh_router",
     "images_router",
     "lists_router",
     "meal_plans_router",

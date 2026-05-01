@@ -74,6 +74,16 @@ class RecipeDetail(BaseModel):
     instruction_steps: list[InstructionStep] = []
 
 
+class HFSearchResultResponse(BaseModel):
+    id: str
+    name: str
+    image_url: str | None
+    tags: list[str]
+    total_time_minutes: int | None
+    hf_url: str
+    already_imported: bool
+
+
 class ScrapeRequest(BaseModel):
     url: HttpUrl
     force: bool = False

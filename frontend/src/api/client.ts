@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   CartInput,
   CartResponse,
+  HFSearchResult,
   IngredientDetail,
   JobStatusResponse,
   MealPlan,
@@ -95,6 +96,13 @@ export async function createCustomRecipe(payload: RecipeCreate) {
 
 export async function queueScrape(url: string, force = false) {
   const { data } = await api.post<ScrapeResponse>("/scrape", { url, force });
+  return data;
+}
+
+export async function searchHelloFresh(query: string): Promise<HFSearchResult[]> {
+  const { data } = await api.get<HFSearchResult[]>("/hellofresh/search", {
+    params: { q: query },
+  });
   return data;
 }
 
