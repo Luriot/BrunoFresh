@@ -452,9 +452,9 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
     if "porc" in text or "pork" in text or "lardons" in text:
         return fallback("pork", "porc", quantity, "g", "Meat")
     if "saumon" in text or "salmon" in text:
-        return fallback("salmon", "saumon", quantity, "g", "Meat")
+        return fallback("salmon", "saumon", quantity, "g", "Fish")
     if "thon" in text or "tuna" in text:
-        return fallback("tuna", "thon", quantity, "g", "Meat")
+        return fallback("tuna", "thon", quantity, "g", "Fish")
     if "carotte" in text or "carrot" in text:
         return fallback("carrot", "carotte", quantity, raw_unit or "piece", "Produce")
     if "courgette" in text or "zucchini" in text:

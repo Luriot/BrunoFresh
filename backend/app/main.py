@@ -31,24 +31,32 @@ from .config import settings
 from .admin import setup_admin
 from .database import SessionLocal
 from .models import Tag
+from .services.tag_rules import KEYWORDS as _TAG_KEYWORDS
 
 logger = logging.getLogger(__name__)
 
+_TAG_COLORS: dict[str, str] = {
+    "Rapide":          "#16a34a",
+    "Végétarien":       "#65a30d",
+    "Végan":            "#4d7c0f",
+    "Épicé":            "#dc2626",
+    "Peu de vaisselle": "#2563eb",
+    "Healthy":          "#0891b2",
+    "Comfort food":     "#d97706",
+    "Pâtes":            "#f59e0b",
+    "Riz":              "#ca8a04",
+    "Poulet":           "#ea580c",
+    "Poisson":          "#0284c7",
+    "Dessert":          "#db2777",
+    "Petit-déjeuner":   "#7c3aed",
+    "Batch cooking":    "#64748b",
+}
+_DEFAULT_TAG_COLOR = "#64748b"
+
+# Derived from KEYWORDS so any new tag added to tag_rules is automatically seeded.
 DEFAULT_TAGS: list[dict] = [
-    {"name": "Rapide",          "color": "#16a34a"},
-    {"name": "Végétarien",       "color": "#65a30d"},
-    {"name": "Végan",            "color": "#4d7c0f"},
-    {"name": "Épicé",            "color": "#dc2626"},
-    {"name": "Peu de vaisselle", "color": "#2563eb"},
-    {"name": "Healthy",          "color": "#0891b2"},
-    {"name": "Comfort food",     "color": "#d97706"},
-    {"name": "Pâtes",            "color": "#f59e0b"},
-    {"name": "Riz",              "color": "#ca8a04"},
-    {"name": "Poulet",           "color": "#ea580c"},
-    {"name": "Poisson",          "color": "#0284c7"},
-    {"name": "Dessert",          "color": "#db2777"},
-    {"name": "Petit-déjeuner",   "color": "#7c3aed"},
-    {"name": "Batch cooking",    "color": "#64748b"},
+    {"name": name, "color": _TAG_COLORS.get(name, _DEFAULT_TAG_COLOR)}
+    for name in _TAG_KEYWORDS
 ]
 
 
@@ -93,7 +101,7 @@ app.include_router(lists_router, dependencies=[Depends(require_auth)])
 app.include_router(tags_router, dependencies=[Depends(require_auth)])
 app.include_router(pantry_router, dependencies=[Depends(require_auth)])
 app.include_router(meal_plans_router, dependencies=[Depends(require_auth)])
-app.include_router(admin_router, dependencies=[Depends(require_auth)])
+app.include_router(admin_router)  # require_auth already applied on the router itself
 
 # SQLAdmin DOIT être initialisé AVANT d'enregistrer le catch-all du SPA
 setup_admin(app)

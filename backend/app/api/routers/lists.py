@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, insert as sa_insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ...database import get_db
-from ...models import PantryItem, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe
-from ...services.normalizer import culinary_to_grams, get_unit_group, normalize_unit, smart_display_unit, to_base_unit
+from ...models import PantryItem, ShoppingList, ShoppingListItem, ShoppingListRecipe
+from ...services.aggregator import aggregate_recipe_ingredients as _aggregate_recipe_items
 from ...schemas import (
     CartRecipeIn,
     ShoppingListCreateRequest,
@@ -29,86 +29,6 @@ def _parse_needs_review(blob: str | None) -> list[str]:
         return []
     return [line for line in blob.split("\n") if line]
 
-
-async def _aggregate_recipe_items(
-    payload_items: list[CartRecipeIn],
-    db: AsyncSession,
-) -> tuple[list[dict], list[str]]:
-    grouped: dict[tuple[str, str, str | None, str, int | None], dict] = {}
-    needs_review: list[str] = []
-
-    if not payload_items:
-        return [], []
-
-    recipe_ids = list({item.recipe_id for item in payload_items})
-    recipes = (
-        await db.scalars(
-            select(Recipe)
-            .options(selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient))
-            .where(Recipe.id.in_(recipe_ids))
-        )
-    ).all()
-    recipes_by_id = {recipe.id: recipe for recipe in recipes}
-
-    for payload in payload_items:
-        recipe = recipes_by_id.get(payload.recipe_id)
-        if not recipe:
-            raise HTTPException(status_code=404, detail=f"Recipe {payload.recipe_id} not found")
-
-        multiplier = payload.target_servings / max(recipe.base_servings, 1)
-
-        for link in recipe.recipe_ingredients:
-            if link.needs_review or not link.ingredient:
-                needs_review.append(f"{recipe.title}: {link.raw_string}")
-                continue
-
-            raw_qty = link.quantity * multiplier
-            norm_unit, norm_qty = normalize_unit(link.unit, raw_qty)
-            # Ingredient-specific density conversion: c. à soupe / c. à thé / tasse → g
-            # (e.g. "2 c. à soupe de beurre" merges with "90 g de beurre")
-            density_result = culinary_to_grams(link.ingredient.name_en, norm_unit, norm_qty)
-            if density_result:
-                norm_unit, norm_qty = density_result
-            # Convert to base unit so g + kg, ml + L, etc. merge into a single row
-            base_unit, base_qty = to_base_unit(norm_unit, norm_qty)
-            # Group key uses the group name ("Poids", "Volume") so compatible units merge;
-            # incompatible units (piece, pincée, …) keep their own key.
-            agg_unit = get_unit_group(norm_unit) or norm_unit
-            key = (
-                link.ingredient.category,
-                link.ingredient.name_en,
-                link.ingredient.name_fr,
-                agg_unit,
-                link.ingredient.id,
-            )
-            if key not in grouped:
-                grouped[key] = {
-                    "category": link.ingredient.category,
-                    "name": link.ingredient.name_en,
-                    "name_fr": link.ingredient.name_fr,
-                    "_base_unit": base_unit,
-                    "quantity": 0.0,
-                    "ingredient_id": link.ingredient.id,
-                }
-            grouped[key]["quantity"] += base_qty
-
-    def _finalize(item: dict) -> dict:
-        base_unit = item.pop("_base_unit")
-        display_unit, display_qty = smart_display_unit(base_unit, round(item["quantity"], 2))
-        return {
-            "category": item["category"],
-            "name": item["name"],
-            "name_fr": item["name_fr"],
-            "unit": display_unit,
-            "quantity": display_qty,
-            "ingredient_id": item["ingredient_id"],
-        }
-
-    aggregated_rows = sorted(
-        (_finalize(item) for item in grouped.values()),
-        key=lambda item: (item["category"], item["name"]),
-    )
-    return aggregated_rows, sorted(set(needs_review))
 
 
 def _list_to_response(entity: ShoppingList) -> ShoppingListOut:
@@ -364,23 +284,29 @@ async def add_custom_shopping_list_item(
     if not exists:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
 
-    current_max = await db.scalar(
-        select(func.max(ShoppingListItem.sort_order)).where(ShoppingListItem.shopping_list_id == list_id)
+    # Atomic INSERT: sort_order computed as a subquery inside the INSERT statement
+    # so two concurrent requests cannot receive the same value.
+    sort_order_subq = (
+        select(func.coalesce(func.max(ShoppingListItem.sort_order), 0) + 1)
+        .where(ShoppingListItem.shopping_list_id == list_id)
+        .scalar_subquery()
     )
-    sort_order = int(current_max or 0) + 1
-
-    item = ShoppingListItem(
-        shopping_list_id=list_id,
-        name=payload.name.strip(),
-        name_fr=payload.name_fr.strip() if payload.name_fr else None,
-        quantity=round(payload.quantity, 2),
-        unit=payload.unit.strip(),
-        category=payload.category.strip(),
-        is_custom=True,
-        is_already_owned=False,
-        sort_order=sort_order,
+    result = await db.execute(
+        sa_insert(ShoppingListItem)
+        .values(
+            shopping_list_id=list_id,
+            name=payload.name.strip(),
+            name_fr=payload.name_fr.strip() if payload.name_fr else None,
+            quantity=round(payload.quantity, 2),
+            unit=payload.unit.strip(),
+            category=payload.category.strip(),
+            is_custom=True,
+            is_already_owned=False,
+            sort_order=sort_order_subq,
+        )
+        .returning(ShoppingListItem.id)
     )
-    db.add(item)
+    item_id = result.scalar_one()
     await db.commit()
-    await db.refresh(item)
+    item = await db.get(ShoppingListItem, item_id)
     return ShoppingListItemOut.model_validate(item)

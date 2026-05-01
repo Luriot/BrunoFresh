@@ -24,7 +24,7 @@ class JobEventBus:
             await queue.put(event)
 
     async def subscribe(self, job_id: int) -> AsyncGenerator[asyncio.Queue[JobEvent], None]:
-        queue: asyncio.Queue[JobEvent] = asyncio.Queue()
+        queue: asyncio.Queue[JobEvent] = asyncio.Queue(maxsize=100)
         async with self._lock:
             self._listeners[job_id].add(queue)
 

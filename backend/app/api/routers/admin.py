@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
 from ...database import engine, get_db
-from ...models import Ingredient, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListRecipe
+from ...models import Ingredient, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe
 from ...schemas import (
     IngredientDetail,
     IngredientMergeRequest,
@@ -51,8 +51,11 @@ async def import_db(file: UploadFile = File(...)):
     if not (filename.endswith(".db") or filename.endswith(".sqlite") or filename.endswith(".sqlite3")):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload a SQLite database file.")
 
-    content = await file.read()
+    _MAX_DB_UPLOAD_BYTES = 500 * 1024 * 1024  # 500 MB
+    content = await file.read(_MAX_DB_UPLOAD_BYTES + 1)
     await file.close()
+    if len(content) > _MAX_DB_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Database file exceeds the 500 MB upload limit.")
 
     _SQLITE_MAGIC = b"SQLite format 3\x00"
     if not content.startswith(_SQLITE_MAGIC):
@@ -227,11 +230,11 @@ async def ai_suggest_merges(db: AsyncSession = Depends(get_db)):
         raw_text = resp.json().get("response", "")
         raw_text = re.sub(r"```(?:json)?", "", raw_text).strip()
         parsed = json.loads(raw_text)
-    except Exception as exc:
+    except Exception:
         raise HTTPException(
             status_code=503,
-            detail=f"AI unavailable. Is Ollama running? ({exc})",
-        ) from exc
+            detail="AI service unavailable. Is Ollama running?",
+        ) from None
 
     name_to_id = {i.name_en: i.id for i in ingredients}
     suggestions: list[MergeSuggestion] = []
@@ -270,10 +273,29 @@ async def merge_ingredients(
     if not target:
         raise HTTPException(status_code=404, detail="Target ingredient not found")
 
+    # Migrate translations: re-parent any lang_code not already in target before
+    # cascade-deleting source (which would otherwise orphan them).
+    source_translations = (await db.scalars(
+        select(IngredientTranslation).where(IngredientTranslation.ingredient_id == payload.source_id)
+    )).all()
+    target_lang_codes = {t.lang_code for t in (await db.scalars(
+        select(IngredientTranslation).where(IngredientTranslation.ingredient_id == payload.target_id)
+    )).all()}
+    for t in source_translations:
+        if t.lang_code not in target_lang_codes:
+            t.ingredient_id = payload.target_id
+    await db.flush()
+
     # Reassign all RecipeIngredients from source → target
     await db.execute(
         update(RecipeIngredient)
         .where(RecipeIngredient.ingredient_id == payload.source_id)
+        .values(ingredient_id=payload.target_id)
+    )
+    # Reassign ShoppingListItem references from source → target
+    await db.execute(
+        update(ShoppingListItem)
+        .where(ShoppingListItem.ingredient_id == payload.source_id)
         .values(ingredient_id=payload.target_id)
     )
     await db.delete(source)

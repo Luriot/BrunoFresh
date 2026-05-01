@@ -14,8 +14,9 @@ from sqlalchemy.orm import selectinload
 from ..models import Ingredient, Recipe, RecipeIngredient, Tag
 from .dedupe import looks_like_duplicate, similarity_score
 from .images import download_image
-from .normalizer import normalize_ingredients_batch
+from .normalizer import NormalizedIngredient, normalize_ingredients_batch
 from .scraper import scrape_recipe_url
+from .scrapers.types import ScrapedIngredient
 from .events import JobEvent, job_event_bus
 from .tag_rules import match_tags
 
@@ -30,6 +31,112 @@ class DuplicateFound:
     existing_image: str | None
     title_score: float
     ingredient_score: float
+
+
+async def save_normalized_ingredients(
+    scraped_ingredients: list[ScrapedIngredient],
+    normalized_ingredients: list[NormalizedIngredient | None],
+    recipe_id: int,
+    db: AsyncSession,
+) -> None:
+    """Look up / create ``Ingredient`` rows and add ``RecipeIngredient`` links.
+
+    Includes a fuzzy pre-pass (WRatio ≥ 90) to avoid creating duplicate rows
+    for near-identical names (e.g. "black pepper" vs "pepper").
+    """
+    normalized_names = [
+        norm.name_en
+        for norm in normalized_ingredients
+        if norm and norm.name_en != "section_header_ignore"
+    ]
+    existing_ingredients: dict[str, Ingredient] = {}
+    if normalized_names:
+        result = await db.scalars(select(Ingredient).where(Ingredient.name_en.in_(normalized_names)))
+        for ing_obj in result:
+            existing_ingredients[ing_obj.name_en] = ing_obj
+
+    # Fuzzy pre-pass: match unresolved names against existing rows in the same category.
+    unmatched = [
+        norm for norm in normalized_ingredients
+        if norm and norm.name_en != "section_header_ignore" and norm.name_en not in existing_ingredients
+    ]
+    if unmatched:
+        unmatched_categories = {norm.category for norm in unmatched}
+        candidate_rows = (
+            await db.scalars(select(Ingredient).where(Ingredient.category.in_(unmatched_categories)))
+        ).all()
+        candidates_by_category: dict[str, list[Ingredient]] = defaultdict(list)
+        for c in candidate_rows:
+            candidates_by_category[c.category].append(c)
+
+        for norm in unmatched:
+            if norm.name_en in existing_ingredients:
+                continue
+            cats = candidates_by_category.get(norm.category, [])
+            if not cats:
+                continue
+            best_score, best_match = 0.0, None
+            for candidate in cats:
+                score = fuzz.WRatio(norm.name_en, candidate.name_en)
+                if score > best_score:
+                    best_score, best_match = score, candidate
+            if best_match is not None and best_score >= 90:
+                logger.info(
+                    f"Fuzzy ingredient match: '{norm.name_en}' → '{best_match.name_en}' "
+                    f"(score={best_score:.0f}) — reusing existing row #{best_match.id}"
+                )
+                existing_ingredients[norm.name_en] = best_match
+
+    for ing, normalized in zip(scraped_ingredients, normalized_ingredients):
+        ingredient = None
+        quantity = ing.quantity
+        unit = ing.unit
+
+        if normalized:
+            if normalized.name_en == "section_header_ignore":
+                continue
+
+            ingredient = existing_ingredients.get(normalized.name_en)
+            if not ingredient:
+                ingredient = Ingredient(
+                    name_en=normalized.name_en,
+                    name_fr=normalized.name_fr,
+                    category=normalized.category,
+                    is_normalized=True,
+                )
+                db.add(ingredient)
+                existing_ingredients[normalized.name_en] = ingredient
+                logger.debug(f"Nouvel ingrédient normalisé: {ingredient.name_en} ({ingredient.category})")
+                await db.flush()
+            elif not ingredient.name_fr and normalized.name_fr:
+                ingredient.name_fr = normalized.name_fr
+            quantity = normalized.quantity
+            unit = normalized.unit
+        else:
+            # Normalization failed: create a raw ingredient so it still appears in shopping lists
+            raw_name = ing.raw.strip().lower() or "unknown ingredient"
+            ingredient = existing_ingredients.get(raw_name)
+            if not ingredient:
+                ingredient = Ingredient(
+                    name_en=raw_name,
+                    name_fr=raw_name,
+                    category="Other",
+                    is_normalized=False,
+                )
+                db.add(ingredient)
+                existing_ingredients[raw_name] = ingredient
+                await db.flush()
+
+        db.add(
+            RecipeIngredient(
+                recipe_id=recipe_id,
+                ingredient_id=ingredient.id if ingredient else None,
+                raw_string=ing.raw,
+                quantity=quantity,
+                unit=unit,
+                needs_review=False,
+            )
+        )
 
 
 async def persist_scraped_recipe(
@@ -126,106 +233,11 @@ async def persist_scraped_recipe(
 
     logger.debug("Sauvegarde et liaison des ingrédients à la recette...")
     await notify_progress("Sauvegarde des ingrédients...")
-
-    normalized_names = [
-        norm.name_en
-        for norm in normalized_ingredients
-        if norm and norm.name_en != "section_header_ignore"
-    ]
-    existing_ingredients: dict[str, Ingredient] = {}
-    if normalized_names:
-        result = await db.scalars(select(Ingredient).where(Ingredient.name_en.in_(normalized_names)))
-        for ing_obj in result:
-            existing_ingredients[ing_obj.name_en] = ing_obj
-
-    # Fuzzy pre-pass: for ingredients not found by exact match, look for near-duplicates
-    # within the same category (WRatio >= 90) to avoid creating separate rows for
-    # e.g. "black pepper" vs "pepper", "butter" vs "unsalted butter".
-    unmatched = [
-        norm for norm in normalized_ingredients
-        if norm and norm.name_en != "section_header_ignore" and norm.name_en not in existing_ingredients
-    ]
-    if unmatched:
-        unmatched_categories = {norm.category for norm in unmatched}
-        candidate_rows = (
-            await db.scalars(select(Ingredient).where(Ingredient.category.in_(unmatched_categories)))
-        ).all()
-        candidates_by_category: dict[str, list[Ingredient]] = defaultdict(list)
-        for c in candidate_rows:
-            candidates_by_category[c.category].append(c)
-
-        for norm in unmatched:
-            if norm.name_en in existing_ingredients:
-                continue  # already resolved by a previous iteration
-            cats = candidates_by_category.get(norm.category, [])
-            if not cats:
-                continue
-            best_score, best_match = 0.0, None
-            for candidate in cats:
-                score = fuzz.WRatio(norm.name_en, candidate.name_en)
-                if score > best_score:
-                    best_score, best_match = score, candidate
-            if best_match is not None and best_score >= 90:
-                logger.info(
-                    f"Fuzzy ingredient match: '{norm.name_en}' → '{best_match.name_en}' "
-                    f"(score={best_score:.0f}) — reusing existing row #{best_match.id}"
-                )
-                existing_ingredients[norm.name_en] = best_match
-
-    for ing, normalized in zip(scraped.ingredients, normalized_ingredients):
-        ingredient = None
-        quantity = ing.quantity
-        unit = ing.unit
-
-        if normalized:
-            if normalized.name_en == "section_header_ignore":
-                continue
-
-            ingredient = existing_ingredients.get(normalized.name_en)
-            if not ingredient:
-                ingredient = Ingredient(
-                    name_en=normalized.name_en,
-                    name_fr=normalized.name_fr,
-                    category=normalized.category,
-                    is_normalized=True,
-                )
-                db.add(ingredient)
-                existing_ingredients[normalized.name_en] = ingredient
-                logger.debug(f"Nouvel ingrédient normalisé: {ingredient.name_en} ({ingredient.category})")
-                await db.flush()
-            elif not ingredient.name_fr and normalized.name_fr:
-                ingredient.name_fr = normalized.name_fr
-            quantity = normalized.quantity
-            unit = normalized.unit
-        else:
-            # Normalization failed: create a raw ingredient so it still appears in shopping lists
-            raw_name = ing.raw.strip().lower() or "unknown ingredient"
-            ingredient = existing_ingredients.get(raw_name)
-            if not ingredient:
-                ingredient = Ingredient(
-                    name_en=raw_name,
-                    name_fr=raw_name,
-                    category="Other",
-                    is_normalized=False,
-                )
-                db.add(ingredient)
-                existing_ingredients[raw_name] = ingredient
-                await db.flush()
-
-        db.add(
-            RecipeIngredient(
-                recipe_id=recipe.id,
-                ingredient_id=ingredient.id if ingredient else None,
-                raw_string=ing.raw,
-                quantity=quantity,
-                unit=unit,
-                needs_review=False,
-            )
-        )
+    await save_normalized_ingredients(scraped.ingredients, normalized_ingredients, recipe.id, db)
 
     # ── Auto-tag ────────────────────────────────────────────────────────────
     await notify_progress("Application automatique des tags...")
-    await _auto_tag_recipe(recipe, scraped.title, incoming_names, scraped.prep_time_minutes, db)
+    await auto_tag_recipe(recipe, scraped.title, incoming_names, scraped.prep_time_minutes, db)
 
     logger.info("Validation finale en base des modifications pour la recette..")
     await db.commit()
@@ -233,7 +245,7 @@ async def persist_scraped_recipe(
     return None
 
 
-async def _auto_tag_recipe(
+async def auto_tag_recipe(
     recipe: Recipe,
     title: str,
     ingredient_names: list[str],

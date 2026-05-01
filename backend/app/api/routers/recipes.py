@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from ...database import get_db
 from ...models import Ingredient, Recipe, RecipeIngredient, Tag
 from ...models import recipe_tags as recipe_tags_table
+from ...services.dedupe import _jaccard_similarity
 from ...schemas import (
     IngredientDetail,
     IngredientNamePatch,
@@ -27,6 +28,19 @@ from ...schemas import (
 router = APIRouter(prefix="/api", tags=["recipes"])
 
 _RECIPE_NOT_FOUND = "Recipe not found"
+
+
+def _escape_like(s: str) -> str:
+    """Escape LIKE/ILIKE wildcards so user input is treated as a literal substring."""
+    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _recipe_detail_opts() -> tuple:
+    """Selectinload options shared by all endpoints that return RecipeDetail."""
+    return (
+        selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
+        selectinload(Recipe.tags),
+    )
 
 
 def _ing_to_out(link: RecipeIngredient) -> RecipeIngredientOut:
@@ -80,8 +94,7 @@ async def list_recipes(
     stmt = select(Recipe).options(selectinload(Recipe.tags))
 
     if q:
-        # Escape ILIKE wildcards so user input is treated as a literal substring.
-        q_safe = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        q_safe = _escape_like(q)
         ingredient_recipe_ids = select(RecipeIngredient.recipe_id).join(
             Ingredient, RecipeIngredient.ingredient_id == Ingredient.id
         ).where(
@@ -98,7 +111,7 @@ async def list_recipes(
     if ingredients:
         keywords = [kw.strip() for kw in ingredients.split(",") if kw.strip()]
         for kw in keywords:
-            kw_safe = kw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            kw_safe = _escape_like(kw)
             subq = select(RecipeIngredient.recipe_id).join(
                 Ingredient, RecipeIngredient.ingredient_id == Ingredient.id
             ).where(
@@ -122,11 +135,7 @@ async def list_recipes(
 @router.get("/recipes/{recipe_id}", response_model=RecipeDetail)
 async def get_recipe(recipe_id: int, db: AsyncSession = Depends(get_db)):
     recipe = await db.scalar(
-        select(Recipe)
-        .options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-            selectinload(Recipe.tags),
-        )
+        select(Recipe).options(*_recipe_detail_opts())
         .where(Recipe.id == recipe_id)
     )
     if not recipe:
@@ -173,11 +182,7 @@ async def create_custom_recipe(
     await db.commit()
 
     recipe = await db.scalar(
-        select(Recipe)
-        .options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-            selectinload(Recipe.tags),
-        )
+        select(Recipe).options(*_recipe_detail_opts())
         .where(Recipe.id == new_recipe.id)
     )
 
@@ -194,11 +199,7 @@ async def patch_recipe(
     db: AsyncSession = Depends(get_db),
 ):
     recipe = await db.scalar(
-        select(Recipe)
-        .options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-            selectinload(Recipe.tags),
-        )
+        select(Recipe).options(*_recipe_detail_opts())
         .where(Recipe.id == recipe_id)
     )
     if not recipe:
@@ -211,11 +212,7 @@ async def patch_recipe(
     await db.commit()
 
     recipe = await db.scalar(
-        select(Recipe)
-        .options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-            selectinload(Recipe.tags),
-        )
+        select(Recipe).options(*_recipe_detail_opts())
         .where(Recipe.id == recipe_id)
     )
     if not recipe:
@@ -244,11 +241,7 @@ async def set_recipe_tags(
     db: AsyncSession = Depends(get_db),
 ):
     recipe = await db.scalar(
-        select(Recipe)
-        .options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-            selectinload(Recipe.tags),
-        )
+        select(Recipe).options(*_recipe_detail_opts())
         .where(Recipe.id == recipe_id)
     )
     if not recipe:
@@ -262,11 +255,7 @@ async def set_recipe_tags(
     await db.commit()
 
     recipe = await db.scalar(
-        select(Recipe)
-        .options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-            selectinload(Recipe.tags),
-        )
+        select(Recipe).options(*_recipe_detail_opts())
         .where(Recipe.id == recipe_id)
     )
     if not recipe:
@@ -294,22 +283,29 @@ async def get_similar_recipes(
         if ri.ingredient_id is not None
     }
 
-    all_recipes = (
+    if not target_ids:
+        return []
+
+    # Pre-filter: only load recipes that share at least one ingredient, avoiding a full-table scan.
+    shared_subq = (
+        select(RecipeIngredient.recipe_id)
+        .where(
+            RecipeIngredient.ingredient_id.in_(target_ids),
+            RecipeIngredient.recipe_id != recipe_id,
+        )
+        .distinct()
+    )
+    candidate_recipes = (
         await db.scalars(
             select(Recipe)
             .options(selectinload(Recipe.recipe_ingredients), selectinload(Recipe.tags))
-            .where(Recipe.id != recipe_id)
+            .where(Recipe.id.in_(shared_subq))
         )
     ).all()
 
-    def jaccard(a: set, b: set) -> float:
-        if not a or not b:
-            return 0.0
-        return len(a & b) / len(a | b)
-
     scored = [
-        (jaccard(target_ids, {ri.ingredient_id for ri in r.recipe_ingredients if ri.ingredient_id}), r)
-        for r in all_recipes
+        (_jaccard_similarity(target_ids, {ri.ingredient_id for ri in r.recipe_ingredients if ri.ingredient_id}), r)
+        for r in candidate_recipes
     ]
     scored.sort(key=lambda x: x[0], reverse=True)
     return [r for _, r in scored[:limit]]
@@ -377,45 +373,16 @@ async def rescrape_recipe(
                 )
                 await session.flush()
 
-                existing_ingredients: dict[str, Ingredient] = {}
-                normalized_names = [n.name_en for n in normalized if n and n.name_en != "section_header_ignore"]
-                if normalized_names:
-                    result = await session.scalars(select(Ingredient).where(Ingredient.name_en.in_(normalized_names)))
-                    for ing_obj in result:
-                        existing_ingredients[ing_obj.name_en] = ing_obj
+                from ...services.orchestrator import auto_tag_recipe, save_normalized_ingredients
+                await save_normalized_ingredients(scraped.ingredients, normalized, recipe_id, session)
 
-                from ...services.normalizer import normalize_unit as _nu
-                for ing, norm in zip(scraped.ingredients, normalized):
-                    if norm and norm.name_en == "section_header_ignore":
-                        continue
-                    ingredient = None
-                    needs_review = False
-                    quantity = ing.quantity
-                    unit = ing.unit
-                    if norm:
-                        ingredient = existing_ingredients.get(norm.name_en)
-                        if not ingredient:
-                            ingredient = Ingredient(
-                                name_en=norm.name_en,
-                                name_fr=norm.name_fr,
-                                category=norm.category,
-                                is_normalized=True,
-                            )
-                            session.add(ingredient)
-                            existing_ingredients[norm.name_en] = ingredient
-                            await session.flush()
-                        quantity = norm.quantity
-                        unit = norm.unit
-                    else:
-                        needs_review = True
-                    session.add(RecipeIngredient(
-                        recipe_id=recipe_id,
-                        ingredient_id=ingredient.id if ingredient else None,
-                        raw_string=ing.raw,
-                        quantity=quantity,
-                        unit=unit,
-                        needs_review=needs_review,
-                    ))
+                incoming_names = [
+                    n.name_en if n and n.name_en != "section_header_ignore" else ing.raw
+                    for n, ing in zip(normalized, scraped.ingredients)
+                ]
+                await auto_tag_recipe(
+                    target_recipe, scraped.title, incoming_names, scraped.prep_time_minutes, session
+                )
 
                 running_job = await session.get(SJ, job_id)
                 if running_job:
@@ -423,12 +390,15 @@ async def rescrape_recipe(
                 await session.commit()
                 await job_event_bus.publish(job_id, JobEvent(status="completed", message="Re-scrape complete"))
             except Exception as exc:
-                from ...models import ScrapeJob as SJ2
-                running_job = await session.get(SJ2, job_id)
-                if running_job:
-                    running_job.status = "failed"
-                    running_job.error_message = str(exc)[:800]
-                    await session.commit()
+                # The session may be poisoned after a failed flush; open a fresh
+                # connection so the status update always reaches the database.
+                async with AsyncSessionLocal() as fail_session:
+                    from ...models import ScrapeJob as SJ2
+                    failed_job = await fail_session.get(SJ2, job_id)
+                    if failed_job:
+                        failed_job.status = "failed"
+                        failed_job.error_message = str(exc)[:800]
+                        await fail_session.commit()
                 await job_event_bus.publish(job_id, JobEvent(status="failed", message=str(exc)))
 
     asyncio.create_task(_run())
@@ -445,11 +415,7 @@ async def format_recipe_instructions(
     import httpx as _httpx
 
     recipe = await db.scalar(
-        select(Recipe)
-        .options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-            selectinload(Recipe.tags),
-        )
+        select(Recipe).options(*_recipe_detail_opts())
         .where(Recipe.id == recipe_id)
     )
     if not recipe:
@@ -477,15 +443,11 @@ async def format_recipe_instructions(
         if formatted:
             recipe.instructions_text = formatted
             await db.commit()
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Ollama error: {exc}")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Ollama service unavailable. Is Ollama running?")
 
     recipe = await db.scalar(
-        select(Recipe)
-        .options(
-            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-            selectinload(Recipe.tags),
-        )
+        select(Recipe).options(*_recipe_detail_opts())
         .where(Recipe.id == recipe_id)
     )
     if not recipe:

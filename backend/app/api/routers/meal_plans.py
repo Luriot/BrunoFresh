@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
-from ...models import MealPlan, MealPlanEntry, Recipe, ShoppingList, ShoppingListItem, ShoppingListRecipe
+from ...models import MealPlan, MealPlanEntry, PantryItem, Recipe, ShoppingList, ShoppingListItem, ShoppingListRecipe
 from ...schemas import (
     CartRecipeIn,
     MealPlanCreate,
@@ -242,6 +242,11 @@ async def generate_list_from_meal_plan(
 
     aggregated_items, needs_review = await _aggregate_recipe_items(cart_items, db)
 
+    # Load pantry for auto-checking items already in stock
+    pantry_items_db = (await db.scalars(select(PantryItem))).all()
+    pantry_ingredient_ids: set[int] = {p.ingredient_id for p in pantry_items_db if p.ingredient_id is not None}
+    pantry_names_lower: set[str] = {p.name.strip().lower() for p in pantry_items_db}
+
     week_label = None
     if plan.week_start_date:
         week_end = plan.week_start_date + timedelta(days=6)
@@ -268,6 +273,10 @@ async def generate_list_from_meal_plan(
 
     sort_order = 0
     for row in aggregated_items:
+        in_pantry = (
+            (row["ingredient_id"] is not None and row["ingredient_id"] in pantry_ingredient_ids)
+            or row["name"].strip().lower() in pantry_names_lower
+        )
         db.add(ShoppingListItem(
             shopping_list_id=shopping_list.id,
             ingredient_id=row["ingredient_id"],
@@ -277,7 +286,7 @@ async def generate_list_from_meal_plan(
             unit=row["unit"],
             category=row["category"],
             is_custom=False,
-            is_already_owned=False,
+            is_already_owned=in_pantry,
             sort_order=sort_order,
         ))
         sort_order += 1
