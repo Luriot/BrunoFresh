@@ -115,6 +115,109 @@ def normalize_unit(unit: str, quantity: float) -> tuple[str, float]:
     return "piece", quantity
 
 
+# ── Unit group helpers (for cross-unit aggregation in shopping lists) ────────
+# Maps canonical unit → (group_name, base_unit, factor_to_base)
+_UNIT_TO_GROUP_INFO: dict[str, tuple[str, str, float]] = {
+    "g":   ("Poids",  "g",  1.0),
+    "kg":  ("Poids",  "g",  1000.0),
+    "ml":  ("Volume", "ml", 1.0),
+    "cl":  ("Volume", "ml", 10.0),
+    "L":   ("Volume", "ml", 1000.0),
+}
+
+
+def get_unit_group(unit: str) -> str | None:
+    """Return the aggregation group name for a canonical unit, or None if not cross-mergeable."""
+    info = _UNIT_TO_GROUP_INFO.get(unit)
+    return info[0] if info else None
+
+
+def to_base_unit(unit: str, qty: float) -> tuple[str, float]:
+    """Convert qty from the given canonical unit to its group's base unit.
+
+    Returns (base_unit, converted_qty). If the unit is not in a mergeable group
+    the unit and qty are returned unchanged.
+    """
+    info = _UNIT_TO_GROUP_INFO.get(unit)
+    if info is None:
+        return unit, qty
+    _, base_unit, factor = info
+    return base_unit, qty * factor
+
+
+def smart_display_unit(base_unit: str, total_qty: float) -> tuple[str, float]:
+    """Rescale a base-unit quantity to the most readable display unit.
+
+    - g  → kg  when total ≥ 1 000
+    - ml → cl  when total ≥ 100
+    - ml → L   when total ≥ 1 000
+    """
+    if base_unit == "g" and total_qty >= 1000:
+        return "kg", round(total_qty / 1000, 2)
+    if base_unit == "ml":
+        if total_qty >= 1000:
+            return "L", round(total_qty / 1000, 2)
+        if total_qty >= 100:
+            return "cl", round(total_qty / 10, 1)
+    return base_unit, total_qty
+
+
+# ── Ingredient-specific density table (culinary unit → grams) ───────────────
+# Maps name_en → { canonical_unit → grams_per_1_unit }
+# Only covers the most common ingredients where mixing g + c. à soupe is realistic.
+_CULINARY_UNIT_DENSITIES: dict[str, dict[str, float]] = {
+    "butter":          {"c. à soupe": 14.2, "c. à thé": 4.7,  "tasse": 227.0},
+    "flour":           {"c. à soupe": 7.8,  "c. à thé": 2.6,  "tasse": 125.0},
+    "all-purpose flour": {"c. à soupe": 7.8, "c. à thé": 2.6, "tasse": 125.0},
+    "sugar":           {"c. à soupe": 12.5, "c. à thé": 4.2,  "tasse": 200.0},
+    "brown sugar":     {"c. à soupe": 13.8, "c. à thé": 4.6,  "tasse": 220.0},
+    "powdered sugar":  {"c. à soupe": 7.5,  "c. à thé": 2.5,  "tasse": 120.0},
+    "icing sugar":     {"c. à soupe": 7.5,  "c. à thé": 2.5,  "tasse": 120.0},
+    "salt":            {"c. à soupe": 18.0, "c. à thé": 6.0,  "pincée": 0.4},
+    "black pepper":    {"c. à soupe": 6.0,  "c. à thé": 2.0,  "pincée": 0.3},
+    "olive oil":       {"c. à soupe": 13.5, "c. à thé": 4.5,  "tasse": 216.0},
+    "oil":             {"c. à soupe": 13.5, "c. à thé": 4.5,  "tasse": 218.0},
+    "vegetable oil":   {"c. à soupe": 13.5, "c. à thé": 4.5,  "tasse": 218.0},
+    "honey":           {"c. à soupe": 21.0, "c. à thé": 7.0,  "tasse": 336.0},
+    "maple syrup":     {"c. à soupe": 20.0, "c. à thé": 6.7,  "tasse": 320.0},
+    "cream":           {"c. à soupe": 15.0, "c. à thé": 5.0,  "tasse": 240.0},
+    "heavy cream":     {"c. à soupe": 15.0, "c. à thé": 5.0,  "tasse": 240.0},
+    "milk":            {"c. à soupe": 15.3, "c. à thé": 5.1,  "tasse": 245.0},
+    "cocoa powder":    {"c. à soupe": 7.5,  "c. à thé": 2.5,  "tasse": 120.0},
+    "baking powder":   {"c. à thé": 4.0},
+    "baking soda":     {"c. à thé": 6.0},
+    "cornstarch":      {"c. à soupe": 9.0,  "c. à thé": 3.0,  "tasse": 128.0},
+    "vinegar":         {"c. à soupe": 15.0, "c. à thé": 5.0,  "tasse": 240.0},
+    "soy sauce":       {"c. à soupe": 16.0, "c. à thé": 5.3},
+    "mustard":         {"c. à soupe": 17.0, "c. à thé": 5.7},
+    "tomato paste":    {"c. à soupe": 16.5, "c. à thé": 5.5},
+    "cream cheese":    {"c. à soupe": 14.5, "c. à thé": 4.8,  "tasse": 232.0},
+    "sour cream":      {"c. à soupe": 14.4, "c. à thé": 4.8,  "tasse": 230.0},
+    "yogurt":          {"c. à soupe": 15.3, "c. à thé": 5.1,  "tasse": 245.0},
+    "peanut butter":   {"c. à soupe": 16.0, "c. à thé": 5.3,  "tasse": 256.0},
+    "almond flour":    {"c. à soupe": 7.0,  "c. à thé": 2.3,  "tasse": 112.0},
+    "breadcrumbs":     {"c. à soupe": 7.5,  "c. à thé": 2.5,  "tasse": 120.0},
+    "parmesan":        {"c. à soupe": 5.0,  "c. à thé": 1.7,  "tasse": 80.0},
+    "cheddar":         {"c. à soupe": 7.0,  "c. à thé": 2.3,  "tasse": 113.0},
+}
+
+
+def culinary_to_grams(name_en: str, unit: str, qty: float) -> tuple[str, float] | None:
+    """Convert a culinary unit to grams using per-ingredient density data.
+
+    Returns ``("g", qty_in_grams)`` if a conversion is known, otherwise ``None``.
+    Only applies to culinary units (c. à soupe, c. à thé, tasse, pincée) — metric
+    units are left unchanged.
+    """
+    densities = _CULINARY_UNIT_DENSITIES.get(name_en.strip().lower())
+    if not densities:
+        return None
+    grams_per_unit = densities.get(unit)
+    if grams_per_unit is None:
+        return None
+    return "g", round(qty * grams_per_unit, 2)
+
+
 def _coerce_unit(value: str) -> str:
     canonical, _ = normalize_unit(value or "", 1.0)
     return canonical

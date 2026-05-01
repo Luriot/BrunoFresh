@@ -2,10 +2,12 @@ import asyncio
 import json
 import re
 import shutil
+from collections import defaultdict
 from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from rapidfuzz import fuzz
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import selectinload
@@ -139,6 +141,46 @@ async def list_ingredients_admin(
         )
         for i in ingredients
     ]
+
+
+@router.get("/ingredients/fuzzy-duplicates", response_model=MergeSuggestionResponse)
+async def fuzzy_duplicate_ingredients(
+    threshold: int = Query(default=85, ge=50, le=99),
+    db: AsyncSession = Depends(get_db),
+):
+    """Find likely duplicate ingredients using rapidfuzz (no Ollama required).
+
+    Compares ingredient names within each category pairwise and returns pairs
+    whose WRatio score meets the threshold.  Use the /merge endpoint to resolve
+    found duplicates.
+    """
+    all_ingredients = (
+        await db.scalars(select(Ingredient).order_by(Ingredient.name_en))
+    ).all()
+
+    by_category: dict[str, list[Ingredient]] = defaultdict(list)
+    for ing in all_ingredients:
+        by_category[ing.category].append(ing)
+
+    scored: list[tuple[int, MergeSuggestion]] = []
+    for _cat, members in by_category.items():
+        for i, a in enumerate(members):
+            for b in members[i + 1:]:
+                score = fuzz.WRatio(a.name_en, b.name_en)
+                if score >= threshold:
+                    scored.append((
+                        score,
+                        MergeSuggestion(
+                            source_id=a.id,
+                            source_name=a.name_en,
+                            target_id=b.id,
+                            target_name=b.name_en,
+                            reason=f"Similarité des noms : {score:.0f} %",
+                        ),
+                    ))
+
+    scored.sort(key=lambda t: t[0], reverse=True)
+    return MergeSuggestionResponse(suggestions=[s for _, s in scored])
 
 
 @router.post("/ingredients/ai-suggest-merges", response_model=MergeSuggestionResponse)

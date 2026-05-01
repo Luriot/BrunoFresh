@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from ...database import get_db
 from ...models import PantryItem, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe
-from ...services.normalizer import normalize_unit
+from ...services.normalizer import culinary_to_grams, get_unit_group, normalize_unit, smart_display_unit, to_base_unit
 from ...schemas import (
     CartRecipeIn,
     ShoppingListCreateRequest,
@@ -64,11 +64,21 @@ async def _aggregate_recipe_items(
 
             raw_qty = link.quantity * multiplier
             norm_unit, norm_qty = normalize_unit(link.unit, raw_qty)
+            # Ingredient-specific density conversion: c. à soupe / c. à thé / tasse → g
+            # (e.g. "2 c. à soupe de beurre" merges with "90 g de beurre")
+            density_result = culinary_to_grams(link.ingredient.name_en, norm_unit, norm_qty)
+            if density_result:
+                norm_unit, norm_qty = density_result
+            # Convert to base unit so g + kg, ml + L, etc. merge into a single row
+            base_unit, base_qty = to_base_unit(norm_unit, norm_qty)
+            # Group key uses the group name ("Poids", "Volume") so compatible units merge;
+            # incompatible units (piece, pincée, …) keep their own key.
+            agg_unit = get_unit_group(norm_unit) or norm_unit
             key = (
                 link.ingredient.category,
                 link.ingredient.name_en,
                 link.ingredient.name_fr,
-                norm_unit,
+                agg_unit,
                 link.ingredient.id,
             )
             if key not in grouped:
@@ -76,20 +86,26 @@ async def _aggregate_recipe_items(
                     "category": link.ingredient.category,
                     "name": link.ingredient.name_en,
                     "name_fr": link.ingredient.name_fr,
-                    "unit": norm_unit,
+                    "_base_unit": base_unit,
                     "quantity": 0.0,
                     "ingredient_id": link.ingredient.id,
                 }
-            grouped[key]["quantity"] += norm_qty
+            grouped[key]["quantity"] += base_qty
+
+    def _finalize(item: dict) -> dict:
+        base_unit = item.pop("_base_unit")
+        display_unit, display_qty = smart_display_unit(base_unit, round(item["quantity"], 2))
+        return {
+            "category": item["category"],
+            "name": item["name"],
+            "name_fr": item["name_fr"],
+            "unit": display_unit,
+            "quantity": display_qty,
+            "ingredient_id": item["ingredient_id"],
+        }
 
     aggregated_rows = sorted(
-        (
-            {
-                **item,
-                "quantity": round(item["quantity"], 2),
-            }
-            for item in grouped.values()
-        ),
+        (_finalize(item) for item in grouped.values()),
         key=lambda item: (item["category"], item["name"]),
     )
     return aggregated_rows, sorted(set(needs_review))

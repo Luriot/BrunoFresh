@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 
+from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -135,6 +137,40 @@ async def persist_scraped_recipe(
         result = await db.scalars(select(Ingredient).where(Ingredient.name_en.in_(normalized_names)))
         for ing_obj in result:
             existing_ingredients[ing_obj.name_en] = ing_obj
+
+    # Fuzzy pre-pass: for ingredients not found by exact match, look for near-duplicates
+    # within the same category (WRatio >= 90) to avoid creating separate rows for
+    # e.g. "black pepper" vs "pepper", "butter" vs "unsalted butter".
+    unmatched = [
+        norm for norm in normalized_ingredients
+        if norm and norm.name_en != "section_header_ignore" and norm.name_en not in existing_ingredients
+    ]
+    if unmatched:
+        unmatched_categories = {norm.category for norm in unmatched}
+        candidate_rows = (
+            await db.scalars(select(Ingredient).where(Ingredient.category.in_(unmatched_categories)))
+        ).all()
+        candidates_by_category: dict[str, list[Ingredient]] = defaultdict(list)
+        for c in candidate_rows:
+            candidates_by_category[c.category].append(c)
+
+        for norm in unmatched:
+            if norm.name_en in existing_ingredients:
+                continue  # already resolved by a previous iteration
+            cats = candidates_by_category.get(norm.category, [])
+            if not cats:
+                continue
+            best_score, best_match = 0.0, None
+            for candidate in cats:
+                score = fuzz.WRatio(norm.name_en, candidate.name_en)
+                if score > best_score:
+                    best_score, best_match = score, candidate
+            if best_match is not None and best_score >= 90:
+                logger.info(
+                    f"Fuzzy ingredient match: '{norm.name_en}' → '{best_match.name_en}' "
+                    f"(score={best_score:.0f}) — reusing existing row #{best_match.id}"
+                )
+                existing_ingredients[norm.name_en] = best_match
 
     for ing, normalized in zip(scraped.ingredients, normalized_ingredients):
         ingredient = None
