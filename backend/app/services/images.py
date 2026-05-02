@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 
 from ..config import settings
-from .network import validate_public_host_for_download
+from .network import SSRFGuardedTransport, validate_public_host_for_download
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,10 @@ async def download_image(image_url: str | None, recipe_id: int) -> str | None:
 
     target = settings.images_dir / f"recipe_{recipe_id}.jpg"
     try:
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+        # SSRFGuardedTransport re-validates the resolved IP at connect time,
+        # preventing DNS rebinding attacks.
+        transport = SSRFGuardedTransport()
+        async with httpx.AsyncClient(transport=transport, timeout=20, follow_redirects=True) as client:
             response = await client.get(image_url)
             response.raise_for_status()
 
@@ -46,6 +49,9 @@ async def download_image(image_url: str | None, recipe_id: int) -> str | None:
         rel = Path("images") / target.name
         logger.info(f"Image téléchargée avec succès et sauvegardée sous {rel}")
         return rel.as_posix()
+    except httpx.ConnectError as exc:
+        logger.warning(f"Connexion bloquée pour la recette {recipe_id}: {exc}")
+        return None
     except Exception as exc:
         logger.error(f"Erreur lors du téléchargement de l'image de la recette {recipe_id}: {exc}", exc_info=True)
         return None

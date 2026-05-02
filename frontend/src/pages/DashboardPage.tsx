@@ -5,9 +5,10 @@ import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
-import { buildImageUrl, patchRecipe, fetchTags, fetchRecipes, searchHelloFresh } from "../api/client";
+import { buildImageUrl, patchRecipe, searchHelloFresh } from "../api/client";
+import { useRecipeFilters } from "../hooks/useRecipeFilters";
 import type { CartEntry } from "../hooks/useCart";
-import type { HFSearchResult, RecipeListItem, Tag } from "../types";
+import type { HFSearchResult, RecipeListItem } from "../types";
 
 type Props = {
   loading: boolean;
@@ -154,19 +155,22 @@ export function DashboardPage({
     localStorage.setItem("brunofresh.recipeView", mode);
   }
 
-  // Search + filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  // Search + filter state (managed by hook)
+  const {
+    searchQuery,
+    setSearchQuery,
+    selectedTagIds,
+    toggleTagFilter,
+    clearTagFilters,
+    showFavoritesOnly,
+    setShowFavoritesOnly,
+    allTags,
+  } = useRecipeFilters(onRecipesChanged);
+
   const [showFilters, setShowFilters] = useState(false);
-  const [allTags, setAllTags] = useState<Tag[]>([]);
 
   // URL input (managed locally — no need to lift to App)
   const [urlInput, setUrlInput] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Import card tab
-  const [importTab, setImportTab] = useState<"hf" | "url">("hf");
 
   // HF discovery state
   const [hfQuery, setHfQuery] = useState("");
@@ -175,6 +179,9 @@ export function DashboardPage({
   const [hfError, setHfError] = useState<string | null>(null);
   const [importingUrls, setImportingUrls] = useState<Set<string>>(new Set());
   const [importedUrls, setImportedUrls] = useState<Set<string>>(new Set());
+
+  // Import card tab
+  const [importTab, setImportTab] = useState<"hf" | "url">("hf");
 
   async function runHfSearch() {
     if (!hfQuery.trim()) {
@@ -208,32 +215,6 @@ export function DashboardPage({
     } finally {
       setImportingUrls((prev) => { const s = new Set(prev); s.delete(hfUrl); return s; });
     }
-  }
-
-  useEffect(() => {
-    fetchTags().then(setAllTags).catch(() => {});
-  }, []);
-
-  // Debounced server-side filter — runs only after user interacts (skips first render)
-  const isFirstRender = useRef(true);
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      void fetchRecipes({
-        q: searchQuery || undefined,
-        is_favorite: showFavoritesOnly || undefined,
-        tags: selectedTagIds.length > 0 ? selectedTagIds.join(",") : undefined,
-      }).then(onRecipesChanged).catch(() => {});
-    }, 300);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [searchQuery, selectedTagIds, showFavoritesOnly, onRecipesChanged]);
-
-  function toggleTagFilter(tagId: number) {
-    setSelectedTagIds((prev) => prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]);
   }
 
   useEffect(() => {
@@ -408,7 +389,7 @@ export function DashboardPage({
                           <a
                             href={hit.hf_url}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="rounded-xl border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
                           >
                             {t("recipe.viewOriginal")}
@@ -532,7 +513,7 @@ export function DashboardPage({
               {selectedTagIds.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setSelectedTagIds([])}
+                  onClick={() => clearTagFilters()}
                   className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   {t("app.clearFilters")}

@@ -10,7 +10,8 @@ RUN npm run build
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    APP_ENV=production
 
 WORKDIR /app
 

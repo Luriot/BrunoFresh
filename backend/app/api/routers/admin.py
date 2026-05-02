@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 import shutil
 import uuid
@@ -7,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from rapidfuzz import fuzz
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select, update
@@ -32,11 +33,15 @@ from ...schemas import (
 from ...services.dedupe import similarity_score
 from ..dependencies import require_auth
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/db/export")
-async def export_db():
+async def export_db(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    logger.warning("DB export triggered by %s", client_ip)
     if not settings.db_file.exists():
         raise HTTPException(status_code=404, detail="Database file not found.")
     return FileResponse(
@@ -47,7 +52,9 @@ async def export_db():
 
 
 @router.post("/db/import")
-async def import_db(file: UploadFile = File(...)):
+async def import_db(request: Request, file: UploadFile = File(...)):
+    client_ip = request.client.host if request.client else "unknown"
+    logger.warning("DB import triggered by %s (filename=%s)", client_ip, file.filename)
     filename = file.filename or ""
     if not (filename.endswith(".db") or filename.endswith(".sqlite") or filename.endswith(".sqlite3")):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload a SQLite database file.")

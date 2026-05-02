@@ -2,7 +2,8 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import select
@@ -90,7 +91,13 @@ app.add_middleware(
     allow_methods=list(settings.allowed_methods),
     allow_headers=list(settings.allowed_headers),
 )
-app.add_middleware(SessionMiddleware, secret_key=settings.auth_secret, same_site="lax", https_only=settings.auth_cookie_secure)
+app.add_middleware(SessionMiddleware, secret_key=settings.auth_secret, same_site="strict", https_only=settings.auth_cookie_secure)
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled exception for %s %s", request.method, request.url, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 app.include_router(health_router)
 app.include_router(auth_router)
@@ -107,6 +114,24 @@ app.include_router(admin_router)  # require_auth already applied on the router i
 
 # SQLAdmin DOIT être initialisé AVANT d'enregistrer le catch-all du SPA
 setup_admin(app)
+
+# Block /dbadmin entirely when disabled (default in production).
+# Must be added AFTER setup_admin so sqladmin routes exist but can be gated.
+if not settings.dbadmin_enabled:
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import Response as StarletteResponse
+
+    class _BlockDbAdmin(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            if request.url.path.startswith("/dbadmin"):
+                return StarletteResponse(status_code=404)
+            return await call_next(request)
+
+    app.add_middleware(_BlockDbAdmin)
+    logger.info("DB admin interface (/dbadmin) is disabled (set DBADMIN_ENABLED=true to enable).")
+else:
+    logger.warning("DB admin interface (/dbadmin) is ENABLED and publicly reachable — "
+                   "ensure it is protected at the network level in production.")
 
 from .spa import register_spa
 register_spa(app)

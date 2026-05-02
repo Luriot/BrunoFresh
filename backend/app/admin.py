@@ -100,7 +100,7 @@ class ShoppingListRecipeAdmin(ModelView, model=ShoppingListRecipe):
 
 def setup_admin(app: FastAPI) -> None:
     authentication_backend = AdminAuth(secret_key=settings.auth_secret)
-    admin = Admin(app, engine, authentication_backend=authentication_backend)
+    admin = Admin(app, engine, authentication_backend=authentication_backend, base_url="/dbadmin")
     admin.add_view(RecipeAdmin)
     admin.add_view(IngredientAdmin)
     admin.add_view(RecipeIngredientAdmin)

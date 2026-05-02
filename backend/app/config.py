@@ -43,6 +43,14 @@ class Settings(BaseModel):
     auth_cookie_secure: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
     auth_cookie_samesite: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").strip().lower()
     admin_username: str = os.getenv("ADMIN_USERNAME", "admin")
+    # DB admin interface (/dbadmin). Defaults to enabled in development, disabled
+    # in production. Set DBADMIN_ENABLED=true to explicitly enable it in prod
+    # (e.g. when accessed exclusively via an SSH tunnel).
+    dbadmin_enabled: bool = os.getenv(
+        "DBADMIN_ENABLED",
+        "false" if os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "development")).strip().lower()
+                   in PRODUCTION_ENVIRONMENTS else "true",
+    ).lower() == "true"
     categories: tuple[str, ...] = (
         "Produce",
         "Meat",
@@ -71,6 +79,9 @@ def _validate_security_settings(current: Settings) -> None:
 
     in_production = current.environment in PRODUCTION_ENVIRONMENTS
 
+    if in_production and len(current.app_passcode) < 12:
+        raise ValueError("APP_PASSCODE must be at least 12 characters in production")
+
     if in_production and current.app_passcode == DEFAULT_APP_PASSCODE:
         raise RuntimeError("APP_PASSCODE cannot use the default value in production")
 
@@ -79,6 +90,13 @@ def _validate_security_settings(current: Settings) -> None:
 
     if in_production and not current.auth_cookie_secure:
         raise RuntimeError("AUTH_COOKIE_SECURE must be true in production")
+
+    if in_production and current.dbadmin_enabled:
+        warnings.warn(
+            "DBADMIN_ENABLED=true in production — the /dbadmin interface is publicly reachable. "
+            "Consider disabling it or restricting access at the network level.",
+            stacklevel=2,
+        )
 
     if not in_production and current.app_passcode == DEFAULT_APP_PASSCODE:
         warnings.warn(

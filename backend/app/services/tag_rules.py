@@ -75,6 +75,19 @@ KEYWORDS: dict[str, list[str]] = {
     ],
 }
 
+# ---------------------------------------------------------------------------
+# Phrase exclusions
+# ---------------------------------------------------------------------------
+# Before keyword-matching a tag, these phrases are stripped from the search
+# text so that ingredient names like "fish sauce" don't falsely trigger the
+# "Poisson" tag when no actual fish is present.
+
+STRIP_PHRASES: dict[str, list[str]] = {
+    "Poisson": [
+        "fish sauce", "sauce poisson", "nuoc mam", "nuoc-mam", "nam pla",
+    ],
+}
+
 
 # ---------------------------------------------------------------------------
 # Matching logic
@@ -98,8 +111,13 @@ def match_tags(
                 matched.append(tag)
             continue
 
+        # Strip exclusion phrases so e.g. "fish sauce" doesn't trigger Poisson
+        effective_text = search_text
+        for phrase in STRIP_PHRASES.get(name, []):
+            effective_text = effective_text.replace(phrase, "")
+
         keywords = [name.lower()] + [kw.lower() for kw in KEYWORDS.get(name, [])]
-        if any(kw in search_text for kw in keywords):
+        if any(kw in effective_text for kw in keywords):
             matched.append(tag)
 
     return matched

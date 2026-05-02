@@ -260,7 +260,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
                   className="mt-2 inline-flex text-xs font-semibold text-accent underline-offset-2 hover:underline"
                   href={recipe.url}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                 >
                   {t("recipe.viewOriginal")}
                 </a>

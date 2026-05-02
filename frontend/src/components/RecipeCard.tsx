@@ -1,6 +1,7 @@
 import type { RecipeListItem } from "../types";
 import { useTranslation } from "react-i18next";
 import { buildImageUrl, patchRecipe } from "../api/client";
+import { isSafeUrl } from "../utils/url";
 
 type Props = {
   recipe: RecipeListItem;
@@ -77,15 +78,17 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
 
       <div className="mt-auto">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <a
-            className="inline-flex text-sm font-semibold text-accent underline-offset-2 hover:underline dark:text-accent/80"
-            href={recipe.url}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {t("recipe.viewOriginal")}
-          </a>
+          {isSafeUrl(recipe.url) && (
+            <a
+              className="inline-flex text-sm font-semibold text-accent underline-offset-2 hover:underline dark:text-accent/80"
+              href={recipe.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {t("recipe.viewOriginal")}
+            </a>
+          )}
           {recipe.prep_time_minutes != null && (
             <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">

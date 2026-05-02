@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import type { RecipeDetail } from "../types";
@@ -52,11 +52,27 @@ export function CookModeModal({ recipe, onClose }: Readonly<Props>) {
     return () => globalThis.removeEventListener("keydown", onKey);
   }, [goNext, goPrev, onClose]);
 
+  // Touch swipe navigation
+  const touchStartX = useRef<number | null>(null);
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < 50) return; // ignore tiny taps
+    if (delta < 0) goNext(); // swipe left → next
+    else goPrev();           // swipe right → prev
+  }
+
   return (
     <dialog
       open
       className="fixed inset-0 z-[60] flex flex-col bg-white text-gray-900 dark:bg-[#1e1e1e] dark:text-gray-100"
       aria-label={t("cookMode.title")}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
       {/* Top bar */}
       <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-[#3e3e42]">
@@ -73,19 +89,19 @@ export function CookModeModal({ recipe, onClose }: Readonly<Props>) {
         </button>
       </div>
 
-      {/* Step content — flex-1 fills remaining height */}
+      {/* Step content — scrollable, nav stays pinned at bottom */}
       {totalSteps === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <p className="text-xl text-gray-400">{t("recipe.noInstructions")}</p>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+        <div className="flex flex-1 flex-col overflow-y-auto px-6 py-8 text-center">
           {/* Step counter */}
           <p className="mb-6 text-lg font-semibold text-accent dark:text-accent/80">
             {t("cookMode.step", { current: currentStep + 1, total: totalSteps })}
           </p>
 
-          <div className="w-full max-w-2xl">
+          <div className="mx-auto w-full max-w-2xl">
             {/* Step image (when available from structured scrape) */}
             {stepImages[currentStep] && (
               <img
@@ -101,46 +117,56 @@ export function CookModeModal({ recipe, onClose }: Readonly<Props>) {
               {steps[currentStep]}
             </p>
           </div>
+        </div>
+      )}
 
+      {/* Bottom navigation — dots + prev/counter/next */}
+      {totalSteps > 0 && (
+        <div
+          className="flex flex-col items-center gap-3 border-t border-gray-200 px-6 pt-4 dark:border-[#3e3e42]"
+          style={{ paddingBottom: "max(1.5rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))" }}
+        >
           {/* Progress dots */}
-          <div className="mt-10 flex flex-wrap justify-center gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
             {steps.map((step, i) => (
               <button
                 key={step.slice(0, 40)}
                 type="button"
                 aria-label={t("cookMode.stepDot", { step: i + 1 })}
                 onClick={() => setCurrentStep(i)}
-                className={`h-2 w-2 rounded-full transition ${
-                  i === currentStep ? "w-6 bg-accent" : "bg-gray-300 hover:bg-gray-400 dark:bg-[#3e3e42] dark:hover:bg-gray-500"
+                className={`h-2 rounded-full transition-all ${
+                  i === currentStep ? "w-6 bg-accent" : "w-2 bg-gray-300 hover:bg-gray-400 dark:bg-[#3e3e42] dark:hover:bg-gray-500"
                 }`}
               />
             ))}
           </div>
+
+          {/* Prev | counter | Next */}
+          <div className="flex w-full items-center gap-3">
+            <button
+              type="button"
+              onClick={goPrev}
+              disabled={currentStep === 0}
+              aria-label={t("cookMode.prev")}
+              className="flex h-12 w-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-300 text-xl transition hover:bg-gray-100 dark:border-[#3e3e42] dark:hover:bg-[#2d2d30] disabled:opacity-30 sm:w-auto sm:px-6 sm:text-lg"
+            >
+              ← <span className="hidden sm:inline font-semibold">{t("cookMode.prev")}</span>
+            </button>
+            <span className="flex-1 text-center text-sm font-medium text-gray-500 dark:text-gray-400">
+              {currentStep + 1} / {totalSteps}
+            </span>
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={currentStep === totalSteps - 1}
+              aria-label={t("cookMode.next")}
+              className="flex h-12 w-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-accent text-xl font-semibold text-white transition hover:bg-accent/90 disabled:opacity-30 sm:w-auto sm:px-6 sm:text-lg"
+            >
+              <span className="hidden sm:inline">{t("cookMode.next")}</span> →
+            </button>
+          </div>
         </div>
       )}
-
-      {/* Bottom navigation */}
-      <div className="flex items-center justify-between border-t border-gray-200 px-6 pt-4 dark:border-[#3e3e42]" style={{ paddingBottom: "max(1.5rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))" }}>
-        <button
-          type="button"
-          onClick={goPrev}
-          disabled={currentStep === 0}
-          className="rounded-xl border border-gray-300 px-6 py-3 text-lg font-semibold transition hover:bg-gray-100 dark:border-[#3e3e42] dark:hover:bg-[#2d2d30] disabled:opacity-30"
-        >
-          ← {t("cookMode.prev")}
-        </button>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
-          {currentStep + 1} / {totalSteps}
-        </span>
-        <button
-          type="button"
-          onClick={goNext}
-          disabled={currentStep === totalSteps - 1}
-          className="rounded-xl bg-accent px-6 py-3 text-lg font-semibold text-white transition hover:bg-accent/90 disabled:opacity-30"
-        >
-          {t("cookMode.next")} →
-        </button>
-      </div>
     </dialog>
   );
 }

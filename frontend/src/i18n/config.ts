@@ -11,6 +11,7 @@ void i18n.use(initReactI18next).init({
   },
   lng: "en",
   fallbackLng: "en",
+  // React already escapes rendered values; i18next escaping is not needed.
   interpolation: { escapeValue: false },
 });
 
