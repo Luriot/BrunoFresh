@@ -87,7 +87,7 @@ async def list_recipes(
     is_favorite: bool | None = Query(default=None),
     ingredients: str | None = Query(default=None, description="Comma-separated ingredient keywords"),
     tags: str | None = Query(default=None, description="Comma-separated tag names (any match)"),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
@@ -359,6 +359,7 @@ async def rescrape_recipe(
                 # Update recipe fields
                 target_recipe.title = scraped.title
                 target_recipe.instructions_text = scraped.instructions_text
+                target_recipe.instruction_steps_json = json.dumps(scraped.instruction_steps) if scraped.instruction_steps else None
                 target_recipe.base_servings = scraped.base_servings
                 target_recipe.prep_time_minutes = scraped.prep_time_minutes
                 if scraped.image_url and scraped.image_url != target_recipe.image_original_url:

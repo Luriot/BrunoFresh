@@ -195,7 +195,7 @@
     "step": "Step {{current}} of {{total}}",
     "prev": "Previous",
     "next": "Next",
-    "formatWithAI": "Reformat with Ollama",
+    "formatWithAI": "Reformat with AI",
     "formatting": "Reformatting...",
     "formatError": "Ollama error. Please retry.",
     "stepDot": "Step {{step}}"
@@ -337,7 +337,21 @@
       "ingredients": "Ingredients",
       "tags": "Tags",
       "duplicates": "Duplicates",
-      "database": "Database"
+      "database": "Database",
+      "recipes": "Recipes"
+    },
+    "recipes": {
+      "title": "All Recipes",
+      "searchPlaceholder": "Search recipes...",
+      "update": "Update",
+      "updating": "Updating...",
+      "reformat": "Reformat AI",
+      "reformatting": "Reformatting...",
+      "delete": "Delete",
+      "updateDone": "Updated!",
+      "reformatDone": "Reformatted!",
+      "updateError": "Update failed.",
+      "reformatError": "Reformat failed."
     },
     "db": {
       "title": "Database",

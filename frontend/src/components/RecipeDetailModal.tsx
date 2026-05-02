@@ -160,7 +160,6 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
       <CookModeModal
         recipe={recipe}
         onClose={() => setCookMode(false)}
-        onRecipeUpdated={(updated) => setRecipe(updated)}
       />
     );
   }
@@ -376,7 +375,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                   disabled={rescraping}
                   className="flex items-center gap-1.5 rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30] disabled:opacity-50"
                 >
-                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  <RefreshCw className={`h-4 w-4 ${rescraping ? "animate-spin" : ""}`} aria-hidden="true" />
                   {t("recipe.rescrape")}
                 </button>
                 {recipe.instructions_text && (

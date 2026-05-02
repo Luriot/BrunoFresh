@@ -17,6 +17,7 @@ def _clean_raw_ingredient(line: str) -> str:
     m = _PAREN_DUP_RE.match(stripped)
     return m.group(1).strip() if m else stripped
 
+from .base import extract_steps_from_html
 from .static_sites import StaticRecipeScraper
 from .types import ScrapedIngredient, ScrapedRecipe
 
@@ -72,6 +73,7 @@ def _try_recipe_scrapers(url: str) -> ScrapedRecipe | None:
             for line in raw_ingredients
             if line.strip()
         ]
+        instruction_steps = extract_steps_from_html(resp.text)
         return ScrapedRecipe(
             title=title,
             source_domain=domain,
@@ -80,6 +82,7 @@ def _try_recipe_scrapers(url: str) -> ScrapedRecipe | None:
             base_servings=base_servings,
             prep_time_minutes=prep_time_minutes,
             ingredients=ingredients,
+            instruction_steps=instruction_steps,
         )
     except Exception as exc:
         logger.debug(f"recipe-scrapers n'a pas pu parser '{url}': {exc}")

@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
-import { formatRecipeInstructions } from "../api/client";
 import type { RecipeDetail } from "../types";
 
 type Props = {
   recipe: RecipeDetail;
   onClose: () => void;
-  onRecipeUpdated: (updated: RecipeDetail) => void;
 };
 
 function parseSteps(text: string): string[] {
@@ -26,7 +24,7 @@ function parseSteps(text: string): string[] {
   return text.split(/\n/).map((s) => s.trim()).filter(Boolean);
 }
 
-export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Props>) {
+export function CookModeModal({ recipe, onClose }: Readonly<Props>) {
   const { t } = useTranslation();
   // Use structured steps when scraped, otherwise fall back to parsing text
   const hasStructuredSteps = recipe.instruction_steps && recipe.instruction_steps.length > 0;
@@ -37,8 +35,6 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
     ? recipe.instruction_steps.map((s) => s.image_url ?? null)
     : steps.map(() => null);
   const [currentStep, setCurrentStep] = useState(0);
-  const [formatting, setFormatting] = useState(false);
-  const [formatError, setFormatError] = useState<string | null>(null);
 
   const totalSteps = steps.length;
 
@@ -56,54 +52,26 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
     return () => globalThis.removeEventListener("keydown", onKey);
   }, [goNext, goPrev, onClose]);
 
-  async function handleFormat() {
-    setFormatting(true);
-    setFormatError(null);
-    try {
-      const updated = await formatRecipeInstructions(recipe.id);
-      onRecipeUpdated(updated);
-      setCurrentStep(0);
-    } catch {
-      setFormatError(t("cookMode.formatError"));
-    } finally {
-      setFormatting(false);
-    }
-  }
-
   return (
     <dialog
       open
-      className="fixed inset-0 z-[60] flex flex-col bg-gray-900 text-white"
+      className="fixed inset-0 z-[60] flex flex-col bg-white text-gray-900 dark:bg-[#1e1e1e] dark:text-gray-100"
       aria-label={t("cookMode.title")}
     >
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="text-sm font-medium text-gray-400">
+      <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-[#3e3e42]">
+        <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
           {recipe.title}
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void handleFormat()}
-            disabled={formatting}
-            className="rounded-lg border border-gray-600 px-3 py-1.5 text-sm text-gray-300 transition hover:bg-gray-700 disabled:opacity-50"
-          >
-            {formatting ? t("cookMode.formatting") : t("cookMode.formatWithAI")}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-600 px-3 py-1.5 text-sm text-gray-300 transition hover:bg-gray-700"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-            {t("app.close")}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+          {t("app.close")}
+        </button>
       </div>
-
-      {formatError && (
-        <p className="px-6 text-sm text-red-400">{formatError}</p>
-      )}
 
       {/* Step content — flex-1 fills remaining height */}
       {totalSteps === 0 ? (
@@ -113,23 +81,26 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
           {/* Step counter */}
-          <p className="mb-6 text-lg font-semibold text-green-400">
+          <p className="mb-6 text-lg font-semibold text-accent dark:text-accent/80">
             {t("cookMode.step", { current: currentStep + 1, total: totalSteps })}
           </p>
 
-          {/* Step image (when available from structured scrape) */}
-          {stepImages[currentStep] && (
-            <img
-              src={stepImages[currentStep]}
-              alt={`Step ${currentStep + 1}`}
-              className="mb-6 max-h-56 w-full max-w-lg rounded-2xl object-cover shadow-lg"
-            />
-          )}
+          <div className="w-full max-w-2xl">
+            {/* Step image (when available from structured scrape) */}
+            {stepImages[currentStep] && (
+              <img
+                src={stepImages[currentStep]}
+                alt={`Step ${currentStep + 1}`}
+                className="mb-6 w-full rounded-2xl object-cover shadow-lg"
+                style={{ maxHeight: "320px" }}
+              />
+            )}
 
-          {/* Step text */}
-          <p className="max-w-2xl text-xl font-medium leading-snug sm:text-3xl">
-            {steps[currentStep]}
-          </p>
+            {/* Step text */}
+            <p className="whitespace-pre-line text-left text-xl font-medium leading-relaxed text-gray-800 dark:text-gray-100 sm:text-2xl">
+              {steps[currentStep]}
+            </p>
+          </div>
 
           {/* Progress dots */}
           <div className="mt-10 flex flex-wrap justify-center gap-2">
@@ -140,7 +111,7 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
                 aria-label={t("cookMode.stepDot", { step: i + 1 })}
                 onClick={() => setCurrentStep(i)}
                 className={`h-2 w-2 rounded-full transition ${
-                  i === currentStep ? "w-6 bg-green-400" : "bg-gray-600 hover:bg-gray-500"
+                  i === currentStep ? "w-6 bg-accent" : "bg-gray-300 hover:bg-gray-400 dark:bg-[#3e3e42] dark:hover:bg-gray-500"
                 }`}
               />
             ))}
@@ -149,23 +120,23 @@ export function CookModeModal({ recipe, onClose, onRecipeUpdated }: Readonly<Pro
       )}
 
       {/* Bottom navigation */}
-      <div className="flex items-center justify-between px-6 pt-6" style={{ paddingBottom: "max(1.5rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))" }}>
+      <div className="flex items-center justify-between border-t border-gray-200 px-6 pt-4 dark:border-[#3e3e42]" style={{ paddingBottom: "max(1.5rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))" }}>
         <button
           type="button"
           onClick={goPrev}
           disabled={currentStep === 0}
-          className="rounded-xl bg-gray-700 px-6 py-3 text-lg font-semibold transition hover:bg-gray-600 disabled:opacity-30"
+          className="rounded-xl border border-gray-300 px-6 py-3 text-lg font-semibold transition hover:bg-gray-100 dark:border-[#3e3e42] dark:hover:bg-[#2d2d30] disabled:opacity-30"
         >
           ← {t("cookMode.prev")}
         </button>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-500 dark:text-gray-400">
           {currentStep + 1} / {totalSteps}
         </span>
         <button
           type="button"
           onClick={goNext}
           disabled={currentStep === totalSteps - 1}
-          className="rounded-xl bg-green-600 px-6 py-3 text-lg font-semibold transition hover:bg-green-500 disabled:opacity-30"
+          className="rounded-xl bg-accent px-6 py-3 text-lg font-semibold text-white transition hover:bg-accent/90 disabled:opacity-30"
         >
           {t("cookMode.next")} →
         </button>
