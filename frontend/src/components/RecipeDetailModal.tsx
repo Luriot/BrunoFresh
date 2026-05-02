@@ -306,14 +306,14 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                           className="flex items-start gap-2 rounded-xl bg-green-50 px-3 py-2 dark:bg-green-900/10"
                         >
                           <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-ink dark:text-gray-200">
+                          <div className="min-w-0 flex flex-wrap items-baseline gap-x-2">
+                            <p className="font-medium text-ink dark:text-gray-200">
                               {i18n.language === "fr" && ing.ingredient_name_fr
                                 ? ing.ingredient_name_fr
                                 : (ing.ingredient_name ?? ing.raw_string)}
                             </p>
                             {(ing.quantity != null || ing.unit) && (
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                              <p className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
                                 {ing.quantity} {ing.unit}
                               </p>
                             )}

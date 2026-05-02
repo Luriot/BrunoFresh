@@ -390,7 +390,7 @@ export function DashboardPage({
                         </div>
 
                         {/* Action */}
-                        <div className="shrink-0">
+                        <div className="flex shrink-0 items-center gap-1.5">
                           {isAlreadyImported ? (
                             <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
                               {t("hfDiscovery.alreadyImported")}
@@ -405,6 +405,14 @@ export function DashboardPage({
                               {isImporting ? t("hfDiscovery.importing") : t("hfDiscovery.import")}
                             </button>
                           )}
+                          <a
+                            href={hit.hf_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
+                          >
+                            {t("recipe.viewOriginal")}
+                          </a>
                         </div>
                       </div>
                     );
@@ -430,9 +438,9 @@ export function DashboardPage({
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
               />
-              <div className="flex flex-wrap gap-2">
+              <div className="flex gap-2">
                 <button
-                  className="shrink-0 whitespace-nowrap rounded-xl bg-accent px-4 py-2 font-semibold text-white"
+                  className="flex flex-1 items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white"
                   onClick={() => void handleMultiScrape()}
                   disabled={loading}
                   type="button"
@@ -440,7 +448,7 @@ export function DashboardPage({
                   {loading ? t("app.scraping") : t("app.scrape")}
                 </button>
                 <button
-                  className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 font-medium hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#2d2d30] dark:hover:bg-[#3e3e42] dark:text-gray-200"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-gray-50 px-4 py-2 text-sm font-medium hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#2d2d30] dark:hover:bg-[#3e3e42] dark:text-gray-200"
                   onClick={() => setIsCustomRecipeModalOpen(true)}
                   type="button"
                 >
@@ -601,7 +609,7 @@ export function DashboardPage({
       </aside>
 
       <button
-        className="fixed left-4 right-4 z-40 rounded-xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-xl lg:hidden"
+        className="fixed left-4 right-4 z-40 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white shadow-xl lg:hidden"
         style={{ bottom: "max(1rem, calc(0.5rem + var(--sab, 0px)))" }}
         onClick={() => setIsMobilePanelOpen(true)}
         type="button"
@@ -623,7 +631,7 @@ export function DashboardPage({
             }}
           />
           <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-b-0 border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex justify-end">
               <button
                 className="rounded-lg border border-gray-200 px-2 py-1 text-sm dark:border-[#3e3e42] dark:text-gray-300"
                 onClick={() => setIsMobilePanelOpen(false)}
