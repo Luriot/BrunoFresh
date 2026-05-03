@@ -64,8 +64,8 @@ export function RecipesTab() {
         setRowStatus(id, { loading: false, msg: t("admin.recipes.updateError"), isError: true });
         return;
       }
-      const es = new EventSource(buildJobStreamUrl(job_id));
-      es.addEventListener("message", (e: MessageEvent) => {
+      const es = new EventSource(buildJobStreamUrl(job_id), { withCredentials: true });
+      es.addEventListener("status", (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data as string) as { status: string; error_message?: string };
           if (data.status === "completed" || data.status === "done") {
@@ -96,8 +96,8 @@ export function RecipesTab() {
       }
       // Wait for rescrape SSE to finish
       await new Promise<void>((resolve, reject) => {
-        const es = new EventSource(buildJobStreamUrl(job_id));
-        es.addEventListener("message", (e: MessageEvent) => {
+        const es = new EventSource(buildJobStreamUrl(job_id), { withCredentials: true });
+        es.addEventListener("status", (e: MessageEvent) => {
           try {
             const data = JSON.parse(e.data as string) as { status: string; error_message?: string };
             if (data.status === "completed" || data.status === "done") { es.close(); resolve(); }
