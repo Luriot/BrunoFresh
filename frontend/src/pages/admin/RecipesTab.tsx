@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { buildImageUrl, buildJobStreamUrl, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe } from "../../api/client";
 import type { RecipeListItem, RecipeSimilarPair } from "../../types";
-import { BookOpen, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
+import { BookOpen, Check, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
 
 type RowStatus = { loading: boolean; msg: string; isError: boolean };
 
@@ -16,6 +16,7 @@ export function RecipesTab() {
   const [recipePairs, setRecipePairs] = useState<RecipeSimilarPair[]>([]);
   const [scanLoading, setScanLoading] = useState(false);
   const [showScanPanel, setShowScanPanel] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   function setRowStatus(id: number, patch: Partial<RowStatus>) {
     setRecipeRowStatus((prev) => {
@@ -139,9 +140,38 @@ export function RecipesTab() {
     r.source_domain.toLowerCase().includes(recipeSearch.toLowerCase()),
   );
 
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    const allSelected =
+      filteredAdminRecipes.length > 0 &&
+      filteredAdminRecipes.every((r) => selectedIds.has(r.id));
+    setSelectedIds(allSelected ? new Set() : new Set(filteredAdminRecipes.map((r) => r.id)));
+  }
+
+  function handleBulkFastFetch() {
+    const ids = [...selectedIds];
+    setSelectedIds(new Set());
+    ids.forEach((id) => void handleAdminRescrape(id));
+  }
+
+  async function handleBulkFullUpdate() {
+    const ids = [...selectedIds];
+    setSelectedIds(new Set());
+    for (const id of ids) {
+      await handleAdminRescrapeWithAI(id);
+    }
+  }
+
   return (
     <>
-      <section>
+      <section className={selectedIds.size > 0 ? "pb-32 sm:pb-0" : ""}>
         <h2 className="mb-4 flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
           <BookOpen className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
           {t("admin.recipes.title")}
@@ -155,6 +185,40 @@ export function RecipesTab() {
           className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
         />
 
+        {selectedIds.size > 0 && (
+          <div className="fixed bottom-0 inset-x-0 z-40 flex flex-col gap-2 border-t border-gray-200 bg-white px-4 pb-8 pt-3 shadow-2xl dark:border-[#3e3e42] dark:bg-[#252526] sm:static sm:inset-auto sm:z-auto sm:mb-3 sm:flex-row sm:items-center sm:rounded-xl sm:border sm:border-accent/30 sm:bg-accent/5 sm:px-3 sm:py-2 sm:shadow-none sm:dark:border-accent/20 sm:dark:bg-accent/10">
+            <span className="text-sm font-semibold text-accent sm:mr-auto">
+              {t("admin.recipes.selectedCount", { count: selectedIds.size })}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleBulkFastFetch}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30] sm:flex-none sm:py-1.5"
+              >
+                <RefreshCw className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {t("admin.recipes.update")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkFullUpdate()}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30] sm:flex-none sm:py-1.5"
+              >
+                <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {t("admin.recipes.reformat")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                aria-label={t("app.close")}
+                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-500 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30] sm:py-1.5"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {recipesLoading ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">{t("app.loading")}</p>
         ) : (
@@ -162,10 +226,22 @@ export function RecipesTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left text-xs text-gray-500 dark:bg-[#252526] dark:text-gray-400">
-                  <th className="w-12 px-3 py-2"></th>
-                  <th className="px-3 py-2">{t("admin.tabs.recipes")}</th>
-                  <th className="hidden px-3 py-2 sm:table-cell">Source</th>
-                  <th className="px-3 py-2 text-right">{t("admin.tabs.database")}</th>
+                  <th className="w-14 px-2 py-2">
+                    <label className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg transition hover:bg-gray-200 dark:hover:bg-[#3e3e42]" aria-label={t("admin.recipes.selectAll")}>
+                      <input
+                        type="checkbox"
+                        ref={(el) => {
+                          if (el) el.indeterminate = selectedIds.size > 0 && !filteredAdminRecipes.every((r) => selectedIds.has(r.id));
+                        }}
+                        checked={filteredAdminRecipes.length > 0 && filteredAdminRecipes.every((r) => selectedIds.has(r.id))}
+                        onChange={toggleAll}
+                        className="h-5 w-5 rounded border-gray-300 accent-accent"
+                      />
+                    </label>
+                  </th>
+                  <th className="px-3 py-2">{t("admin.recipes.recipes")}</th>
+                  <th className="hidden px-3 py-2 sm:table-cell">{t("admin.recipes.sources")}</th>
+                  <th className="px-3 py-2 text-center">{t("admin.recipes.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#3e3e42]">
@@ -173,17 +249,35 @@ export function RecipesTab() {
                   const row = recipeRowStatus[recipe.id];
                   const isLoading = row?.loading ?? false;
                   return (
-                    <tr key={recipe.id} className="bg-white hover:bg-gray-50 dark:bg-[#1e1e1e] dark:hover:bg-[#252526]">
-                      <td className="px-3 py-2">
-                        {recipe.image_local_path ? (
-                          <img
-                            src={buildImageUrl(recipe.image_local_path)}
-                            alt=""
-                            className="h-10 w-10 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-[#3e3e42]" />
-                        )}
+                    <tr key={recipe.id} className={`hover:bg-gray-50 dark:hover:bg-[#252526] ${selectedIds.has(recipe.id) ? "bg-accent/5 dark:bg-accent/10" : "bg-white dark:bg-[#1e1e1e]"}`}>
+                      <td
+                        className="cursor-pointer select-none px-2 py-2"
+                        onClick={() => toggleSelect(recipe.id)}
+                      >
+                        <div className="relative h-10 w-10">
+                          {recipe.image_local_path ? (
+                            <img
+                              src={buildImageUrl(recipe.image_local_path)}
+                              alt=""
+                              className="h-full w-full rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full rounded-lg bg-gray-100 dark:bg-[#3e3e42]" />
+                          )}
+                          <div
+                            className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity ${
+                              selectedIds.has(recipe.id)
+                                ? "bg-accent/70 opacity-100"
+                                : selectedIds.size > 0
+                                ? "bg-black/20 opacity-100 dark:bg-black/40"
+                                : "opacity-0"
+                            }`}
+                          >
+                            {selectedIds.has(recipe.id) && (
+                              <Check className="h-5 w-5 text-white" strokeWidth={3} aria-hidden="true" />
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         <p className="font-medium text-ink dark:text-gray-200 line-clamp-2">{recipe.title}</p>

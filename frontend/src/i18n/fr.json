@@ -351,7 +351,12 @@
       "updateDone": "Mis à jour !",
       "reformatDone": "Reformaté !",
       "updateError": "Échec de la mise à jour.",
-      "reformatError": "Échec du reformatage."
+      "reformatError": "Échec du reformatage.",
+      "selectedCount": "{{count}} sélectionnées",
+      "selectAll": "Tout sélectionner",
+      "recipes": "Recettes",
+      "sources": "Sources",
+      "actions": "Actions"
     },
     "db": {
       "title": "Base de données",

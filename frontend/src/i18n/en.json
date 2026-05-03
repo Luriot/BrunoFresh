@@ -351,7 +351,12 @@
       "updateDone": "Updated!",
       "reformatDone": "Reformatted!",
       "updateError": "Update failed.",
-      "reformatError": "Reformat failed."
+      "reformatError": "Reformat failed.",
+      "selectedCount": "{{count}} selected",
+      "selectAll": "Select all",
+      "recipes": "Recipes",
+      "sources": "Sources",
+      "actions": "Actions"
     },
     "db": {
       "title": "Database",
