@@ -257,6 +257,11 @@ async def normalize_with_ollama(raw_string: str, quantity: float, unit: str) -> 
                         "prompt": prompt,
                         "stream": False,
                         "format": "json",
+                        "options": {
+                            "temperature": settings.ollama_temperature,
+                            "num_predict": settings.ollama_num_predict,
+                            "num_ctx": settings.ollama_num_ctx,
+                        },
                     },
                 )
                 response.raise_for_status()
@@ -513,6 +518,11 @@ async def _ollama_parse_chunk(
                         "prompt": prompt,
                         "stream": False,
                         "format": "json",
+                        "options": {
+                            "temperature": settings.ollama_temperature,
+                            "num_predict": settings.ollama_num_predict,
+                            "num_ctx": settings.ollama_num_ctx,
+                        },
                     },
                 )
                 response.raise_for_status()
@@ -716,6 +726,11 @@ async def translate_ingredient_name(
                         "prompt": prompt,
                         "stream": False,
                         "format": "json",
+                        "options": {
+                            "temperature": settings.ollama_temperature,
+                            "num_predict": settings.ollama_num_predict,
+                            "num_ctx": settings.ollama_num_ctx,
+                        },
                     },
                 )
         resp.raise_for_status()
