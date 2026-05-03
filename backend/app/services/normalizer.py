@@ -477,6 +477,95 @@ def normalize_fallback(raw_string: str, quantity: float) -> NormalizedIngredient
     return fallback(name, name, quantity, u, "Other")
 
 
+# Nombre maximum d'ingrédients par appel Ollama.
+# Au-delà, le modèle tend à ne retourner que le premier item ou à "penser" à voix haute.
+_OLLAMA_BATCH_CHUNK_SIZE = 8
+
+
+async def _ollama_parse_chunk(
+    chunk: list[dict],
+    categories_str: str,
+    units_str: str,
+) -> list[dict]:
+    """Envoie un chunk d'ingrédients à Ollama et retourne la liste d'items parsés.
+
+    Retourne une liste vide en cas d'erreur (l'appelant appliquera le fallback).
+    """
+    prompt = (
+        "You are an ingredient parser. Return strict JSON ONLY. "
+        "The root MUST be a JSON object with a single key 'ingredients' containing an array. "
+        "Each object must have exactly these keys: idx, name_en, name_fr, quantity, unit, category. "
+        'Example: {"ingredients": [{"idx": 0, "name_en": "tomato", "name_fr": "tomate", "quantity": 300.0, "unit": "g", "category": "Produce"}]}\n'
+        f"Allowed units (metric/European only): {units_str}. "
+        f"Allowed categories: {categories_str}. "
+        "Translate ALL ingredient names to both English and French. "
+        f"Process ALL {len(chunk)} items. Maintain the exact idx.\n\n"
+        f"Input:\n{json.dumps(chunk, ensure_ascii=False)}"
+    )
+
+    try:
+        async with ollama_semaphore:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=5.0)) as client:
+                response = await client.post(
+                    f"{settings.ollama_base_url}/api/generate",
+                    json={
+                        "model": settings.ollama_model,
+                        "prompt": prompt,
+                        "stream": False,
+                        "format": "json",
+                    },
+                )
+                response.raise_for_status()
+
+        payload = response.json()
+        raw = (payload.get("response", "") or payload.get("thinking", "")).strip()
+        if not raw:
+            logger.warning("Chunk Ollama : réponse vide.")
+            return []
+
+        # Nettoyer un éventuel bloc markdown
+        if raw.startswith("```json"):
+            raw = raw[7:]
+        if raw.startswith("```"):
+            raw = raw[3:]
+        if raw.endswith("```"):
+            raw = raw[:-3]
+        raw = raw.strip()
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            try:
+                parsed = ast.literal_eval(raw)
+                logger.warning("Chunk Ollama : ast.literal_eval utilisé (JSON strict invalide).")
+            except Exception:
+                logger.error(f"Chunk Ollama : JSON invalide. Brut (200 premiers chars) : {raw[:200]}")
+                return []
+
+        if isinstance(parsed, list):
+            return parsed
+
+        if isinstance(parsed, dict):
+            # Cas normal : {"ingredients": [...]}
+            for v in parsed.values():
+                if isinstance(v, list):
+                    return v
+            # Modèle n'a traité qu'un seul ingrédient
+            if "idx" in parsed:
+                logger.warning(
+                    f"Chunk Ollama : un seul ingrédient retourné (idx={parsed.get('idx')}), "
+                    f"{len(chunk) - 1} manquant(s) → fallback."
+                )
+                return [parsed]
+            logger.warning(f"Chunk Ollama : dict sans liste ni idx. Clés : {list(parsed.keys())[:6]}")
+
+        return []
+
+    except Exception as exc:
+        logger.error(f"Chunk Ollama : erreur inattendue : {exc}", exc_info=True)
+        return []
+
+
 async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> list[NormalizedIngredient | None]:
     if not ingredients:
         return []
@@ -488,7 +577,7 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         if _SECTION_HEADER_RE.match(safe_raw.strip()):
             input_list.append(None)
             continue
-            
+
         input_list.append({
             "idx": i,
             "raw": safe_raw,
@@ -506,100 +595,41 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
         ]
 
     valid_inputs = [item for item in input_list if item is not None]
-    
+
     categories_str = ", ".join(settings.categories)
-    prompt = (
-        "You are an ingredient parser. Return strict JSON ONLY. "
-        "The root MUST be a JSON object with a single key 'ingredients' containing an array of all processed objects. "
-        "Each object must have exactly these keys: idx, name_en, name_fr, quantity, unit, category. "
-        'Example output:\n{"ingredients": [{"idx": 0, "name_en": "tomato", "name_fr": "tomate", "quantity": 300.0, "unit": "g", "category": "Produce"}]}\n'
-        f"Allowed units (metric/European only): {', '.join(u for units in CANONICAL_UNITS.values() for u in units)}. "
-        f"Allowed categories: {categories_str}. "
-        "Translate ALL ingredient names to both English and French. "
-        "Process ALL items from the input array. Maintain the exact idx passed.\n\n"
-        f"Input array to process:\n{json.dumps(valid_inputs, ensure_ascii=False)}"
+    units_str = ", ".join(u for units in CANONICAL_UNITS.values() for u in units)
+
+    # Découper en chunks pour éviter que le modèle ne tronque les grands lots
+    chunks = [
+        valid_inputs[i:i + _OLLAMA_BATCH_CHUNK_SIZE]
+        for i in range(0, len(valid_inputs), _OLLAMA_BATCH_CHUNK_SIZE)
+    ]
+    logger.info(
+        f"Demande de normalisation Ollama par LOT "
+        f"({len(valid_inputs)} ingrédients, {len(chunks)} chunk(s) de ≤{_OLLAMA_BATCH_CHUNK_SIZE})..."
     )
 
-    try:
-        async with ollama_semaphore:
-            logger.info(f"Demande de normalisation Ollama par LOT ({len(valid_inputs)} ingrédients)...")
-            async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=5.0)) as client:
-                response = await client.post(
-                    f"{settings.ollama_base_url}/api/generate",
-                    json={
-                        "model": settings.ollama_model,
-                        "prompt": prompt,
-                        "stream": False,
-                        "format": "json",
-                    },
-                )
-                response.raise_for_status()
-                
-        payload = response.json()
-        raw = payload.get("response", "")
-        
-        if not raw.strip():
-            raw = payload.get("thinking", "")
-        
-        if not raw.strip():
-            raise ValueError("Réponse vide de la part d'Ollama.")
+    results: list[NormalizedIngredient | None] = [None] * len(ingredients)
 
-        raw = raw.strip()
-        if raw.startswith("```json"):
-            raw = raw[7:]
-        if raw.startswith("```"):
-            raw = raw[3:]
-        if raw.endswith("```"):
-            raw = raw[:-3]
-        raw = raw.strip()
-        
-        try:
-            parsed_array = json.loads(raw)
-        except json.JSONDecodeError as jde:
-            logger.error(f"Le JSON de retour BATCH est invalide ! Contenu brut Ollama:\n{raw}\n--- Erreur: {jde}")
-            # Si c'est juste un problème de guillemets simples (arrive parfois quand "thinking" leak du pseudo code python), on peut tenter eval:
-            try:
-                parsed_array = ast.literal_eval(raw)
-                logger.warning("ast.literal_eval a pu récupérer le tableau malgré l'invalidité JSON stricte.")
-            except Exception:
-                raise ValueError("Impossible de décoder la réponse en JSON.")
+    # Pré-remplir les en-têtes de section
+    for pos, item in enumerate(input_list):
+        if item is None:
+            results[pos] = NormalizedIngredient(
+                "section_header_ignore", "section_header_ignore", 0, "piece", "Other"
+            )
 
-        if not isinstance(parsed_array, list):
-            logger.warning(f"Ollama n'a pas renvoyé une liste directe. Type reçu: {type(parsed_array)}. Tentative d'extraction...")
-            if isinstance(parsed_array, dict):
-                # Le modèle respecte souvent la consigne "{"ingredients": [...]}" ou un dérivé
-                for k, v in parsed_array.items():
-                    if isinstance(v, list):
-                        parsed_array = v
-                        logger.info(f"Liste extraite depuis la clé '{k}'")
-                        break
-            
-            # S'il a renvoyé uniquement le PREMIER ingrédient au lieu du tableau :
-            if isinstance(parsed_array, dict) and "idx" in parsed_array:
-                logger.warning(f"Ollama n'a traité qu'un seul ingrédient sur tout le lot ! Contenu: {parsed_array}")
-                parsed_array = [parsed_array]
+    for chunk_no, chunk in enumerate(chunks, start=1):
+        parsed_items = await _ollama_parse_chunk(chunk, categories_str, units_str)
 
-            if not isinstance(parsed_array, list):
-                logger.error(f"Structure inattendue renvoyée par Ollama : {parsed_array}")
-                raise ValueError("Le JSON renvoyé n'est pas un tableau (list) et ne contient pas de tableau.")
-
-        results: list[NormalizedIngredient | None] = [None] * len(ingredients)
-        
-        # On replace les en-têtes
-        for idx, item in enumerate(input_list):
-            if item is None:
-                results[idx] = NormalizedIngredient(
-                    "section_header_ignore", "section_header_ignore", 0, "piece", "Other"
-                )
-
-        for item in parsed_array:
+        returned_idxs: set[int] = set()
+        for item in parsed_items:
             if not isinstance(item, dict):
                 continue
 
             idx = item.get("idx")
             if idx is None or not isinstance(idx, int) or idx < 0 or idx >= len(ingredients):
                 continue
-                
+
             name = str(item.get("name_en", "")).strip().lower()
             name_fr = _coerce_name_fr(str(item.get("name_fr", "")), name)
             try:
@@ -611,21 +641,24 @@ async def normalize_ingredients_batch(ingredients: list[ScrapedIngredient]) -> l
 
             if name:
                 results[idx] = NormalizedIngredient(name, name_fr, abs(qty), parsed_unit, parsed_category)
+                returned_idxs.add(idx)
 
-        # Fallback pour ceux qui n'ont pas été traduits (LLM truncating, ou erreur)
-        for idx, res in enumerate(results):
-            if res is None:
-                orig = ingredients[idx]
-                results[idx] = normalize_fallback(orig.raw, orig.quantity)
+        expected_idxs = {int(item["idx"]) for item in chunk}
+        missing = expected_idxs - returned_idxs
+        if missing:
+            logger.warning(
+                f"Chunk {chunk_no}/{len(chunks)} : {len(missing)} ingrédient(s) non retourné(s) "
+                f"(idx={sorted(missing)}) → fallback keyword appliqué."
+            )
 
-        logger.info("Normalisation batch terminée avec succès.")
-        return results
+    # Fallback pour tout ce qui n'a pas été résolu par Ollama
+    for idx, res in enumerate(results):
+        if res is None:
+            orig = ingredients[idx]
+            results[idx] = normalize_fallback(orig.raw, orig.quantity)
 
-    except Exception as exc:
-        logger.error(f"Erreur globale lors de la normalisation BATCH: {exc}", exc_info=True)
-        # Si globalement pété (réponse bizarre de Ollama), on fallback tout le monde
-        logger.warning("Application du fallback sur la totalité du lot...")
-        return [normalize_fallback(i.raw, i.quantity) for i in ingredients]
+    logger.info("Normalisation batch terminée avec succès.")
+    return results
 
 
 # ── Name translation ──────────────────────────────────────────────────────
