@@ -85,6 +85,35 @@ export function RecipesTab() {
     }
   }
 
+  async function handleAdminRescrapeWithAI(id: number) {
+    setRowStatus(id, { loading: true, msg: "", isError: false });
+    try {
+      const { job_id } = await rescrapeRecipe(id);
+      if (job_id == null) {
+        setRowStatus(id, { loading: false, msg: t("admin.recipes.updateError"), isError: true });
+        return;
+      }
+      // Wait for rescrape SSE to finish
+      await new Promise<void>((resolve, reject) => {
+        const es = new EventSource(buildJobStreamUrl(job_id));
+        es.addEventListener("message", (e: MessageEvent) => {
+          try {
+            const data = JSON.parse(e.data as string) as { status: string; error_message?: string };
+            if (data.status === "completed" || data.status === "done") { es.close(); resolve(); }
+            else if (data.status === "failed") { es.close(); reject(new Error(data.error_message ?? "")); }
+          } catch { /* ignore */ }
+        });
+        es.onerror = () => { es.close(); reject(new Error("")); };
+      });
+      // Now run AI formatting
+      setRowStatus(id, { loading: true, msg: t("admin.recipes.reformatting"), isError: false });
+      await formatRecipeInstructions(id);
+      setRowStatus(id, { loading: false, msg: t("admin.recipes.updateDone"), isError: false });
+    } catch (err) {
+      setRowStatus(id, { loading: false, msg: err instanceof Error && err.message ? err.message : t("admin.recipes.updateError"), isError: true });
+    }
+  }
+
   async function handleAdminReformat(id: number) {
     setRowStatus(id, { loading: true, msg: "", isError: false });
     try {
@@ -183,7 +212,7 @@ export function RecipesTab() {
                             type="button"
                             title={t("admin.recipes.reformat")}
                             disabled={isLoading}
-                            onClick={() => void handleAdminReformat(recipe.id)}
+                            onClick={() => void handleAdminRescrapeWithAI(recipe.id)}
                             className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
                           >
                             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />

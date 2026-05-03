@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ShoppingList as ShoppingListType } from "../types";
 import { UnitSelector } from "./UnitSelector";
+import { formatQty } from "../utils/format";
 
 type CustomItemPayload = { name: string; quantity: number; unit: string };
 
@@ -81,7 +82,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
                 {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
               </span>
               <span className="text-xs text-gray-600 dark:text-gray-400">
-                {item.quantity} {item.unit}
+                {formatQty(item.quantity)} {item.unit}
               </span>
             </span>
             {isOwnedTarget ? (
@@ -147,7 +148,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
                 {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
               </span>
               <span className="text-xs text-gray-400 dark:text-gray-500">
-                {item.quantity} {item.unit}
+                {formatQty(item.quantity)} {item.unit}
               </span>
             </span>
             <button

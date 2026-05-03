@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw, ChefHat } from "lucide-react";
+import { ChefHat } from "lucide-react";
 import {
   buildImageUrl,
   fetchRecipeDetail,
@@ -11,7 +11,7 @@ import {
 import type { RecipeDetail, RecipeListItem, Tag } from "../../types";
 import { CookModeModal } from "../CookModeModal";
 import { isSafeUrl } from "../../utils/url";
-import { useRecipeRescrape } from "./useRecipeRescrape";
+import { formatQty } from "../../utils/format";
 
 type Props = {
   recipeId: number;
@@ -68,11 +68,6 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
     fetchTags().then(setAllTags).catch(() => {});
     fetchSimilarRecipes(recipeId).then(setSimilar).catch(() => {});
   }, [recipeId]);
-
-  const { rescraping, rescrapeMsg, handleRescrape, cleanup } = useRecipeRescrape(recipe, loadRecipe);
-
-  // Close the SSE stream when the modal unmounts
-  useEffect(() => cleanup, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleTagToggle(tag: Tag) {
     if (!recipe) return;
@@ -206,19 +201,6 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                   </div>
                 </div>
 
-                {/* Re-scrape notice */}
-                {rescrapeMsg && (
-                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-2 dark:border-accent/30 dark:bg-accent/10">
-                    {rescraping && (
-                      <svg className="h-4 w-4 shrink-0 animate-spin text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                    )}
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{rescrapeMsg}</p>
-                  </div>
-                )}
-
                 {/* Ingredients */}
                 <div className="mb-6">
                   <h3 className="mb-3 font-heading text-lg font-semibold text-ink dark:text-gray-100">
@@ -240,7 +222,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                             </p>
                             {(ing.quantity != null || ing.unit) && (
                               <p className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
-                                {ing.quantity} {ing.unit}
+                                {formatQty(ing.quantity)} {ing.unit}
                               </p>
                             )}
                           </div>
@@ -296,15 +278,6 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
             {/* Sticky footer */}
             <div className="shrink-0 rounded-b-2xl border-t border-gray-100 bg-gray-50 p-3 dark:border-[#3e3e42] dark:bg-[#1e1e1e] sm:p-4">
               <div className="flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleRescrape()}
-                  disabled={rescraping}
-                  className="flex items-center gap-1.5 rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30] disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-4 w-4 ${rescraping ? "animate-spin" : ""}`} aria-hidden="true" />
-                  {t("recipe.rescrape")}
-                </button>
                 {recipe.instructions_text && (
                   <button
                     type="button"
