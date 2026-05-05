@@ -280,9 +280,13 @@ export async function generateListFromMealPlan(planId: number) {
 
 // ── Admin: ingredients ────────────────────────────────────────────────────
 
-export async function fetchIngredientsAdmin(params?: { q?: string; needs_review?: boolean; limit?: number; offset?: number }) {
+export async function fetchIngredientsAdmin(params?: { q?: string; needs_review?: boolean; limit?: number; offset?: number; sort_by?: string; sort_order?: "asc" | "desc" }) {
   const { data } = await api.get<IngredientDetail[]>("/admin/ingredients", { params });
   return data;
+}
+
+export async function deleteIngredient(id: number) {
+  await api.delete(`/admin/ingredients/${id}`);
 }
 
 export async function patchIngredient(id: number, payload: { name: string; lang: string; category: string }) {

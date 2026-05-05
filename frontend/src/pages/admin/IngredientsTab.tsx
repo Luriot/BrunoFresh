@@ -1,8 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { fetchIngredientsAdmin, mergeIngredients, patchIngredient, suggestIngredientMerges } from "../../api/client";
+import { deleteIngredient, fetchIngredientsAdmin, mergeIngredients, patchIngredient, suggestIngredientMerges } from "../../api/client";
 import type { IngredientDetail, MergeSuggestion } from "../../types";
-import { ArrowRight, Pencil, Sparkles, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowRight, ChevronsUpDown, Pencil, Sparkles, Trash2, X } from "lucide-react";
 
 const CATEGORIES = [
   "Produce", "Meat", "Fish", "Dairy", "Pantry",
@@ -11,6 +11,19 @@ const CATEGORIES = [
 
 type EditDraft = { id: number; name: string; category: string };
 type StatusMsg = { text: string; isError: boolean } | null;
+type UsagesSort = "asc" | "desc" | null;
+
+function cycleSortUsages(prev: UsagesSort): UsagesSort {
+  if (prev === "asc") return "desc";
+  if (prev === "desc") return null;
+  return "asc";
+}
+
+function UsagesSortIcon({ sort }: Readonly<{ sort: UsagesSort }>) {
+  if (sort === "asc") return <ArrowUp className="h-3 w-3" aria-hidden="true" />;
+  if (sort === "desc") return <ArrowDown className="h-3 w-3" aria-hidden="true" />;
+  return <ChevronsUpDown className="h-3 w-3 opacity-50" aria-hidden="true" />;
+}
 
 export function IngredientsTab() {
   const { t, i18n } = useTranslation();
@@ -19,6 +32,7 @@ export function IngredientsTab() {
   const [needsReview, setNeedsReview] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
+  const [sortUsages, setSortUsages] = useState<UsagesSort>(null);
   const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
   const [status, setStatus] = useState<StatusMsg>(null);
@@ -35,6 +49,8 @@ export function IngredientsTab() {
         q: search || undefined,
         needs_review: needsReview || undefined,
         limit: 100,
+        sort_by: sortUsages ? "usage_count" : undefined,
+        sort_order: sortUsages ?? undefined,
       });
       setIngredients(data);
     } catch {
@@ -42,7 +58,7 @@ export function IngredientsTab() {
     } finally {
       setLoading(false);
     }
-  }, [search, needsReview]);
+  }, [search, needsReview, sortUsages]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -121,6 +137,17 @@ export function IngredientsTab() {
     setSelectedSuggestions(new Set());
     setShowAiPanel(false);
     setStatus({ text: t("ingredients.mergeApplied", { count: applied }), isError: false });
+  }
+
+  async function handleDelete(ing: IngredientDetail) {
+    if (!confirm(t("ingredients.confirmDelete", { name: getDisplayName(ing) }))) return;
+    try {
+      await deleteIngredient(ing.id);
+      setIngredients((prev) => prev.filter((i) => i.id !== ing.id));
+      setStatus({ text: t("ingredients.deleted"), isError: false });
+    } catch {
+      setStatus({ text: t("ingredients.deleteError"), isError: true });
+    }
   }
 
   return (
@@ -264,7 +291,16 @@ export function IngredientsTab() {
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">#</th>
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("ingredients.name")}</th>
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("ingredients.category")}</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("ingredients.usages")}</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => setSortUsages(cycleSortUsages)}
+                    className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    {t("ingredients.usages")}
+                    <UsagesSortIcon sort={sortUsages} />
+                  </button>
+                </th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -314,14 +350,26 @@ export function IngredientsTab() {
                     </td>
                     <td className="px-4 py-2 text-gray-500">{ing.usage_count}</td>
                     <td className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(ing)}
-                        className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
-                      >
-                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                        {t("ingredients.edit")}
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(ing)}
+                          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                          {t("ingredients.edit")}
+                        </button>
+                        {ing.usage_count === 0 && (
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(ing)}
+                            className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-500 transition hover:bg-red-50 dark:border-red-800/40 dark:text-red-400 dark:hover:bg-red-900/20"
+                            title={t("ingredients.deleteUnused")}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

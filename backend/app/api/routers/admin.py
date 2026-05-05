@@ -93,6 +93,8 @@ async def list_ingredients_admin(
     needs_review: bool | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    sort_by: str | None = Query(default=None),
+    sort_order: str = Query(default="asc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Ingredient).options(selectinload(Ingredient.translations))
@@ -109,7 +111,17 @@ async def list_ingredients_admin(
         else:
             # Show only fully-normalised ingredients
             stmt = stmt.where(Ingredient.is_normalized == True)
-    stmt = stmt.order_by(Ingredient.name_en).offset(offset).limit(limit)
+    if sort_by == "usage_count":
+        usage_count_subq = (
+            select(func.count(RecipeIngredient.id))
+            .where(RecipeIngredient.ingredient_id == Ingredient.id)
+            .correlate(Ingredient)
+            .scalar_subquery()
+        )
+        order_expr = usage_count_subq.desc() if sort_order == "desc" else usage_count_subq.asc()
+    else:
+        order_expr = Ingredient.name_en
+    stmt = stmt.order_by(order_expr).offset(offset).limit(limit)
     ingredients = (await db.scalars(stmt)).all()
 
     # Compute usage counts in a single query
@@ -264,6 +276,30 @@ async def ai_suggest_merges(db: AsyncSession = Depends(get_db)):
             )
 
     return MergeSuggestionResponse(suggestions=suggestions)
+
+
+@router.delete("/ingredients/{ingredient_id}", status_code=204)
+async def delete_ingredient(
+    ingredient_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete an ingredient that is not used by any recipe."""
+    ingredient = await db.get(Ingredient, ingredient_id)
+    if not ingredient:
+        raise HTTPException(status_code=404, detail="Ingredient not found")
+    usage_count = (
+        await db.scalar(
+            select(func.count()).select_from(RecipeIngredient)
+            .where(RecipeIngredient.ingredient_id == ingredient_id)
+        )
+    ) or 0
+    if usage_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ingredient is used by {usage_count} recipe(s) and cannot be deleted.",
+        )
+    await db.delete(ingredient)
+    await db.commit()
 
 
 @router.post("/ingredients/merge", response_model=IngredientDetail)

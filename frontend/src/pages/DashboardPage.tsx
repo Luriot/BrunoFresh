@@ -266,7 +266,7 @@ export function DashboardPage({
               }`}
             >
               <Search className="h-3.5 w-3.5" aria-hidden="true" />
-              {t("hfDiscovery.tabLabel")}
+              <span className="hidden sm:inline">{t("hfDiscovery.tabLabel")}</span>
             </button>
             <button
               type="button"
@@ -278,7 +278,7 @@ export function DashboardPage({
               }`}
             >
               <Link className="h-3.5 w-3.5" aria-hidden="true" />
-              {t("hfDiscovery.tabUrl")}
+              <span className="hidden sm:inline">{t("hfDiscovery.tabUrl")}</span>
             </button>
           </div>
 
