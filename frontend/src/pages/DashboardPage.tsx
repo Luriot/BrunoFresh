@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Heart, SlidersHorizontal, Search, LayoutGrid, List, Plus, Clock, Link } from "lucide-react";
+import { Heart, SlidersHorizontal, Search, LayoutGrid, List, Plus, Clock, Link, ExternalLink } from "lucide-react";
 import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
@@ -371,9 +371,9 @@ export function DashboardPage({
                         </div>
 
                         {/* Action */}
-                        <div className="flex shrink-0 items-center gap-1.5">
+                        <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
                           {isAlreadyImported ? (
-                            <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
                               {t("hfDiscovery.alreadyImported")}
                             </span>
                           ) : (
@@ -381,7 +381,7 @@ export function DashboardPage({
                               type="button"
                               disabled={isImporting}
                               onClick={() => void handleHfImport(hit.hf_url)}
-                              className="rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
+                              className="rounded-xl bg-accent px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
                             >
                               {isImporting ? t("hfDiscovery.importing") : t("hfDiscovery.import")}
                             </button>
@@ -390,9 +390,11 @@ export function DashboardPage({
                             href={hit.hf_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="rounded-xl border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
+                            title={t("recipe.viewOriginal")}
+                            className="flex items-center gap-1 rounded-xl border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
                           >
-                            {t("recipe.viewOriginal")}
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <span className="hidden sm:inline">{t("recipe.viewOriginal")}</span>
                           </a>
                         </div>
                       </div>
