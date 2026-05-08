@@ -1,13 +1,14 @@
 import { ChangeEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { exportDb, importDb } from "../../api/client";
-import { Database } from "lucide-react";
+import { exportDb, importDb, backupDb } from "../../api/client";
+import { Database, Download, Save, Upload } from "lucide-react";
 
 type StatusMsg = { text: string; isError: boolean } | null;
 
 export function DatabaseTab() {
   const { t } = useTranslation();
   const [dbExporting, setDbExporting] = useState(false);
+  const [dbBacking, setDbBacking] = useState(false);
   const [dbImporting, setDbImporting] = useState(false);
   const [dbStatus, setDbStatus] = useState<StatusMsg>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -27,6 +28,19 @@ export function DatabaseTab() {
       setDbStatus({ text: t("admin.db.importError"), isError: true });
     } finally {
       setDbExporting(false);
+    }
+  }
+
+  async function handleBackupDb() {
+    setDbBacking(true);
+    setDbStatus(null);
+    try {
+      const { filename } = await backupDb();
+      setDbStatus({ text: t("admin.db.backupSuccess", { filename }), isError: false });
+    } catch {
+      setDbStatus({ text: t("admin.db.backupError"), isError: true });
+    } finally {
+      setDbBacking(false);
     }
   }
 
@@ -73,7 +87,25 @@ export function DatabaseTab() {
           onClick={() => void handleExportDb()}
           className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
         >
-          {dbExporting ? t("app.loading") : `⬇ ${t("admin.db.exportBtn")}`}
+          {dbExporting ? t("app.loading") : (
+            <span className="flex items-center gap-1.5"><Download className="h-4 w-4" aria-hidden="true" />{t("admin.db.exportBtn")}</span>
+          )}
+        </button>
+      </div>
+
+      {/* Backup to server */}
+      <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-700/30 dark:bg-blue-900/10">
+        <h3 className="mb-1 text-sm font-semibold text-blue-800 dark:text-blue-300">{t("admin.db.backupBtn")}</h3>
+        <p className="mb-3 text-xs text-blue-600 dark:text-blue-400">{t("admin.db.backupDesc")}</p>
+        <button
+          type="button"
+          disabled={dbBacking}
+          onClick={() => void handleBackupDb()}
+          className="rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-blue-700/40 dark:bg-[#252526] dark:text-blue-400 dark:hover:bg-[#2d2d30] disabled:opacity-50"
+        >
+          {dbBacking ? t("app.loading") : (
+            <span className="flex items-center gap-1.5"><Save className="h-4 w-4" aria-hidden="true" />{t("admin.db.backupBtn")}</span>
+          )}
         </button>
       </div>
 
@@ -83,7 +115,9 @@ export function DatabaseTab() {
         <p className="mb-3 text-xs text-red-600 dark:text-red-400">{t("admin.db.importDesc")}</p>
         <label className="flex cursor-pointer items-center gap-3">
           <span className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-700/40 dark:bg-[#252526] dark:text-red-400 dark:hover:bg-[#2d2d30]">
-            {dbImporting ? t("app.loading") : `⬆ ${t("admin.db.importBtn")}`}
+            {dbImporting ? t("app.loading") : (
+              <span className="flex items-center gap-1.5"><Upload className="h-4 w-4" aria-hidden="true" />{t("admin.db.importBtn")}</span>
+            )}
           </span>
           <input
             ref={importFileRef}

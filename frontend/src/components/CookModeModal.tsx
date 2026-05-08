@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { X } from "lucide-react";
+import { X, Timer } from "lucide-react";
 import type { RecipeDetail } from "../types";
+import { patchRecipe } from "../api/client";
 
 type Props = {
   recipe: RecipeDetail;
@@ -38,8 +39,28 @@ export function CookModeModal({ recipe, onClose }: Readonly<Props>) {
 
   const totalSteps = steps.length;
 
+  // Prep time editor state (shown on last step)
+  const [prepTimeInput, setPrepTimeInput] = useState<string>(
+    recipe.prep_time_minutes == null ? "" : String(recipe.prep_time_minutes)
+  );
+  const [prepTimeSaved, setPrepTimeSaved] = useState(false);
+  const [prepTimeSaving, setPrepTimeSaving] = useState(false);
+
   const goNext = useCallback(() => setCurrentStep((s) => Math.min(s + 1, totalSteps - 1)), [totalSteps]);
   const goPrev = useCallback(() => setCurrentStep((s) => Math.max(s - 1, 0)), []);
+
+  async function handleSavePrepTime() {
+    const val = Number.parseInt(prepTimeInput, 10);
+    if (Number.isNaN(val) || val < 0 || val > 1440) return;
+    setPrepTimeSaving(true);
+    try {
+      await patchRecipe(recipe.id, { prep_time_minutes: val });
+      setPrepTimeSaved(true);
+      setTimeout(() => setPrepTimeSaved(false), 2500);
+    } finally {
+      setPrepTimeSaving(false);
+    }
+  }
 
   // Keyboard navigation
   useEffect(() => {
@@ -141,7 +162,7 @@ export function CookModeModal({ recipe, onClose }: Readonly<Props>) {
             ))}
           </div>
 
-          {/* Prev | counter | Next */}
+          {/* Prep | counter | Next */}
           <div className="flex w-full items-center gap-3">
             <button
               type="button"
@@ -165,6 +186,33 @@ export function CookModeModal({ recipe, onClose }: Readonly<Props>) {
               <span className="hidden sm:inline">{t("cookMode.next")}</span> →
             </button>
           </div>
+
+          {/* Prep time editor — shown on last step */}
+          {currentStep === totalSteps - 1 && (
+            <div className="flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-[#3e3e42] dark:bg-[#252526]">
+              <Timer className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+              <label className="shrink-0 text-sm text-gray-600 dark:text-gray-400">
+                {t("cookMode.adjustPrepTime")}
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={1440}
+                value={prepTimeInput}
+                onChange={(e) => { setPrepTimeInput(e.target.value); setPrepTimeSaved(false); }}
+                className="w-20 rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+              />
+              <span className="shrink-0 text-sm text-gray-500 dark:text-gray-400">min</span>
+              <button
+                type="button"
+                disabled={prepTimeSaving || prepTimeInput === ""}
+                onClick={() => void handleSavePrepTime()}
+                className="ml-auto shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
+              >
+                {prepTimeSaved ? t("cookMode.prepTimeSaved") : t("cookMode.savePrepTime")}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </dialog>

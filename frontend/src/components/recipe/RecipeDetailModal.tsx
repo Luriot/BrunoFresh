@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { ChefHat } from "lucide-react";
+import { ChefHat, ExternalLink, ShoppingCart } from "lucide-react";
 import {
   buildImageUrl,
   fetchRecipeDetail,
@@ -141,7 +141,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
               )}
               {/* Close button on image */}
               <button
-                className="absolute right-3 top-3 rounded-full bg-black/40 p-1.5 text-white transition hover:bg-black/60"
+                className="absolute right-3 top-3 rounded-full bg-black/70 p-1.5 text-white transition hover:bg-black/90"
                 onClick={onClose}
                 aria-label={t("app.close")}
               >
@@ -285,7 +285,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                     className="flex items-center gap-1.5 rounded-xl border border-green-400 px-3 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-900/20"
                   >
                     <ChefHat className="h-4 w-4" aria-hidden="true" />
-                    {t("recipe.cookMode")}
+                    <span className="hidden sm:inline">{t("recipe.cookMode")}</span>
                   </button>
                 )}
                 {isSafeUrl(recipe.url) && (
@@ -293,22 +293,18 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                     href={recipe.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                    className="flex items-center gap-1.5 rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
                   >
-                    {t("recipe.viewOriginal")}
+                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    <span className="hidden sm:inline">{t("recipe.viewOriginal")}</span>
                   </a>
                 )}
                 <button
-                  className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
-                  onClick={onClose}
-                >
-                  {t("app.close")}
-                </button>
-                <button
-                  className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent/90"
+                  className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent/90"
                   onClick={onAddToCart}
                 >
-                  {t("recipe.addToCart")}
+                  <ShoppingCart className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">{t("recipe.addToCart")}</span>
                 </button>
               </div>
             </div>

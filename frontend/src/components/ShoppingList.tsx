@@ -174,7 +174,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center gap-2">
             <h4 className="font-heading text-lg font-semibold text-ink dark:text-gray-100">{t("shopping.toBuy")}</h4>
             <button
               type="button"

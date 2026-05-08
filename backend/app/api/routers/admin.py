@@ -51,6 +51,24 @@ async def export_db(request: Request):
     )
 
 
+@router.post("/db/backup")
+async def backup_db(request: Request):
+    """Create a timestamped backup of the database file in the same directory."""
+    from datetime import datetime as _dt
+    client_ip = request.client.host if request.client else "unknown"
+    logger.warning("DB backup triggered by %s", client_ip)
+    if not settings.db_file.exists():
+        raise HTTPException(status_code=404, detail="Database file not found.")
+    timestamp = _dt.now().strftime("%Y%m%d_%H%M%S")
+    backup_filename = f"brunofresh_backup_{timestamp}.db"
+    backup_path = settings.db_file.parent / backup_filename
+    try:
+        await asyncio.to_thread(shutil.copy2, str(settings.db_file), str(backup_path))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to create backup.")
+    return {"filename": backup_filename}
+
+
 @router.post("/db/import")
 async def import_db(request: Request, file: UploadFile = File(...)):
     client_ip = request.client.host if request.client else "unknown"

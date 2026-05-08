@@ -198,7 +198,10 @@
     "formatWithAI": "Reformatter avec IA",
     "formatting": "Reformatage...",
     "formatError": "Erreur Ollama. Réessayez.",
-    "stepDot": "Étape {{step}}"
+    "stepDot": "Étape {{step}}",
+    "adjustPrepTime": "Temps de prép. :",
+    "savePrepTime": "Enregistrer",
+    "prepTimeSaved": "Enregistré !"
   },
   "pantry": {
     "title": "Mon garde-manger",
@@ -366,6 +369,10 @@
       "title": "Base de données",
       "exportBtn": "Exporter la base",
       "exportDesc": "Télécharger un backup de la base de données SQLite.",
+      "backupBtn": "Sauvegarder sur le serveur",
+      "backupDesc": "Enregistre une copie horodatée dans le dossier de la base de données.",
+      "backupSuccess": "Backup enregistré : {{filename}}",
+      "backupError": "Erreur lors du backup.",
       "importBtn": "Importer une base",
       "importDesc": "Remplacer la base de données par un backup précédent.",
       "importFileLabel": "Fichier SQLite (.db)",
@@ -383,6 +390,7 @@
     "searchError": "Erreur lors de la recherche. Réessayez.",
     "alreadyImported": "Déjà importée",
     "import": "Importer",
-    "importing": "Import..."
+    "importing": "Import...",
+    "results": "résultats"
   }
 }

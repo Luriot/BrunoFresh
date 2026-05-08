@@ -62,12 +62,20 @@ async def list_recipes(
             stmt = stmt.where(Recipe.id.in_(subq))
 
     if tags:
-        tag_names = [t.strip() for t in tags.split(",") if t.strip()]
-        tag_subq = (
-            select(recipe_tags_table.c.recipe_id)
-            .join(Tag, recipe_tags_table.c.tag_id == Tag.id)
-            .where(Tag.name.in_(tag_names))
-        )
+        raw_parts = [t.strip() for t in tags.split(",") if t.strip()]
+        # Frontend sends numeric IDs; fall back to name-based matching if not numeric
+        if all(p.lstrip("-").isdigit() for p in raw_parts):
+            tag_ids = [int(p) for p in raw_parts]
+            tag_subq = (
+                select(recipe_tags_table.c.recipe_id)
+                .where(recipe_tags_table.c.tag_id.in_(tag_ids))
+            )
+        else:
+            tag_subq = (
+                select(recipe_tags_table.c.recipe_id)
+                .join(Tag, recipe_tags_table.c.tag_id == Tag.id)
+                .where(Tag.name.in_(raw_parts))
+            )
         stmt = stmt.where(Recipe.id.in_(tag_subq))
 
     recipes = (await db.scalars(
@@ -148,6 +156,8 @@ async def patch_recipe(
         recipe.is_favorite = payload.is_favorite
     if payload.instructions_text is not None:
         recipe.instructions_text = payload.instructions_text
+    if payload.prep_time_minutes is not None:
+        recipe.prep_time_minutes = payload.prep_time_minutes
     await db.commit()
 
     recipe = await db.scalar(

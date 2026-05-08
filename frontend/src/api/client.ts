@@ -160,7 +160,7 @@ export async function deleteShoppingListItem(listId: number, itemId: number) {
 
 // ── Recipes extras ────────────────────────────────────────────────────────
 
-export async function patchRecipe(id: number, payload: { is_favorite?: boolean; instructions_text?: string }) {
+export async function patchRecipe(id: number, payload: { is_favorite?: boolean; instructions_text?: string; prep_time_minutes?: number }) {
   const { data } = await api.patch<RecipeDetail>(`/recipes/${id}`, payload);
   return data;
 }
@@ -314,6 +314,11 @@ export async function suggestIngredientMerges() {
 export async function exportDb(): Promise<Blob> {
   const response = await api.get("/admin/db/export", { responseType: "blob" });
   return response.data as Blob;
+}
+
+export async function backupDb(): Promise<{ filename: string }> {
+  const { data } = await api.post<{ filename: string }>("/admin/db/backup");
+  return data;
 }
 
 export async function importDb(file: File): Promise<void> {

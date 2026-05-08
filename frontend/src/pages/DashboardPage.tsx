@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Heart, SlidersHorizontal, Search, LayoutGrid, List, Plus, Clock, Link, ExternalLink } from "lucide-react";
+import { Heart, SlidersHorizontal, Search, LayoutGrid, List, Plus, Clock, Link, ExternalLink, ShoppingCart, X, Download } from "lucide-react";
 import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
@@ -90,10 +90,12 @@ function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<R
       </button>
       <button
         type="button"
+        aria-label={t("recipe.addToCart")}
         onClick={(e) => { e.stopPropagation(); onAdd(recipe); }}
         className="shrink-0 rounded-xl bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:bg-accent/90"
       >
-        {t("recipe.addToCart")}
+        <ShoppingCart className="h-4 w-4 sm:hidden" aria-hidden="true" />
+        <span className="hidden sm:inline">{t("recipe.addToCart")}</span>
       </button>
     </article>
   );
@@ -182,6 +184,10 @@ export function DashboardPage({
 
   // Import card tab
   const [importTab, setImportTab] = useState<"hf" | "url">("hf");
+  const [importOpen, setImportOpen] = useState(false);
+
+  // HF detail popup
+  const [selectedHfResult, setSelectedHfResult] = useState<HFSearchResult | null>(null);
 
   async function runHfSearch() {
     if (!hfQuery.trim()) {
@@ -247,20 +253,18 @@ export function DashboardPage({
     await onScrape(urls);
   }
 
-  const recipeCount = recipes.length;
-
   return (
     <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 pb-28 sm:px-6 lg:grid-cols-3 lg:px-8 lg:pb-10">
       <section className="space-y-4 lg:col-span-2">
         {/* Import card — 2 tabs */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]">
+        <div className={`rounded-2xl transition-all ${importOpen ? "border border-gray-200 bg-white p-4 shadow-sm dark:border-[#3e3e42] dark:bg-[#252526]" : "border border-transparent bg-[#faf8f5] p-1 dark:bg-[#1e1e1e]"}`}>
           {/* Tab bar */}
-          <div className="mb-3 flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-[#1e1e1e]">
+          <div className={`flex gap-1 rounded-xl p-1 ${importOpen ? "mb-3 bg-gray-100 dark:bg-[#1e1e1e]" : "bg-gray-100/60 dark:bg-[#252526]/60"}`}>
             <button
               type="button"
-              onClick={() => setImportTab("hf")}
+              onClick={() => { if (importTab === "hf" && importOpen) { setImportOpen(false); } else { setImportTab("hf"); setImportOpen(true); } }}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm font-semibold transition ${
-                importTab === "hf"
+                importOpen && importTab === "hf"
                   ? "bg-white shadow text-ink dark:bg-[#252526] dark:text-gray-100"
                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               }`}
@@ -270,9 +274,9 @@ export function DashboardPage({
             </button>
             <button
               type="button"
-              onClick={() => setImportTab("url")}
+              onClick={() => { if (importTab === "url" && importOpen) { setImportOpen(false); } else { setImportTab("url"); setImportOpen(true); } }}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-sm font-semibold transition ${
-                importTab === "url"
+                importOpen && importTab === "url"
                   ? "bg-white shadow text-ink dark:bg-[#252526] dark:text-gray-100"
                   : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               }`}
@@ -282,7 +286,7 @@ export function DashboardPage({
             </button>
           </div>
 
-          {importTab === "hf" ? (
+          {importOpen && (importTab === "hf" ? (
             <div className="flex flex-col gap-3">
               {/* HF search input */}
               <form
@@ -292,7 +296,7 @@ export function DashboardPage({
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                   <input
-                    className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500"
+                    className={`w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200 dark:placeholder-gray-500 ${hfResults.length > 0 ? "pr-8" : "pr-3"}`}
                     placeholder={t("hfDiscovery.searchPlaceholder")}
                     value={hfQuery}
                     onChange={(e) => {
@@ -300,6 +304,16 @@ export function DashboardPage({
                       if (!e.target.value.trim()) { setHfResults([]); setHfError(null); }
                     }}
                   />
+                  {hfResults.length > 0 && (
+                    <button
+                      type="button"
+                      aria-label={t("app.close")}
+                      onClick={() => { setHfResults([]); setHfError(null); setHfQuery(""); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
                 <button
                   type="submit"
@@ -324,14 +338,16 @@ export function DashboardPage({
 
               {/* Results */}
               {hfResults.length > 0 && (
-                <div className="flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
                   {hfResults.map((hit) => {
                     const isAlreadyImported = hit.already_imported || importedUrls.has(hit.hf_url);
                     const isImporting = importingUrls.has(hit.hf_url);
                     return (
                       <div
                         key={hit.id}
-                        className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
+                        className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-2 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:hover:bg-[#252526]"
+                        onClick={() => setSelectedHfResult(hit)}
                       >
                         {/* Thumbnail */}
                         <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-green-50 dark:bg-[#252526]">
@@ -370,7 +386,7 @@ export function DashboardPage({
                           </div>
                         </div>
 
-                        {/* Action */}
+                        {/* Action — stop propagation so clicks on buttons don't open popup */}
                         <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
                           {isAlreadyImported ? (
                             <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -380,30 +396,103 @@ export function DashboardPage({
                             <button
                               type="button"
                               disabled={isImporting}
-                              onClick={() => void handleHfImport(hit.hf_url)}
-                              className="rounded-xl bg-accent px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
+                              onClick={(e) => { e.stopPropagation(); void handleHfImport(hit.hf_url); }}
+                              className="flex items-center gap-1.5 rounded-xl bg-accent px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
                             >
-                              {isImporting ? t("hfDiscovery.importing") : t("hfDiscovery.import")}
+                              <Download className="h-3.5 w-3.5 shrink-0 sm:hidden" aria-hidden="true" />
+                              <span className="hidden sm:inline">{isImporting ? t("hfDiscovery.importing") : t("hfDiscovery.import")}</span>
                             </button>
                           )}
-                          <a
-                            href={hit.hf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={t("recipe.viewOriginal")}
-                            className="flex items-center gap-1 rounded-xl border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-400 dark:hover:bg-[#2d2d30]"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                            <span className="hidden sm:inline">{t("recipe.viewOriginal")}</span>
-                          </a>
                         </div>
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               )}
 
-              <p className="text-xs text-gray-500 dark:text-gray-400">{t("app.recipesLoaded", { count: recipeCount })}</p>
+              {/* HF Detail Popup */}
+              {selectedHfResult && (
+                <dialog
+                  open
+                  aria-label={selectedHfResult.name}
+                  className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                  onKeyDown={(e) => { if (e.key === "Escape") setSelectedHfResult(null); }}
+                >
+                  <div
+                    className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                    onClick={() => setSelectedHfResult(null)}
+                    aria-hidden="true"
+                  />
+                  <div className="relative z-10 flex w-full max-w-lg flex-col rounded-2xl border border-gray-200 bg-white dark:border-[#3e3e42] dark:bg-[#252526]" style={{ maxHeight: "90dvh" }}>
+                    {/* Close button */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedHfResult(null)}
+                      aria-label={t("app.close")}
+                      className="absolute right-3 top-3 z-10 rounded-full bg-black/40 p-1.5 text-white transition hover:bg-black/60"
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    {/* Image */}
+                    <div className="relative h-48 w-full shrink-0 overflow-hidden rounded-t-2xl bg-green-50 dark:bg-[#1e1e1e]">
+                      {selectedHfResult.image_url ? (
+                        <img src={selectedHfResult.image_url} alt={selectedHfResult.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-green-600 dark:text-green-400">{t("recipe.noImage")}</div>
+                      )}
+                    </div>
+                    {/* Body */}
+                    <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                      <h2 className="mb-2 font-heading text-xl font-bold text-ink dark:text-gray-100">{selectedHfResult.name}</h2>
+                      {selectedHfResult.total_time_minutes != null && (
+                        <p className="mb-3 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                          <Clock className="h-4 w-4" aria-hidden="true" />
+                          {selectedHfResult.total_time_minutes} {t("recipe.minutes")}
+                        </p>
+                      )}
+                      {selectedHfResult.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedHfResult.tags.map((tag) => (
+                            <span key={tag} className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Footer */}
+                    <div className="shrink-0 rounded-b-2xl border-t border-gray-100 bg-gray-50 p-3 dark:border-[#3e3e42] dark:bg-[#1e1e1e]">
+                      <div className="flex gap-2">
+                        {(selectedHfResult.already_imported || importedUrls.has(selectedHfResult.hf_url)) ? (
+                          <span className="flex-1 rounded-xl bg-green-100 px-3 py-2 text-center text-sm font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            {t("hfDiscovery.alreadyImported")}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={importingUrls.has(selectedHfResult.hf_url)}
+                            onClick={() => void handleHfImport(selectedHfResult.hf_url)}
+                            className="flex-1 rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
+                          >
+                            {importingUrls.has(selectedHfResult.hf_url) ? t("hfDiscovery.importing") : t("hfDiscovery.import")}
+                          </button>
+                        )}
+                        <a
+                          href={selectedHfResult.hf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                        >
+                          <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                          {t("recipe.viewOriginal")}
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </dialog>
+              )}
+
               {scrapeState && (
                 <div className="flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 p-2 dark:border-accent/30 dark:bg-accent/10">
                   {loading && <SpinnerIcon />}
@@ -439,7 +528,6 @@ export function DashboardPage({
                   {t("app.customRecipe")}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t("app.recipesLoaded", { count: recipeCount })}</p>
               {scrapeState && (
                 <div className="mt-1 flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 p-2 dark:border-accent/30 dark:bg-accent/10">
                   {loading && <SpinnerIcon />}
@@ -447,10 +535,8 @@ export function DashboardPage({
                 </div>
               )}
             </div>
-          )}
+          ))}
         </div>
-
-        {/* Search + filter bar */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" aria-hidden="true" />
@@ -469,7 +555,7 @@ export function DashboardPage({
               className={`relative flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${filterButtonClass(allTags.length, showFilters, selectedTagIds.length)}`}
             >
               <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-              {t("app.filtersLabel")}
+              <span className="hidden sm:inline">{t("app.filtersLabel")}</span>
               {selectedTagIds.length > 0 && (
                 <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
                   {selectedTagIds.length}
@@ -482,7 +568,7 @@ export function DashboardPage({
             className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-semibold transition ${showFavoritesOnly ? "border-red-300 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400" : "border-gray-200 text-gray-600 dark:border-[#3e3e42] dark:text-gray-400"}`}
           >
             <Heart className="h-4 w-4" aria-hidden="true" />
-            {t("app.favoritesFilter")}
+            <span className="hidden sm:inline">{t("app.favoritesFilter")}</span>
           </button>
           {/* View mode toggle */}
           <div className="flex overflow-hidden rounded-xl border border-gray-200 dark:border-[#3e3e42]">

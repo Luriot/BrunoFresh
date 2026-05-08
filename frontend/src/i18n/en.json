@@ -198,7 +198,10 @@
     "formatWithAI": "Reformat with AI",
     "formatting": "Reformatting...",
     "formatError": "Ollama error. Please retry.",
-    "stepDot": "Step {{step}}"
+    "stepDot": "Step {{step}}",
+    "adjustPrepTime": "Prep time:",
+    "savePrepTime": "Save",
+    "prepTimeSaved": "Saved!"
   },
   "pantry": {
     "title": "My Pantry",
@@ -366,6 +369,10 @@
       "title": "Database",
       "exportBtn": "Export Database",
       "exportDesc": "Download a backup of the SQLite database.",
+      "backupBtn": "Backup to Server",
+      "backupDesc": "Save a timestamped backup file in the server's database directory.",
+      "backupSuccess": "Backup saved: {{filename}}",
+      "backupError": "Backup failed.",
       "importBtn": "Import Database",
       "importDesc": "Replace the database with a previous backup.",
       "importFileLabel": "SQLite file (.db)",
@@ -383,6 +390,7 @@
     "searchError": "Search failed. Please retry.",
     "alreadyImported": "Already imported",
     "import": "Import",
-    "importing": "Importing..."
+    "importing": "Importing...",
+    "results": "results"
   }
 }

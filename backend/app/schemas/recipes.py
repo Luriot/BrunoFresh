@@ -28,6 +28,7 @@ class RecipeCreate(BaseModel):
 class RecipePatch(BaseModel):
     is_favorite: bool | None = None
     instructions_text: str | None = Field(default=None, max_length=50_000)
+    prep_time_minutes: int | None = Field(default=None, ge=0, le=1440)
 
 
 # ── Output ────────────────────────────────────────────────────────────────────
