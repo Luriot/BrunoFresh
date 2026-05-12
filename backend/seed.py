@@ -58,9 +58,7 @@ async def seed() -> None:
 
             existing = await db.scalar(select(User).where(User.username == username))
             if existing:
-                existing.hashed_password = hashed
-                existing.role = role
-                print(f"Updated user: {username} (role={role})")
+                print(f"Skipped (already exists): {username}")
             else:
                 db.add(User(username=username, hashed_password=hashed, role=role))
                 print(f"Created user: {username} (role={role})")
