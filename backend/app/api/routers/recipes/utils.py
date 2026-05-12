@@ -36,7 +36,11 @@ def _ing_to_out(link: RecipeIngredient) -> RecipeIngredientOut:
     )
 
 
-def _recipe_to_detail(recipe: Recipe) -> RecipeDetail:
+def _recipe_to_detail(
+    recipe: Recipe,
+    is_favorite_by_me: bool = False,
+    recommenders: list[str] | None = None,
+) -> RecipeDetail:
     steps: list[InstructionStep] = []
     if recipe.instruction_steps_json:
         try:
@@ -54,7 +58,8 @@ def _recipe_to_detail(recipe: Recipe) -> RecipeDetail:
         instructions_text=recipe.instructions_text,
         base_servings=recipe.base_servings,
         prep_time_minutes=recipe.prep_time_minutes,
-        is_favorite=recipe.is_favorite,
+        is_favorite_by_me=is_favorite_by_me,
+        recommenders=recommenders or [],
         tags=[TagOut.model_validate(t) for t in recipe.tags],
         ingredients=[_ing_to_out(link) for link in recipe.recipe_ingredients],
         instruction_steps=steps,

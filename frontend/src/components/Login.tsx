@@ -2,25 +2,26 @@ import { FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type LoginProps = {
-  onLogin: (passcode: string) => Promise<void>;
+  onLogin: (username: string, password: string) => Promise<void>;
   error: string | null;
 };
 
 export function Login({ onLogin, error }: Readonly<LoginProps>) {
   const { t } = useTranslation();
-  const [passcode, setPasscode] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!passcode.trim()) {
+    if (!username.trim() || !password) {
       return;
     }
 
     setSubmitting(true);
     try {
-      await onLogin(passcode);
-      setPasscode("");
+      await onLogin(username.trim(), password);
+      setPassword("");
     } finally {
       setSubmitting(false);
     }
@@ -34,10 +35,18 @@ export function Login({ onLogin, error }: Readonly<LoginProps>) {
 
         <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
           <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder={t("auth.usernameLabel")}
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            autoComplete="username"
+          />
+          <input
             type="password"
-            value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
-            placeholder={t("auth.passcodePlaceholder")}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t("auth.passwordLabel")}
             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
             autoComplete="current-password"
           />

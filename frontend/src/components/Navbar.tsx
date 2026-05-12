@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import type { User } from "../types";
+import { UserAvatar } from "./UserAvatar";
 
 type Props = {
+  user: User;
   onLogout: () => void;
   isDark: boolean;
   onToggleDark: () => void;
 };
 
-export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
+export function Navbar({ user, onLogout, isDark, onToggleDark }: Readonly<Props>) {
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -58,8 +61,12 @@ export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
             <NavLink to="/history" className={({ isActive }) => navLinkClass({ isActive: isActive || location.pathname.startsWith("/lists/") })}>{t("nav.history")}</NavLink>
             <NavLink to="/pantry" className={navLinkClass}>{t("nav.pantry")}</NavLink>
             <NavLink to="/planner" className={({ isActive }) => navLinkClass({ isActive: isActive || location.pathname.startsWith("/planner") })}>{t("nav.mealPlanner")}</NavLink>
-            <NavLink to="/admin" className={navLinkClass}>{t("nav.admin")}</NavLink>
+            {user.role === "admin" && <NavLink to="/admin" className={navLinkClass}>{t("nav.admin")}</NavLink>}
           </nav>
+
+          <NavLink to="/profile" className="rounded-full" aria-label={user.username}>
+            <UserAvatar user={user} size="h-9 w-9" />
+          </NavLink>
 
           <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-[#3e3e42] dark:bg-[#252526]">
             <button
@@ -125,7 +132,17 @@ export function Navbar({ onLogout, isDark, onToggleDark }: Readonly<Props>) {
               <NavLink to="/history" className={({ isActive }) => navLinkClass({ isActive: isActive || location.pathname.startsWith("/lists/") })} onClick={closeMenu}>{t("nav.history")}</NavLink>
               <NavLink to="/pantry" className={navLinkClass} onClick={closeMenu}>{t("nav.pantry")}</NavLink>
               <NavLink to="/planner" className={({ isActive }) => navLinkClass({ isActive: isActive || location.pathname.startsWith("/planner") })} onClick={closeMenu}>{t("nav.mealPlanner")}</NavLink>
-              <NavLink to="/admin" className={navLinkClass} onClick={closeMenu}>{t("nav.admin")}</NavLink>
+              {user.role === "admin" && <NavLink to="/admin" className={navLinkClass} onClick={closeMenu}>{t("nav.admin")}</NavLink>}
+              <NavLink
+                to="/profile"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${isActive ? "bg-accent font-semibold text-white" : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#2d2d30]"}`
+                }
+                onClick={closeMenu}
+              >
+                <UserAvatar user={user} size="h-6 w-6" />
+                <span>{user.username}</span>
+              </NavLink>
             </nav>
 
             <div className="flex items-center gap-2">

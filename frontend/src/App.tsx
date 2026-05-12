@@ -7,15 +7,15 @@ import {
   createShoppingList,
   deleteShoppingList,
   deleteShoppingListItem,
+  fetchMe,
   fetchRecipes,
   fetchShoppingList,
   fetchShoppingLists,
-  loginWithPasscode,
+  login,
   logout,
   patchShoppingList,
   patchShoppingListItem,
   setUnauthorizedHandler,
-  verifySession,
 } from "./api/client";
 import { Login } from "./components/Login";
 import { Navbar } from "./components/Navbar";
@@ -28,7 +28,8 @@ import { PantryPage } from "./pages/PantryPage";
 import { MealPlannerPage } from "./pages/MealPlannerPage";
 import { MealPlanDetailPage } from "./pages/MealPlanDetailPage";
 import { AdminPage } from "./pages/AdminPage";
-import type { RecipeListItem, ShoppingList as ShoppingListType, ShoppingListSummary } from "./types";
+import { ProfilePage } from "./pages/ProfilePage";
+import type { RecipeListItem, ShoppingList as ShoppingListType, ShoppingListSummary, User } from "./types";
 import { useTranslation } from "react-i18next";
 
 function getIsoWeekNumber(date: Date): number {
@@ -42,7 +43,8 @@ function getIsoWeekNumber(date: Date): number {
 function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  // undefined = still loading, null = logged out, User = logged in
+  const [user, setUser] = useState<User | null | undefined>(undefined);
   const [isDark, setIsDark] = useState(() => {
     const stored = localStorage.getItem("brunofresh.theme");
     if (stored) return stored === "dark";
@@ -95,7 +97,7 @@ function App() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      setIsAuthenticated(false);
+      setUser(null);
       setRecipes([]);
       setList(null);
       setListHistory([]);
@@ -106,7 +108,7 @@ function App() {
   }, [t]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!user) {
       setRecipes([]);
       setList(null);
       setListHistory([]);
@@ -114,21 +116,15 @@ function App() {
     }
     void loadRecipes();
     void loadShoppingListHistory();
-  }, [isAuthenticated, loadRecipes, loadShoppingListHistory]);
+  }, [user, loadRecipes, loadShoppingListHistory]);
 
   useEffect(() => {
     let canceled = false;
 
     async function bootstrapSession() {
-      try {
-        const authenticated = await verifySession();
-        if (!canceled) {
-          setIsAuthenticated(authenticated);
-        }
-      } catch {
-        if (!canceled) {
-          setIsAuthenticated(false);
-        }
+      const me = await fetchMe();
+      if (!canceled) {
+        setUser(me);
       }
     }
 
@@ -139,14 +135,13 @@ function App() {
     };
   }, []);
 
-  async function onLogin(passcode: string) {
+  async function onLogin(username: string, password: string) {
     try {
-      await loginWithPasscode(passcode);
-      setIsAuthenticated(true);
+      const me = await login(username, password);
+      setUser(me);
       setAuthError(null);
-      // Data loading is handled by the useEffect that watches isAuthenticated.
     } catch {
-      setAuthError(t("auth.invalidPasscode"));
+      setAuthError(t("auth.invalidCredentials"));
     }
   }
 
@@ -156,7 +151,7 @@ function App() {
     } catch {
       // Treat client-side logout as complete even if the request fails.
     }
-    setIsAuthenticated(false);
+    setUser(null);
     setAuthError(null);
     setRecipes([]);
     setList(null);
@@ -296,7 +291,7 @@ function App() {
   }
 
   async function onScrape(urls: string[]): Promise<boolean> {
-    if (!isAuthenticated) return false;
+    if (!user) return false;
     let success = false;
     for (const u of urls) {
       if (u.trim()) {
@@ -306,7 +301,7 @@ function App() {
     return success;
   }
 
-  if (isAuthenticated === null) {
+  if (user === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <p className="text-sm text-gray-600">{t("app.checkingSession")}</p>
@@ -314,13 +309,13 @@ function App() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return <Login onLogin={onLogin} error={authError} />;
   }
 
   return (
     <div className="min-h-screen text-ink">
-      <Navbar onLogout={onLogout} isDark={isDark} onToggleDark={toggleDark} />
+      <Navbar user={user} onLogout={onLogout} isDark={isDark} onToggleDark={toggleDark} />
 
       {/* Duplicate recipe warning modal */}
       {duplicateWarning && (
@@ -407,7 +402,8 @@ function App() {
         <Route path="/pantry" element={<PantryPage />} />
         <Route path="/planner" element={<MealPlannerPage onListGenerated={(l: ShoppingListType) => { setList(l); void loadShoppingListHistory(); }} />} />
         <Route path="/planner/:planId" element={<MealPlanDetailPage onListGenerated={(l: ShoppingListType) => { setList(l); void loadShoppingListHistory(); }} />} />
-        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin" element={<AdminPage user={user} />} />
+        <Route path="/profile" element={<ProfilePage user={user} onUserUpdate={setUser} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

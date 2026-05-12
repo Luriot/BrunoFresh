@@ -28,6 +28,7 @@ from .api.routers import (
     scrape_router,
     tags_router,
     admin_router,
+    users_router,
 )
 from .config import settings
 from .admin import setup_admin
@@ -110,7 +111,8 @@ app.include_router(lists_router, dependencies=[Depends(require_auth)])
 app.include_router(tags_router, dependencies=[Depends(require_auth)])
 app.include_router(pantry_router, dependencies=[Depends(require_auth)])
 app.include_router(meal_plans_router, dependencies=[Depends(require_auth)])
-app.include_router(admin_router)  # require_auth already applied on the router itself
+app.include_router(admin_router)  # require_admin already applied on the router itself
+app.include_router(users_router, dependencies=[Depends(require_auth)])
 
 # SQLAdmin DOIT être initialisé AVANT d'enregistrer le catch-all du SPA
 setup_admin(app)

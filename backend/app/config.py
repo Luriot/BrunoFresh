@@ -8,7 +8,6 @@ import warnings
 load_dotenv()
 
 
-DEFAULT_APP_PASSCODE = "change-me-before-deploy"
 DEFAULT_AUTH_SECRET = "local-dev-secret-do-not-use-in-prod-123456789"
 PRODUCTION_ENVIRONMENTS = {"prod", "production"}
 
@@ -39,13 +38,11 @@ class Settings(BaseModel):
         if header.strip()
     )
     scrape_concurrency_limit: int = int(os.getenv("SCRAPE_CONCURRENCY_LIMIT", "1"))
-    app_passcode: str = os.getenv("APP_PASSCODE", DEFAULT_APP_PASSCODE)
     auth_secret: str = os.getenv("AUTH_SECRET", DEFAULT_AUTH_SECRET)
     auth_token_ttl_minutes: int = int(os.getenv("AUTH_TOKEN_TTL_MINUTES", "10080"))  # 7 days default
     auth_cookie_name: str = os.getenv("AUTH_COOKIE_NAME", "brunofresh_access_token")
     auth_cookie_secure: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
     auth_cookie_samesite: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").strip().lower()
-    admin_username: str = os.getenv("ADMIN_USERNAME", "admin")
     # DB admin interface (/dbadmin). Defaults to enabled in development, disabled
     # in production. Set DBADMIN_ENABLED=true to explicitly enable it in prod
     # (e.g. when accessed exclusively via an SSH tunnel).
@@ -82,12 +79,6 @@ def _validate_security_settings(current: Settings) -> None:
 
     in_production = current.environment in PRODUCTION_ENVIRONMENTS
 
-    if in_production and len(current.app_passcode) < 12:
-        raise ValueError("APP_PASSCODE must be at least 12 characters in production")
-
-    if in_production and current.app_passcode == DEFAULT_APP_PASSCODE:
-        raise RuntimeError("APP_PASSCODE cannot use the default value in production")
-
     if in_production and current.auth_secret == DEFAULT_AUTH_SECRET:
         raise RuntimeError("AUTH_SECRET cannot use the default value in production")
 
@@ -101,9 +92,9 @@ def _validate_security_settings(current: Settings) -> None:
             stacklevel=2,
         )
 
-    if not in_production and current.app_passcode == DEFAULT_APP_PASSCODE:
+    if not in_production and current.auth_secret == DEFAULT_AUTH_SECRET:
         warnings.warn(
-            "Using default APP_PASSCODE in development. Set APP_PASSCODE in your environment.",
+            "Using default AUTH_SECRET in development. Set AUTH_SECRET in your environment before deploying.",
             stacklevel=2,
         )
 

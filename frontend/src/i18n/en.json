@@ -34,6 +34,7 @@
     "noTags": "No tags — manage tags in Settings",
     "favorite": "Add to favorites",
     "unfavorite": "Remove from favorites",
+    "recommendedBy": "Recommended by",
     "similar": "You might also like...",
     "rescrape": "Update",
     "cookMode": "Cook Mode",
@@ -98,11 +99,12 @@
   },
   "auth": {
     "logout": "Logout",
-    "loginPrompt": "Enter passcode to access your recipes.",
-    "passcodePlaceholder": "Passcode",
+    "loginPrompt": "Sign in to access your recipes.",
+    "usernameLabel": "Username",
+    "passwordLabel": "Password",
     "signIn": "Sign in",
     "signingIn": "Signing in...",
-    "invalidPasscode": "Invalid passcode.",
+    "invalidCredentials": "Invalid username or password.",
     "sessionExpired": "Session expired. Sign in again."
   },
   "customRecipe": {
@@ -340,6 +342,7 @@
     }
   },
   "admin": {
+    "forbidden": "Access denied. Admin only.",
     "tabs": {
       "ingredients": "Ingredients",
       "tags": "Tags",
@@ -392,5 +395,24 @@
     "import": "Import",
     "importing": "Importing...",
     "results": "results"
+  },
+  "profile": {
+    "title": "Profile",
+    "changeUsername": "Change Username",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "newUsername": "New Username",
+    "save": "Save",
+    "saved": "Saved!",
+    "role": "Role",
+    "admin": "Admin",
+    "user": "User",
+    "errorCurrentPassword": "Incorrect current password.",
+    "errorUsernameTaken": "Username already taken.",
+    "changeAvatar": "Change profile picture",
+    "avatarTooLarge": "Image too large (max 5 MB).",
+    "avatarInvalidType": "Unsupported format. Use JPEG, PNG, or WebP.",
+    "avatarError": "Failed to upload image."
   }
 }

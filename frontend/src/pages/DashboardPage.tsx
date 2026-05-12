@@ -5,7 +5,7 @@ import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
-import { buildImageUrl, patchRecipe, searchHelloFresh } from "../api/client";
+import { buildImageUrl, toggleFavorite, searchHelloFresh } from "../api/client";
 import { useRecipeFilters } from "../hooks/useRecipeFilters";
 import type { CartEntry } from "../hooks/useCart";
 import type { HFSearchResult, RecipeListItem } from "../types";
@@ -37,8 +37,8 @@ function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<R
   async function handleFavorite(e: React.MouseEvent) {
     e.stopPropagation();
     try {
-      const updated = await patchRecipe(recipe.id, { is_favorite: !recipe.is_favorite });
-      onFavoriteToggled?.({ ...recipe, is_favorite: updated.is_favorite });
+      const { is_favorite_by_me } = await toggleFavorite(recipe.id);
+      onFavoriteToggled?.({ ...recipe, is_favorite_by_me });
     } catch {
       // silently fail
     }
@@ -74,11 +74,11 @@ function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<R
       </div>
       <button
         type="button"
-        aria-label={recipe.is_favorite ? t("recipe.unfavorite") : t("recipe.favorite")}
+        aria-label={recipe.is_favorite_by_me ? t("recipe.unfavorite") : t("recipe.favorite")}
         className="shrink-0 rounded-full p-1 text-gray-400 transition hover:text-red-500 dark:text-gray-500"
         onClick={handleFavorite}
       >
-        {recipe.is_favorite ? (
+        {recipe.is_favorite_by_me ? (
           <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
@@ -241,7 +241,7 @@ export function DashboardPage({
   function sortRecipes(list: RecipeListItem[]): RecipeListItem[] {
     return [...list].sort((a, b) => {
       // Favorites first, then alphabetical
-      if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+      if (a.is_favorite_by_me !== b.is_favorite_by_me) return a.is_favorite_by_me ? -1 : 1;
       return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
     });
   }

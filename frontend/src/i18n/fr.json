@@ -34,6 +34,7 @@
     "noTags": "Aucun tag — gérez les tags dans les paramètres",
     "favorite": "Ajouter aux favoris",
     "unfavorite": "Retirer des favoris",
+    "recommendedBy": "Recommandé par",
     "similar": "Vous aimerez aussi...",
     "rescrape": "Mettre à jour",
     "cookMode": "Mode cuisine",
@@ -98,11 +99,12 @@
   },
   "auth": {
     "logout": "Quitter",
-    "loginPrompt": "Entrez le code d'accès pour voir vos recettes.",
-    "passcodePlaceholder": "Code d'accès",
+    "loginPrompt": "Connectez-vous pour accéder à vos recettes.",
+    "usernameLabel": "Nom d'utilisateur",
+    "passwordLabel": "Mot de passe",
     "signIn": "Se connecter",
     "signingIn": "Connexion...",
-    "invalidPasscode": "Code d'accès invalide.",
+    "invalidCredentials": "Nom d'utilisateur ou mot de passe invalide.",
     "sessionExpired": "Session expirée. Reconnectez-vous."
   },
   "customRecipe": {
@@ -340,6 +342,7 @@
     }
   },
   "admin": {
+    "forbidden": "Accès refusé. Réservé aux administrateurs.",
     "tabs": {
       "ingredients": "Ingrédients",
       "tags": "Tags",
@@ -392,5 +395,24 @@
     "import": "Importer",
     "importing": "Import...",
     "results": "résultats"
+  },
+  "profile": {
+    "title": "Profil",
+    "changeUsername": "Changer le nom d'utilisateur",
+    "changePassword": "Changer le mot de passe",
+    "currentPassword": "Mot de passe actuel",
+    "newPassword": "Nouveau mot de passe",
+    "newUsername": "Nouveau nom d'utilisateur",
+    "save": "Enregistrer",
+    "saved": "Enregistré !",
+    "role": "Rôle",
+    "admin": "Admin",
+    "user": "Utilisateur",
+    "errorCurrentPassword": "Mot de passe actuel incorrect.",
+    "errorUsernameTaken": "Ce nom d'utilisateur est déjà pris.",
+    "changeAvatar": "Changer la photo de profil",
+    "avatarTooLarge": "Image trop grande (max 5 Mo).",
+    "avatarInvalidType": "Format non supporté. Utilisez JPEG, PNG ou WebP.",
+    "avatarError": "Échec de l'envoi de l'image."
   }
 }

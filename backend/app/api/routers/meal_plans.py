@@ -19,6 +19,8 @@ from ...schemas import (
     MealPlanSummaryOut,
     ShoppingListOut,
 )
+from ..dependencies import require_auth
+from ...services.auth import UserClaims
 
 router = APIRouter(prefix="/api", tags=["meal-plans"])
 
@@ -54,12 +56,14 @@ def _plan_to_out(plan: MealPlan) -> MealPlanOut:
 async def list_meal_plans(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     plans = (
         await db.scalars(
             select(MealPlan)
             .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))
+            .where(MealPlan.user_id == claims.user_id)
             .order_by(MealPlan.created_at.desc())
             .offset(offset)
             .limit(limit)
@@ -87,8 +91,12 @@ async def list_meal_plans(
 
 
 @router.post("/meal-plans", response_model=MealPlanOut, status_code=status.HTTP_201_CREATED)
-async def create_meal_plan(payload: MealPlanCreate, db: AsyncSession = Depends(get_db)):
-    plan = MealPlan(label=payload.label, week_start_date=payload.week_start_date)
+async def create_meal_plan(
+    payload: MealPlanCreate,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    plan = MealPlan(user_id=claims.user_id, label=payload.label, week_start_date=payload.week_start_date)
     db.add(plan)
     await db.commit()
     await db.refresh(plan)
@@ -99,11 +107,15 @@ async def create_meal_plan(payload: MealPlanCreate, db: AsyncSession = Depends(g
 
 
 @router.get("/meal-plans/{plan_id}", response_model=MealPlanOut)
-async def get_meal_plan(plan_id: int, db: AsyncSession = Depends(get_db)):
+async def get_meal_plan(
+    plan_id: int,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
     plan = await db.scalar(
         select(MealPlan)
         .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))
-        .where(MealPlan.id == plan_id)
+        .where(MealPlan.id == plan_id, MealPlan.user_id == claims.user_id)
     )
     if not plan:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
@@ -111,8 +123,14 @@ async def get_meal_plan(plan_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/meal-plans/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_meal_plan(plan_id: int, db: AsyncSession = Depends(get_db)):
-    plan = await db.get(MealPlan, plan_id)
+async def delete_meal_plan(
+    plan_id: int,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    plan = await db.scalar(
+        select(MealPlan).where(MealPlan.id == plan_id, MealPlan.user_id == claims.user_id)
+    )
     if not plan:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
     await db.delete(plan)
@@ -121,11 +139,16 @@ async def delete_meal_plan(plan_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/meal-plans/{plan_id}", response_model=MealPlanOut)
-async def patch_meal_plan(plan_id: int, payload: MealPlanPatch, db: AsyncSession = Depends(get_db)):
+async def patch_meal_plan(
+    plan_id: int,
+    payload: MealPlanPatch,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
     plan = await db.scalar(
         select(MealPlan)
         .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))
-        .where(MealPlan.id == plan_id)
+        .where(MealPlan.id == plan_id, MealPlan.user_id == claims.user_id)
     )
     if not plan:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
@@ -143,9 +166,12 @@ async def patch_meal_plan(plan_id: int, payload: MealPlanPatch, db: AsyncSession
 async def add_meal_plan_entry(
     plan_id: int,
     payload: MealPlanEntryCreate,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
-    plan = await db.get(MealPlan, plan_id)
+    plan = await db.scalar(
+        select(MealPlan).where(MealPlan.id == plan_id, MealPlan.user_id == claims.user_id)
+    )
     if not plan:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
     recipe = await db.get(Recipe, payload.recipe_id)
@@ -175,8 +201,15 @@ async def add_meal_plan_entry(
 async def delete_meal_plan_entry(
     plan_id: int,
     entry_id: int,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
+    # Verify plan belongs to user first
+    plan_exists = await db.scalar(
+        select(MealPlan.id).where(MealPlan.id == plan_id, MealPlan.user_id == claims.user_id)
+    )
+    if not plan_exists:
+        raise HTTPException(status_code=404, detail=_NOT_FOUND)
     entry = await db.scalar(
         select(MealPlanEntry).where(
             MealPlanEntry.id == entry_id,
@@ -195,8 +228,15 @@ async def patch_meal_plan_entry(
     plan_id: int,
     entry_id: int,
     payload: MealPlanEntryPatch,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
+    # Verify plan belongs to user first
+    plan_exists = await db.scalar(
+        select(MealPlan.id).where(MealPlan.id == plan_id, MealPlan.user_id == claims.user_id)
+    )
+    if not plan_exists:
+        raise HTTPException(status_code=404, detail=_NOT_FOUND)
     entry = await db.scalar(
         select(MealPlanEntry)
         .options(selectinload(MealPlanEntry.recipe))
@@ -218,12 +258,13 @@ async def patch_meal_plan_entry(
 @router.post("/meal-plans/{plan_id}/generate-list", response_model=ShoppingListOut)
 async def generate_list_from_meal_plan(
     plan_id: int,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     plan = await db.scalar(
         select(MealPlan)
         .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))
-        .where(MealPlan.id == plan_id)
+        .where(MealPlan.id == plan_id, MealPlan.user_id == claims.user_id)
     )
     if not plan:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
@@ -242,8 +283,10 @@ async def generate_list_from_meal_plan(
 
     aggregated_items, needs_review = await _aggregate_recipe_items(cart_items, db)
 
-    # Load pantry for auto-checking items already in stock
-    pantry_items_db = (await db.scalars(select(PantryItem))).all()
+    # Load current user's pantry for auto-checking items already in stock
+    pantry_items_db = (await db.scalars(
+        select(PantryItem).where(PantryItem.user_id == claims.user_id)
+    )).all()
     pantry_ingredient_ids: set[int] = {p.ingredient_id for p in pantry_items_db if p.ingredient_id is not None}
     pantry_names_lower: set[str] = {p.name.strip().lower() for p in pantry_items_db}
 
@@ -254,6 +297,7 @@ async def generate_list_from_meal_plan(
     label = plan.label or week_label or f"Plan repas #{plan_id}"
 
     shopping_list = ShoppingList(
+        user_id=claims.user_id,
         label=label,
         needs_review_blob="\n".join(needs_review) if needs_review else None,
     )

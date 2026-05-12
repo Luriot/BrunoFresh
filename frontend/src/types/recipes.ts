@@ -18,7 +18,8 @@ export type RecipeListItem = {
   image_local_path: string | null;
   base_servings: number;
   prep_time_minutes: number | null;
-  is_favorite: boolean;
+  is_favorite_by_me: boolean;
+  recommenders: string[];
   tags: Tag[];
 };
 

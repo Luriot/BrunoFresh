@@ -4,9 +4,10 @@ from fastapi import FastAPI
 from starlette.requests import Request
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
+from sqlalchemy import select
 
 from .config import settings
-from .database import engine
+from .database import engine, SessionLocal
 from .models import (
     Ingredient,
     Recipe,
@@ -15,8 +16,10 @@ from .models import (
     ShoppingList,
     ShoppingListItem,
     ShoppingListRecipe,
+    User,
 )
-from .services.auth import verify_passcode
+from .services.auth import verify_password
+from .services.rate_limiter import check_rate_limit, clear_rate_limit
 
 
 class AdminAuth(AuthenticationBackend):
@@ -24,15 +27,24 @@ class AdminAuth(AuthenticationBackend):
         super().__init__(secret_key=secret_key)
 
     async def login(self, request: Request) -> bool:
+        client_ip = request.client.host if request.client else "unknown"
+        try:
+            check_rate_limit(client_ip)
+        except Exception:
+            return False
+
         form = await request.form()
         username = str(form.get("username", "")).strip()
         password = str(form.get("password", ""))
 
-        if username != settings.admin_username:
-            return False
-        if not verify_passcode(password):
+        async with SessionLocal() as db:
+            user = await db.scalar(
+                select(User).where(User.username == username, User.role == "admin")
+            )
+        if not user or not verify_password(password, user.hashed_password):
             return False
 
+        clear_rate_limit(client_ip)
         request.session.update({"admin": True})
         return True
 

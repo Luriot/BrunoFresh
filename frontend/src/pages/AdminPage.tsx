@@ -4,12 +4,21 @@ import { IngredientsTab } from "./admin/IngredientsTab";
 import { TagsTab } from "./admin/TagsTab";
 import { DatabaseTab } from "./admin/DatabaseTab";
 import { RecipesTab } from "./admin/RecipesTab";
+import type { User } from "../types";
 
 type AdminTab = "ingredients" | "tags" | "database" | "recipes";
 
-export function AdminPage() {
+export function AdminPage({ user }: Readonly<{ user: User }>) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<AdminTab>("ingredients");
+
+  if (user.role !== "admin") {
+    return (
+      <main className="mx-auto max-w-5xl px-4 pb-10 pt-4 sm:px-6 lg:px-8">
+        <p className="text-red-600 dark:text-red-400">{t("admin.forbidden")}</p>
+      </main>
+    );
+  }
 
   const TABS: { key: AdminTab; label: string }[] = [
     { key: "ingredients", label: t("admin.tabs.ingredients") },

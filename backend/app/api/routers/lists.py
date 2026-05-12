@@ -17,6 +17,8 @@ from ...schemas import (
     ShoppingListRecipeOut,
     ShoppingListSummaryOut,
 )
+from ..dependencies import require_auth
+from ...services.auth import UserClaims
 
 router = APIRouter(prefix="/api", tags=["lists"])
 
@@ -55,15 +57,22 @@ def _list_to_response(entity: ShoppingList) -> ShoppingListOut:
 
 
 @router.post("/lists", response_model=ShoppingListOut)
-async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSession = Depends(get_db)):
+async def create_shopping_list(
+    payload: ShoppingListCreateRequest,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
     aggregated_items, needs_review = await _aggregate_recipe_items(payload.items, db)
 
-    # Load pantry for auto-checking items already in stock
-    pantry_items = (await db.scalars(select(PantryItem))).all()
+    # Load current user's pantry for auto-checking items already in stock
+    pantry_items = (await db.scalars(
+        select(PantryItem).where(PantryItem.user_id == claims.user_id)
+    )).all()
     pantry_ingredient_ids: set[int] = {p.ingredient_id for p in pantry_items if p.ingredient_id is not None}
     pantry_names_lower: set[str] = {p.name.strip().lower() for p in pantry_items}
 
     shopping_list = ShoppingList(
+        user_id=claims.user_id,
         label=payload.label,
         needs_review_blob="\n".join(needs_review) if needs_review else None,
     )
@@ -136,6 +145,7 @@ async def create_shopping_list(payload: ShoppingListCreateRequest, db: AsyncSess
 async def list_shopping_lists(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     # Use aggregated counts instead of loading all items into memory
@@ -151,6 +161,7 @@ async def list_shopping_lists(
                 ).label("already_owned_items"),
             )
             .outerjoin(ShoppingListItem, ShoppingListItem.shopping_list_id == ShoppingList.id)
+            .where(ShoppingList.user_id == claims.user_id)
             .group_by(ShoppingList.id)
             .order_by(ShoppingList.created_at.desc())
             .offset(offset)
@@ -171,14 +182,18 @@ async def list_shopping_lists(
 
 
 @router.get("/lists/{list_id}", response_model=ShoppingListOut)
-async def get_shopping_list(list_id: int, db: AsyncSession = Depends(get_db)):
+async def get_shopping_list(
+    list_id: int,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
     entity = await db.scalar(
         select(ShoppingList)
         .options(
             selectinload(ShoppingList.items),
             selectinload(ShoppingList.recipe_links).selectinload(ShoppingListRecipe.recipe),
         )
-        .where(ShoppingList.id == list_id)
+        .where(ShoppingList.id == list_id, ShoppingList.user_id == claims.user_id)
     )
     if not entity:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
@@ -189,6 +204,7 @@ async def get_shopping_list(list_id: int, db: AsyncSession = Depends(get_db)):
 async def patch_shopping_list(
     list_id: int,
     payload: ShoppingListPatch,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     entity = await db.scalar(
@@ -197,7 +213,7 @@ async def patch_shopping_list(
             selectinload(ShoppingList.items),
             selectinload(ShoppingList.recipe_links).selectinload(ShoppingListRecipe.recipe),
         )
-        .where(ShoppingList.id == list_id)
+        .where(ShoppingList.id == list_id, ShoppingList.user_id == claims.user_id)
     )
     if not entity:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
@@ -214,7 +230,7 @@ async def patch_shopping_list(
             selectinload(ShoppingList.items),
             selectinload(ShoppingList.recipe_links).selectinload(ShoppingListRecipe.recipe),
         )
-        .where(ShoppingList.id == list_id)
+        .where(ShoppingList.id == list_id, ShoppingList.user_id == claims.user_id)
     )
     if not entity:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
@@ -222,8 +238,14 @@ async def patch_shopping_list(
 
 
 @router.delete("/lists/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_shopping_list(list_id: int, db: AsyncSession = Depends(get_db)):
-    entity = await db.scalar(select(ShoppingList).where(ShoppingList.id == list_id))
+async def delete_shopping_list(
+    list_id: int,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    entity = await db.scalar(
+        select(ShoppingList).where(ShoppingList.id == list_id, ShoppingList.user_id == claims.user_id)
+    )
     if not entity:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
 

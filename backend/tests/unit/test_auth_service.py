@@ -12,9 +12,11 @@ import pytest
 from app.config import settings
 from app.services.auth import (
     TOKEN_VERSION,
+    UserClaims,
+    hash_password,
     issue_access_token,
     verify_access_token,
-    verify_passcode,
+    verify_password,
 )
 
 
@@ -41,15 +43,17 @@ def _valid_payload(
     *,
     iat_offset: int = 0,
     exp_offset: int = 3600,
-    scope: str = "api",
     ver: int = TOKEN_VERSION,
+    sub: int = 1,
+    role: str = "user",
 ) -> dict:
     now = int(datetime.now(tz=UTC).timestamp())
     return {
         "ver": ver,
         "iat": now + iat_offset,
         "exp": now + exp_offset,
-        "scope": scope,
+        "sub": sub,
+        "role": role,
     }
 
 
@@ -57,97 +61,120 @@ def _valid_payload(
 
 class TestIssueAccessToken:
     def test_returns_string_with_one_dot(self):
-        token = issue_access_token()
+        token = issue_access_token(user_id=1, role="user")
         assert isinstance(token, str)
         parts = token.split(".")
         assert len(parts) == 2, "Token must have exactly one '.' separator"
 
     def test_issued_token_is_valid(self):
-        token = issue_access_token()
-        assert verify_access_token(token) is True
+        token = issue_access_token(user_id=1, role="user")
+        claims = verify_access_token(token)
+        assert isinstance(claims, UserClaims)
+        assert claims.user_id == 1
+        assert claims.role == "user"
+
+    def test_admin_role_preserved_in_token(self):
+        token = issue_access_token(user_id=42, role="admin")
+        claims = verify_access_token(token)
+        assert isinstance(claims, UserClaims)
+        assert claims.user_id == 42
+        assert claims.role == "admin"
 
     def test_two_tokens_differ(self):
         """Tokens issued at different moments must differ (different timestamps)."""
         import time
-        t1 = issue_access_token()
+        t1 = issue_access_token(user_id=1, role="user")
         time.sleep(0.01)
-        t2 = issue_access_token()
-        # They differ when issued at different seconds; acceptable if same second
-        # Just assert both are valid.
-        assert verify_access_token(t1)
-        assert verify_access_token(t2)
+        t2 = issue_access_token(user_id=1, role="user")
+        assert verify_access_token(t1) is not None
+        assert verify_access_token(t2) is not None
 
 
 # ── verify_access_token ───────────────────────────────────────────────────────
 
 class TestVerifyAccessToken:
     def test_valid_token(self):
-        token = issue_access_token()
-        assert verify_access_token(token) is True
+        token = issue_access_token(user_id=1, role="user")
+        claims = verify_access_token(token)
+        assert isinstance(claims, UserClaims)
 
-    def test_empty_string_returns_false(self):
-        assert verify_access_token("") is False
+    def test_empty_string_returns_none(self):
+        assert verify_access_token("") is None
 
-    def test_none_returns_false(self):
-        assert verify_access_token(None) is False  # type: ignore[arg-type]
+    def test_none_returns_none(self):
+        assert verify_access_token(None) is None  # type: ignore[arg-type]
 
-    def test_token_too_long_returns_false(self):
-        assert verify_access_token("a" * 4097) is False
+    def test_token_too_long_returns_none(self):
+        assert verify_access_token("a" * 4097) is None
 
-    def test_no_dot_separator_returns_false(self):
-        assert verify_access_token("nodottokenvalue") is False
+    def test_no_dot_separator_returns_none(self):
+        assert verify_access_token("nodottokenvalue") is None
 
-    def test_tampered_payload_returns_false(self):
-        token = issue_access_token()
+    def test_tampered_payload_returns_none(self):
+        token = issue_access_token(user_id=1, role="user")
         payload_b64, sig_b64 = token.split(".")
-        # Flip one character in payload
         chars = list(payload_b64)
         chars[0] = "A" if chars[0] != "A" else "B"
         tampered = "".join(chars) + "." + sig_b64
-        assert verify_access_token(tampered) is False
+        assert verify_access_token(tampered) is None
 
-    def test_tampered_signature_returns_false(self):
-        token = issue_access_token()
+    def test_tampered_signature_returns_none(self):
+        token = issue_access_token(user_id=1, role="user")
         payload_b64, sig_b64 = token.split(".")
         chars = list(sig_b64)
         chars[0] = "A" if chars[0] != "A" else "B"
         tampered = payload_b64 + "." + "".join(chars)
-        assert verify_access_token(tampered) is False
+        assert verify_access_token(tampered) is None
 
-    def test_expired_token_returns_false(self):
-        payload = _valid_payload(iat_offset=-7200, exp_offset=-3600)  # expired 1h ago
+    def test_expired_token_returns_none(self):
+        payload = _valid_payload(iat_offset=-7200, exp_offset=-3600)
         token = _build_token(payload)
-        assert verify_access_token(token) is False
+        assert verify_access_token(token) is None
 
-    def test_future_iat_returns_false(self):
-        payload = _valid_payload(iat_offset=3600)  # issued 1h in the future
+    def test_future_iat_returns_none(self):
+        payload = _valid_payload(iat_offset=3600)
         token = _build_token(payload)
-        assert verify_access_token(token) is False
+        assert verify_access_token(token) is None
 
-    def test_wrong_scope_returns_false(self):
-        payload = _valid_payload(scope="admin")
+    def test_non_int_sub_returns_none(self):
+        payload = _valid_payload(sub="not-an-int")  # type: ignore[arg-type]
         token = _build_token(payload)
-        assert verify_access_token(token) is False
+        assert verify_access_token(token) is None
 
-    def test_wrong_version_returns_false(self):
+    def test_wrong_version_returns_none(self):
         payload = _valid_payload(ver=99)
         token = _build_token(payload)
-        assert verify_access_token(token) is False
+        assert verify_access_token(token) is None
 
-    def test_exp_equals_iat_returns_false(self):
+    def test_exp_equals_iat_returns_none(self):
         payload = _valid_payload(iat_offset=0, exp_offset=0)
         token = _build_token(payload)
-        assert verify_access_token(token) is False
+        assert verify_access_token(token) is None
+
+    def test_extra_dot_in_token_returns_none(self):
+        """A token with multiple dots must be rejected (maxsplit=1 guard)."""
+        token = issue_access_token(user_id=1, role="user")
+        assert verify_access_token(token + ".extra") is None
 
 
-# ── verify_passcode ───────────────────────────────────────────────────────────
+# ── hash_password / verify_password ─────────────────────────────────────────
 
-class TestVerifyPasscode:
-    def test_correct_passcode_returns_true(self):
-        assert verify_passcode(settings.app_passcode) is True
+class TestPasswordHashing:
+    def test_hash_is_not_plain(self):
+        assert hash_password("secret") != "secret"
 
-    def test_wrong_passcode_returns_false(self):
-        assert verify_passcode("definitely-wrong-passcode") is False
+    def test_verify_correct_password(self):
+        h = hash_password("mypassword")
+        assert verify_password("mypassword", h) is True
 
-    def test_empty_passcode_returns_false(self):
-        assert verify_passcode("") is False
+    def test_verify_wrong_password(self):
+        h = hash_password("mypassword")
+        assert verify_password("wrong", h) is False
+
+    def test_verify_empty_password(self):
+        h = hash_password("mypassword")
+        assert verify_password("", h) is False
+
+    def test_two_hashes_differ(self):
+        """bcrypt uses random salt — same plain must produce different hashes."""
+        assert hash_password("same") != hash_password("same")

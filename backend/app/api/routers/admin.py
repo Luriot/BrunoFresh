@@ -31,11 +31,11 @@ from ...schemas import (
     TopRecipeStat,
 )
 from ...services.dedupe import similarity_score
-from ..dependencies import require_auth
+from ..dependencies import require_admin
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
 @router.get("/db/export")

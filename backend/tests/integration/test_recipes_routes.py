@@ -77,13 +77,12 @@ async def test_get_recipe_not_found(client):
 async def test_patch_recipe_favorite(client):
     create_resp = await client.post("/api/recipes", json={"title": "Patchable Recipe"})
     recipe_id = create_resp.json()["id"]
-    assert create_resp.json()["is_favorite"] is False
+    assert create_resp.json()["is_favorite_by_me"] is False
 
-    patch_resp = await client.patch(
-        f"/api/recipes/{recipe_id}", json={"is_favorite": True}
-    )
-    assert patch_resp.status_code == 200
-    assert patch_resp.json()["is_favorite"] is True
+    # Toggle favorite via the dedicated endpoint
+    fav_resp = await client.post(f"/api/recipes/{recipe_id}/favorite")
+    assert fav_resp.status_code == 200
+    assert fav_resp.json()["is_favorite_by_me"] is True
 
 
 # ── DELETE /api/recipes/{id} ──────────────────────────────────────────────────

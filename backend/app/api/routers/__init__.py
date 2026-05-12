@@ -10,6 +10,7 @@ from .recipes import router as recipes_router
 from .scrape import router as scrape_router
 from .tags import router as tags_router
 from .admin import router as admin_router
+from .users import router as users_router
 
 __all__ = [
     "auth_router",
@@ -24,4 +25,5 @@ __all__ = [
     "scrape_router",
     "tags_router",
     "admin_router",
+    "users_router",
 ]

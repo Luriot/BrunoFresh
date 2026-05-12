@@ -1,6 +1,7 @@
 // Barrel re-export — all existing `from "../types"` or `from "../../types"` imports
 // continue to work without any changes.
 export type { Tag } from "./tags";
+export type { User } from "./users";
 export type {
   HFSearchResult,
   RecipeListItem,

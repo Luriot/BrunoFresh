@@ -17,7 +17,8 @@ function makeEntry(
     image_local_path: null,
     base_servings: servings,
     prep_time_minutes: null,
-    is_favorite: false,
+    is_favorite_by_me: false,
+    recommenders: [],
     tags: [],
   };
   return { recipe, target_servings: servings };

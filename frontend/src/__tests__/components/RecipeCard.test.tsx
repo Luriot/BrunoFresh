@@ -6,11 +6,11 @@ import type { RecipeListItem } from "../../types";
 // Mock the API client so tests don't make real HTTP requests.
 vi.mock("../../api/client", () => ({
   buildImageUrl: (path: string) => `/images/${path}`,
-  patchRecipe: vi.fn(),
+  toggleFavorite: vi.fn(),
 }));
 
-import { patchRecipe } from "../../api/client";
-const mockPatchRecipe = vi.mocked(patchRecipe);
+import { toggleFavorite } from "../../api/client";
+const mockToggleFavorite = vi.mocked(toggleFavorite);
 
 function makeRecipe(overrides: Partial<RecipeListItem> = {}): RecipeListItem {
   return {
@@ -21,7 +21,8 @@ function makeRecipe(overrides: Partial<RecipeListItem> = {}): RecipeListItem {
     image_local_path: null,
     base_servings: 4,
     prep_time_minutes: 30,
-    is_favorite: false,
+    is_favorite_by_me: false,
+    recommenders: [],
     tags: [],
     ...overrides,
   };
@@ -95,13 +96,12 @@ describe("RecipeCard", () => {
   });
 
   it("calls onFavoriteToggled with updated recipe after favorite toggle", async () => {
-    const updated = makeRecipe({ is_favorite: true });
-    mockPatchRecipe.mockResolvedValueOnce(updated as never);
+    mockToggleFavorite.mockResolvedValueOnce({ is_favorite_by_me: true } as never);
     const onFavoriteToggled = vi.fn();
 
     render(
       <RecipeCard
-        recipe={makeRecipe({ is_favorite: false })}
+        recipe={makeRecipe({ is_favorite_by_me: false })}
         onAdd={vi.fn()}
         onFavoriteToggled={onFavoriteToggled}
       />
@@ -109,6 +109,6 @@ describe("RecipeCard", () => {
 
     fireEvent.click(screen.getByLabelText("recipe.favorite"));
     await waitFor(() => expect(onFavoriteToggled).toHaveBeenCalledOnce());
-    expect(onFavoriteToggled).toHaveBeenCalledWith(expect.objectContaining({ is_favorite: true }));
+    expect(onFavoriteToggled).toHaveBeenCalledWith(expect.objectContaining({ is_favorite_by_me: true }));
   });
 });

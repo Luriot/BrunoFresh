@@ -15,6 +15,35 @@ recipe_tags = Table(
 )
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(200))
+    role: Mapped[str] = mapped_column(String(20), default="user")
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    favorites: Mapped[list["UserFavorite"]] = relationship(
+        "UserFavorite", back_populates="user", cascade="all, delete-orphan"
+    )
+    shopping_lists: Mapped[list["ShoppingList"]] = relationship("ShoppingList", back_populates="user")
+    pantry_items: Mapped[list["PantryItem"]] = relationship("PantryItem", back_populates="user")
+    meal_plans: Mapped[list["MealPlan"]] = relationship("MealPlan", back_populates="user")
+
+
+class UserFavorite(Base):
+    __tablename__ = "user_favorites"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    recipe_id: Mapped[int] = mapped_column(ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", back_populates="favorites")
+    recipe: Mapped["Recipe"] = relationship("Recipe", back_populates="user_favorites")
+
+
 class Recipe(Base):
     __tablename__ = "recipes"
 
@@ -28,7 +57,6 @@ class Recipe(Base):
     instruction_steps_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_servings: Mapped[int] = mapped_column(Integer, default=2)
     prep_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False)
 
     recipe_ingredients: Mapped[list["RecipeIngredient"]] = relationship(
         "RecipeIngredient", back_populates="recipe", cascade="all, delete-orphan"
@@ -37,6 +65,9 @@ class Recipe(Base):
         "ShoppingListRecipe", back_populates="recipe", cascade="all, delete-orphan"
     )
     tags: Mapped[list["Tag"]] = relationship("Tag", secondary=recipe_tags, back_populates="recipes")
+    user_favorites: Mapped[list["UserFavorite"]] = relationship(
+        "UserFavorite", back_populates="recipe", cascade="all, delete-orphan"
+    )
 
 
 class Ingredient(Base):
@@ -101,6 +132,7 @@ class ShoppingList(Base):
     __tablename__ = "shopping_lists"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     label: Mapped[str | None] = mapped_column(String(160), nullable=True)
     needs_review_blob: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -108,6 +140,7 @@ class ShoppingList(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    user: Mapped["User | None"] = relationship("User", back_populates="shopping_lists")
     items: Mapped[list["ShoppingListItem"]] = relationship(
         "ShoppingListItem", back_populates="shopping_list", cascade="all, delete-orphan"
     )
@@ -164,6 +197,7 @@ class PantryItem(Base):
     __tablename__ = "pantry_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     ingredient_id: Mapped[int | None] = mapped_column(
         ForeignKey("ingredients.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -172,6 +206,7 @@ class PantryItem(Base):
     category: Mapped[str | None] = mapped_column(String(80), nullable=True)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    user: Mapped["User | None"] = relationship("User", back_populates="pantry_items")
     ingredient: Mapped["Ingredient | None"] = relationship("Ingredient")
 
 
@@ -179,10 +214,12 @@ class MealPlan(Base):
     __tablename__ = "meal_plans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     label: Mapped[str | None] = mapped_column(String(160), nullable=True)
     week_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    user: Mapped["User | None"] = relationship("User", back_populates="meal_plans")
     entries: Mapped[list["MealPlanEntry"]] = relationship(
         "MealPlanEntry", back_populates="meal_plan", cascade="all, delete-orphan"
     )

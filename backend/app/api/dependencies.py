@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 
 from ..config import settings
-from ..services.auth import verify_access_token
+from ..services.auth import UserClaims, verify_access_token
 
 
 def _extract_cookie_token(request: Request) -> str | None:
@@ -13,10 +13,21 @@ def _extract_cookie_token(request: Request) -> str | None:
     return None
 
 
-async def require_auth(request: Request) -> None:
+async def require_auth(request: Request) -> UserClaims:
     token = _extract_cookie_token(request)
-    if not token or not verify_access_token(token):
+    claims = verify_access_token(token or "")
+    if not claims:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unauthorized",
         )
+    return claims
+
+
+def require_admin(claims: UserClaims = Depends(require_auth)) -> UserClaims:
+    if claims.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden",
+        )
+    return claims

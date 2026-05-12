@@ -201,6 +201,23 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                   </div>
                 </div>
 
+                {/* Recommenders */}
+                {recipe.recommenders && recipe.recommenders.length > 0 && (
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {t("recipe.recommendedBy")}
+                    </span>
+                    {recipe.recommenders.map((name) => (
+                      <span
+                        key={name}
+                        className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent dark:bg-accent/20"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {/* Ingredients */}
                 <div className="mb-6">
                   <h3 className="mb-3 font-heading text-lg font-semibold text-ink dark:text-gray-100">

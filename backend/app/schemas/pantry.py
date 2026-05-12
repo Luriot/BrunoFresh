@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -16,6 +18,6 @@ class PantryItemOut(BaseModel):
     name_fr: str | None = None
     ingredient_id: int | None = None
     category: str | None = None
-    added_at: str
+    added_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

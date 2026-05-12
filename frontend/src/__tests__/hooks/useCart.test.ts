@@ -15,7 +15,8 @@ function makeRecipe(overrides: Partial<RecipeListItem> = {}): RecipeListItem {
     image_local_path: null,
     base_servings: 4,
     prep_time_minutes: null,
-    is_favorite: false,
+    is_favorite_by_me: false,
+    recommenders: [],
     tags: [],
     ...overrides,
   };

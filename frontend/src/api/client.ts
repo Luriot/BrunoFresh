@@ -21,6 +21,7 @@ import type {
   ShoppingListSummary,
   StatsOut,
   Tag,
+  User,
 } from "../types";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
@@ -58,17 +59,22 @@ export function buildJobStreamUrl(jobId: number): string {
   return `${API_BASE_URL}/api/jobs/${jobId}/stream`;
 }
 
-export async function loginWithPasscode(passcode: string): Promise<void> {
-  await api.post("/auth/login", { passcode });
+export async function login(username: string, password: string): Promise<User> {
+  const { data } = await api.post<User>("/auth/login", { username, password });
+  return data;
 }
 
 export async function logout(): Promise<void> {
   await api.post("/auth/logout");
 }
 
-export async function verifySession(): Promise<boolean> {
-  const { data } = await api.get<{ authenticated: boolean }>("/auth/me");
-  return Boolean(data.authenticated);
+export async function fetchMe(): Promise<User | null> {
+  try {
+    const { data } = await api.get<User>("/auth/me");
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchRecipes(params?: {
@@ -160,8 +166,13 @@ export async function deleteShoppingListItem(listId: number, itemId: number) {
 
 // ── Recipes extras ────────────────────────────────────────────────────────
 
-export async function patchRecipe(id: number, payload: { is_favorite?: boolean; instructions_text?: string; prep_time_minutes?: number }) {
+export async function patchRecipe(id: number, payload: { instructions_text?: string; prep_time_minutes?: number }) {
   const { data } = await api.patch<RecipeDetail>(`/recipes/${id}`, payload);
+  return data;
+}
+
+export async function toggleFavorite(id: number): Promise<{ is_favorite_by_me: boolean }> {
+  const { data } = await api.post<{ is_favorite_by_me: boolean }>(`/recipes/${id}/favorite`);
   return data;
 }
 

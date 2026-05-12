@@ -30,9 +30,12 @@ from app.models import (  # noqa: F401
     ShoppingListRecipe,
     ScrapeJob,
     Tag,
+    User,
+    UserFavorite,
 )
 from app.database import Base, get_db
 from app.api.dependencies import require_auth
+from app.services.auth import UserClaims, hash_password
 from app.main import app
 
 
@@ -65,13 +68,24 @@ async def db_session(test_engine):
 
 @pytest.fixture
 async def client(db_session: AsyncSession):
-    """AsyncClient with auth bypassed and DB pointing at the in-memory test DB."""
+    """AsyncClient with auth bypassed and DB pointing at the in-memory test DB.
+
+    A stub user is created first so that per-user FK constraints (pantry, favorites …)
+    work correctly with the faked UserClaims returned by _override_require_auth.
+    """
+    from app.models import User  # local to avoid circular if run standalone
+
+    stub_user = User(username="_stub_", hashed_password=hash_password("_"), role="user")
+    db_session.add(stub_user)
+    await db_session.commit()
+    await db_session.refresh(stub_user)
+    stub_user_id = stub_user.id
 
     async def _override_get_db():
         yield db_session
 
-    async def _override_require_auth():
-        pass
+    async def _override_require_auth() -> UserClaims:
+        return UserClaims(user_id=stub_user_id, role="user")
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[require_auth] = _override_require_auth

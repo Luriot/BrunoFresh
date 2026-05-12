@@ -1,6 +1,6 @@
-import type { RecipeListItem } from "../types";
+﻿import type { RecipeListItem } from "../types";
 import { useTranslation } from "react-i18next";
-import { buildImageUrl, patchRecipe } from "../api/client";
+import { buildImageUrl, toggleFavorite } from "../api/client";
 import { isSafeUrl } from "../utils/url";
 
 type Props = {
@@ -16,8 +16,8 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
   async function handleFavorite(e: React.MouseEvent) {
     e.stopPropagation();
     try {
-      const updated = await patchRecipe(recipe.id, { is_favorite: !recipe.is_favorite });
-      onFavoriteToggled?.({ ...recipe, is_favorite: updated.is_favorite });
+      const { is_favorite_by_me } = await toggleFavorite(recipe.id);
+      onFavoriteToggled?.({ ...recipe, is_favorite_by_me });
     } catch {
       // silently fail
     }
@@ -43,11 +43,11 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
         {/* Favorite button */}
         <button
           type="button"
-          aria-label={recipe.is_favorite ? t("recipe.unfavorite") : t("recipe.favorite")}
+          aria-label={recipe.is_favorite_by_me ? t("recipe.unfavorite") : t("recipe.favorite")}
           className="absolute right-2 top-2 rounded-full bg-white/80 p-1 text-gray-600 shadow transition hover:bg-white dark:bg-[#252526]/80 dark:text-gray-300 dark:hover:bg-[#252526]"
           onClick={handleFavorite}
         >
-          {recipe.is_favorite ? (
+          {recipe.is_favorite_by_me ? (
             <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
             </svg>
@@ -58,6 +58,16 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
           )}
         </button>
       </div>
+
+      {/* Recommenders bar */}
+      {recipe.recommenders.length > 0 && (
+        <div className="mb-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+          <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-5-3.87M9 20H4v-2a4 4 0 015-3.87M16 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <span>{recipe.recommenders.join(", ")}</span>
+        </div>
+      )}
 
       <h3 className="font-heading text-lg font-semibold text-ink dark:text-gray-100">{recipe.title}</h3>
       <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">{recipe.source_domain}</p>
@@ -95,7 +105,7 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
                 <circle cx="12" cy="12" r="10" />
                 <path strokeLinecap="round" d="M12 6v6l4 2" />
               </svg>
-              {recipe.prep_time_minutes} {t("recipe.minutes")}
+              {recipe.prep_time_minutes} {t("recipe.minutes")}
             </span>
           )}
         </div>
@@ -112,3 +122,4 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
     </article>
   );
 }
+
