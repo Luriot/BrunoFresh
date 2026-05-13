@@ -9,6 +9,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from pydantic import BaseModel
 from rapidfuzz import fuzz
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select, update
@@ -423,6 +424,83 @@ async def find_duplicate_recipes(
                 ))
 
     return RecipeSimilarPairsResponse(pairs=pairs)
+
+
+# ── Recipe image retry ───────────────────────────────────────────────────────
+
+class ImageRetryResult(BaseModel):
+    recipe_id: int
+    success: bool
+    image_local_path: str | None = None
+    error: str | None = None
+
+
+class BulkImageRetryResult(BaseModel):
+    retried: int
+    success: int
+    failed: list[ImageRetryResult]
+
+
+@router.post("/recipes/retry-images", response_model=BulkImageRetryResult)
+async def bulk_retry_images(db: AsyncSession = Depends(get_db)):
+    """Re-download images for all recipes that have an original URL but no local file."""
+    from ...services.images import download_image  # noqa: PLC0415
+
+    recipes = (
+        await db.scalars(
+            select(Recipe).where(
+                Recipe.image_local_path.is_(None),
+                Recipe.image_original_url.isnot(None),
+            )
+        )
+    ).all()
+
+    results: list[ImageRetryResult] = []
+    for recipe in recipes:
+        # Remove stale local file if it exists somehow
+        if recipe.image_local_path:
+            old_path = settings.images_dir / Path(recipe.image_local_path).name
+            old_path.unlink(missing_ok=True)
+            recipe.image_local_path = None
+
+        local_path = await download_image(recipe.image_original_url, recipe.id)
+        if local_path:
+            recipe.image_local_path = local_path
+            results.append(ImageRetryResult(recipe_id=recipe.id, success=True, image_local_path=local_path))
+        else:
+            results.append(ImageRetryResult(recipe_id=recipe.id, success=False, error="Download failed"))
+
+    await db.commit()
+
+    failed = [r for r in results if not r.success]
+    return BulkImageRetryResult(retried=len(results), success=len(results) - len(failed), failed=failed)
+
+
+@router.post("/recipes/{recipe_id}/retry-image", response_model=ImageRetryResult)
+async def retry_recipe_image(recipe_id: int, db: AsyncSession = Depends(get_db)):
+    """Re-download the image for a single recipe from its original URL."""
+    from ...services.images import download_image  # noqa: PLC0415
+
+    recipe = await db.get(Recipe, recipe_id)
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    if not recipe.image_original_url:
+        raise HTTPException(status_code=400, detail="Recipe has no original image URL to retry")
+
+    # Remove old local file before downloading
+    if recipe.image_local_path:
+        old_path = settings.images_dir / Path(recipe.image_local_path).name
+        old_path.unlink(missing_ok=True)
+        recipe.image_local_path = None
+
+    local_path = await download_image(recipe.image_original_url, recipe_id)
+    if local_path:
+        recipe.image_local_path = local_path
+        await db.commit()
+        return ImageRetryResult(recipe_id=recipe_id, success=True, image_local_path=local_path)
+
+    await db.commit()
+    return ImageRetryResult(recipe_id=recipe_id, success=False, error="Download failed")
 
 
 # ── Stats ────────────────────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { buildImageUrl, buildJobStreamUrl, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe } from "../../api/client";
+import { buildImageUrl, buildJobStreamUrl, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe, retryAllMissingImages, retryRecipeImage, uploadRecipeImage } from "../../api/client";
 import type { RecipeListItem, RecipeSimilarPair } from "../../types";
-import { BookOpen, Check, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, CheckCircle, Image, RefreshCw, Search, Sparkles, Trash2, Upload, XCircle } from "lucide-react";
 
 type RowStatus = { loading: boolean; msg: string; isError: boolean };
 
@@ -18,11 +18,72 @@ export function RecipesTab() {
   const [showScanPanel, setShowScanPanel] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
+  const [showImagesPanel, setShowImagesPanel] = useState(false);
+  const [imageRowStatus, setImageRowStatus] = useState<Record<number, RowStatus>>({});
+  const [bulkRetryMsg, setBulkRetryMsg] = useState<string | null>(null);
+  const [bulkRetryLoading, setBulkRetryLoading] = useState(false);
+  const uploadRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
   function setRowStatus(id: number, patch: Partial<RowStatus>) {
     setRecipeRowStatus((prev) => {
       const existing: RowStatus = prev[id] ?? { loading: false, msg: "", isError: false };
       return { ...prev, [id]: { ...existing, ...patch } };
     });
+  }
+
+  function setImgStatus(id: number, patch: Partial<RowStatus>) {
+    setImageRowStatus((prev) => {
+      const existing: RowStatus = prev[id] ?? { loading: false, msg: "", isError: false };
+      return { ...prev, [id]: { ...existing, ...patch } };
+    });
+  }
+
+  async function handleRetryImage(id: number) {
+    setImgStatus(id, { loading: true, msg: "", isError: false });
+    try {
+      const res = await retryRecipeImage(id);
+      if (res.success && res.image_local_path) {
+        setAdminRecipes((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, image_local_path: res.image_local_path } : r)),
+        );
+        setImgStatus(id, { loading: false, msg: "Image téléchargée", isError: false });
+      } else {
+        setImgStatus(id, { loading: false, msg: res.error ?? "Échec du téléchargement", isError: true });
+      }
+    } catch {
+      setImgStatus(id, { loading: false, msg: "Erreur", isError: true });
+    }
+  }
+
+  async function handleUploadImage(id: number, file: File) {
+    setImgStatus(id, { loading: true, msg: "", isError: false });
+    try {
+      const updated = await uploadRecipeImage(id, file);
+      setAdminRecipes((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, image_local_path: updated.image_local_path } : r)),
+      );
+      setImgStatus(id, { loading: false, msg: "Image mise à jour", isError: false });
+    } catch {
+      setImgStatus(id, { loading: false, msg: "Erreur lors de l'upload", isError: true });
+    }
+  }
+
+  async function handleBulkRetryImages() {
+    setBulkRetryLoading(true);
+    setBulkRetryMsg(null);
+    try {
+      const res = await retryAllMissingImages();
+      setBulkRetryMsg(`${res.success} / ${res.retried} téléchargées`);
+      if (res.success > 0) {
+        // Reload recipe list to get updated image_local_path values
+        const updated = await fetchRecipes({ limit: 1000 });
+        setAdminRecipes(updated);
+      }
+    } catch {
+      setBulkRetryMsg("Erreur lors du retry");
+    } finally {
+      setBulkRetryLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -328,6 +389,159 @@ export function RecipesTab() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      {/* Images section */}
+      <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3e3e42]">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
+            <Image className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            {t("admin.images.title")}
+          </h2>
+          <button
+            type="button"
+            onClick={() => setShowImagesPanel((v) => !v)}
+            className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+          >
+            {showImagesPanel ? t("app.close") : t("admin.images.show")}
+          </button>
+        </div>
+
+        {showImagesPanel && (
+          <div>
+            {/* Bulk retry */}
+            {(() => {
+              const canRetry = adminRecipes.some((r) => !r.image_local_path && r.image_original_url);
+              return (
+                <div className="mb-4 flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={bulkRetryLoading || !canRetry}
+                    onClick={() => void handleBulkRetryImages()}
+                    className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${bulkRetryLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+                    {t("admin.images.retryAll")}
+                  </button>
+                  {bulkRetryMsg && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{bulkRetryMsg}</span>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-[#3e3e42]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left text-xs text-gray-500 dark:bg-[#252526] dark:text-gray-400">
+                    <th className="w-12 px-3 py-2">{t("admin.images.status")}</th>
+                    <th className="px-3 py-2">{t("admin.recipes.recipes")}</th>
+                    <th className="px-3 py-2 text-right">{t("admin.recipes.actions")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-[#3e3e42]">
+                  {adminRecipes.map((recipe) => {
+                    const hasLocal = !!recipe.image_local_path;
+                    const hasUrl = !!recipe.image_original_url;
+                    const row = imageRowStatus[recipe.id];
+                    const isLoading = row?.loading ?? false;
+
+                    let statusIcon: ReactNode;
+                    let statusColor: string;
+                    let statusText: string;
+                    if (hasLocal) {
+                      statusIcon = <CheckCircle className="h-4 w-4 text-green-500" aria-hidden="true" />;
+                      statusColor = "text-green-600 dark:text-green-400";
+                      statusText = t("admin.images.statusOk");
+                    } else if (hasUrl) {
+                      statusIcon = <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden="true" />;
+                      statusColor = "text-amber-600 dark:text-amber-400";
+                      statusText = t("admin.images.statusMissing");
+                    } else {
+                      statusIcon = <XCircle className="h-4 w-4 text-red-500" aria-hidden="true" />;
+                      statusColor = "text-red-600 dark:text-red-400";
+                      statusText = t("admin.images.statusNoUrl");
+                    }
+
+                    return (
+                      <tr
+                        key={recipe.id}
+                        className="bg-white hover:bg-gray-50 dark:bg-[#1e1e1e] dark:hover:bg-[#252526]"
+                      >
+                        <td className="px-3 py-2">
+                          <div className="flex h-9 w-9 items-center justify-center">
+                            {recipe.image_local_path ? (
+                              <img
+                                src={buildImageUrl(recipe.image_local_path)}
+                                alt=""
+                                className="h-9 w-9 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-[#3e3e42]">
+                                {statusIcon}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <p className="font-medium text-ink dark:text-gray-200 line-clamp-1">{recipe.title}</p>
+                          <div className="mt-0.5 flex items-center gap-1">
+                            {statusIcon}
+                            <span className={`text-xs ${statusColor}`}>
+                              {statusText}
+                            </span>
+                          </div>
+                          {row?.msg && (
+                            <p className={`mt-0.5 text-xs ${row.isError ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>
+                              {row.msg}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {hasUrl && !hasLocal && (
+                              <button
+                                type="button"
+                                title={t("admin.images.retry")}
+                                disabled={isLoading}
+                                onClick={() => void handleRetryImage(recipe.id)}
+                                className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                              >
+                                <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+                                <span className="hidden sm:inline">{t("admin.images.retry")}</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              title={t("admin.images.upload")}
+                              disabled={isLoading}
+                              onClick={() => uploadRefs.current[recipe.id]?.click()}
+                              className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                            >
+                              <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span className="hidden sm:inline">{t("admin.images.upload")}</span>
+                            </button>
+                            <input
+                              ref={(el) => { uploadRefs.current[recipe.id] = el; }}
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="sr-only"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) void handleUploadImage(recipe.id, f);
+                                e.target.value = "";
+                              }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </section>

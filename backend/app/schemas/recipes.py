@@ -67,6 +67,7 @@ class RecipeListItem(BaseModel):
     url: str
     source_domain: str
     image_local_path: str | None
+    image_original_url: str | None = None
     base_servings: int
     prep_time_minutes: int | None
     is_favorite_by_me: bool = False

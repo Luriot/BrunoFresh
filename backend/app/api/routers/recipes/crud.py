@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, select
@@ -267,6 +268,12 @@ async def upload_recipe_image(
     ext = _IMAGE_ALLOWED[content_type]
     filename = f"recipe_{recipe_id}{ext}"
     dest = settings.images_dir / filename
+
+    # Remove any previously stored image (extension may differ)
+    if recipe.image_local_path:
+        old_file = settings.images_dir / Path(recipe.image_local_path).name
+        old_file.unlink(missing_ok=True)
+
     dest.write_bytes(data)
 
     recipe.image_local_path = f"images/{filename}"

@@ -109,6 +109,20 @@ export async function uploadRecipeImage(recipeId: number, file: File) {
   return data;
 }
 
+export async function retryRecipeImage(recipeId: number) {
+  const { data } = await api.post<{ recipe_id: number; success: boolean; image_local_path: string | null; error: string | null }>(
+    `/admin/recipes/${recipeId}/retry-image`,
+  );
+  return data;
+}
+
+export async function retryAllMissingImages() {
+  const { data } = await api.post<{ retried: number; success: number; failed: { recipe_id: number; success: boolean; error: string | null }[] }>(
+    "/admin/recipes/retry-images",
+  );
+  return data;
+}
+
 export async function queueScrape(url: string, force = false) {
   const { data } = await api.post<ScrapeResponse>("/scrape", { url, force });
   return data;

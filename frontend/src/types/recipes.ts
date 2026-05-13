@@ -21,6 +21,7 @@ export type RecipeListItem = {
   url: string;
   source_domain: string;
   image_local_path: string | null;
+  image_original_url: string | null;
   base_servings: number;
   prep_time_minutes: number | null;
   is_favorite_by_me: boolean;
@@ -44,7 +45,6 @@ export type InstructionStep = {
 };
 
 export type RecipeDetail = RecipeListItem & {
-  image_original_url: string | null;
   instructions_text: string | null;
   prep_time_minutes: number | null;
   ingredients: RecipeIngredientOut[];
