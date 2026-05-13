@@ -1,5 +1,10 @@
 import type { Tag } from "./tags";
 
+export type Recommender = {
+  username: string;
+  avatar_url: string | null;
+};
+
 export type HFSearchResult = {
   id: string;
   name: string;
@@ -19,7 +24,7 @@ export type RecipeListItem = {
   base_servings: number;
   prep_time_minutes: number | null;
   is_favorite_by_me: boolean;
-  recommenders: string[];
+  recommenders: Recommender[];
   tags: Tag[];
 };
 

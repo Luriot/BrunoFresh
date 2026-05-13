@@ -8,6 +8,7 @@ import {
   fetchTags,
   setRecipeTags,
 } from "../../api/client";
+import { RecommenderAvatars } from "../RecommenderAvatars";
 import type { RecipeDetail, RecipeListItem, Tag } from "../../types";
 import { CookModeModal } from "../CookModeModal";
 import { isSafeUrl } from "../../utils/url";
@@ -207,12 +208,13 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                     <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       {t("recipe.recommendedBy")}
                     </span>
-                    {recipe.recommenders.map((name) => (
+                    <RecommenderAvatars recommenders={recipe.recommenders} size="h-7 w-7" />
+                    {recipe.recommenders.map((r) => (
                       <span
-                        key={name}
+                        key={r.username}
                         className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent dark:bg-accent/20"
                       >
-                        {name}
+                        {r.username}
                       </span>
                     ))}
                   </div>

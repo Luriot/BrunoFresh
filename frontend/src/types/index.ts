@@ -4,6 +4,7 @@ export type { Tag } from "./tags";
 export type { User } from "./users";
 export type {
   HFSearchResult,
+  Recommender,
   RecipeListItem,
   RecipeIngredientOut,
   InstructionStep,

@@ -18,6 +18,7 @@ from ....schemas import (
     RecipeListItem,
     RecipePatch,
 )
+from ....schemas.recipes import RecommenderOut
 from ....services.auth import UserClaims
 from ...dependencies import require_auth
 from .utils import _RECIPE_NOT_FOUND, _escape_like, _recipe_detail_opts, _recipe_to_detail
@@ -29,25 +30,27 @@ async def _load_favorites_data(
     recipe_ids: list[int],
     user_id: int,
     db: AsyncSession,
-) -> tuple[set[int], dict[int, list[str]]]:
+) -> tuple[set[int], dict[int, list[RecommenderOut]]]:
     """Return (user_fav_set, recommenders_map) for the given recipe_ids."""
     if not recipe_ids:
         return set(), {}
 
     rows = (
         await db.execute(
-            select(UserFavorite.recipe_id, UserFavorite.user_id, User.username)
+            select(UserFavorite.recipe_id, UserFavorite.user_id, User.username, User.avatar_url)
             .join(User, UserFavorite.user_id == User.id)
             .where(UserFavorite.recipe_id.in_(recipe_ids))
         )
     ).all()
 
     user_fav_set: set[int] = set()
-    recommenders_map: dict[int, list[str]] = defaultdict(list)
+    recommenders_map: dict[int, list[RecommenderOut]] = defaultdict(list)
     for row in rows:
         if row.user_id == user_id:
             user_fav_set.add(row.recipe_id)
-        recommenders_map[row.recipe_id].append(row.username)
+        recommenders_map[row.recipe_id].append(
+            RecommenderOut(username=row.username, avatar_url=row.avatar_url)
+        )
 
     return user_fav_set, dict(recommenders_map)
 
@@ -55,7 +58,7 @@ async def _load_favorites_data(
 def _build_list_item(
     r: Recipe,
     user_fav_set: set[int],
-    recommenders_map: dict[int, list[str]],
+    recommenders_map: dict[int, list[RecommenderOut]],
 ) -> RecipeListItem:
     from ....schemas import TagOut  # local to avoid circular import
     return RecipeListItem(

@@ -55,6 +55,11 @@ class InstructionStep(BaseModel):
     image_url: str | None = None
 
 
+class RecommenderOut(BaseModel):
+    username: str
+    avatar_url: str | None = None
+
+
 # Forward reference resolved by tags.TagOut
 class RecipeListItem(BaseModel):
     id: int
@@ -65,7 +70,7 @@ class RecipeListItem(BaseModel):
     base_servings: int
     prep_time_minutes: int | None
     is_favorite_by_me: bool = False
-    recommenders: list[str] = []
+    recommenders: list[RecommenderOut] = []
     tags: list["TagOut"] = []  # noqa: F821 — resolved at model_rebuild time
 
     model_config = ConfigDict(from_attributes=True)
@@ -82,7 +87,7 @@ class RecipeDetail(BaseModel):
     base_servings: int
     prep_time_minutes: int | None
     is_favorite_by_me: bool = False
-    recommenders: list[str] = []
+    recommenders: list[RecommenderOut] = []
     tags: list["TagOut"] = []  # noqa: F821 — resolved at model_rebuild time
     ingredients: list[RecipeIngredientOut]
     instruction_steps: list[InstructionStep] = []
