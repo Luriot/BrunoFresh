@@ -1,6 +1,6 @@
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useRef, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { createCustomRecipe } from "../api/client";
+import { createCustomRecipe, uploadRecipeImage } from "../api/client";
 import type { RecipeCreate, RecipeIngredientCreate, RecipeDetail } from "../types";
 import { UnitSelector } from "./UnitSelector";
 import { formatQty } from "../utils/format";
@@ -48,6 +48,9 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
   const [instructions, setInstructions] = useState("");
   const [servings, setServings] = useState(2);
   const [prepTime, setPrepTime] = useState<number | "">("");
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const [ingredients, setIngredients] = useState<RecipeIngredientCreate[]>([]);
   const [ingRaw, setIngRaw] = useState("");
@@ -128,7 +131,14 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
         prep_time_minutes: prepTime === "" ? null : Math.max(0, Number(prepTime)),
         ingredients: normalizedIngredients,
       };
-      const detail = await createCustomRecipe(payload);
+      let detail = await createCustomRecipe(payload);
+      if (imageFile) {
+        try {
+          detail = await uploadRecipeImage(detail.id, imageFile);
+        } catch {
+          // image upload failed non-fatally — recipe was created
+        }
+      }
       onCreated(detail);
     } catch (err: unknown) {
       console.error("Custom recipe creation failed", err);
@@ -171,6 +181,41 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
           {error && <div className="mb-4 rounded bg-red-100 p-3 text-red-700">{error}</div>}
 
           <form id="create-recipe-form" onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">{t("customRecipe.fields.image")}</label>
+              <div className="flex items-center gap-3">
+                {imagePreview && (
+                  <img src={imagePreview} alt="" className="h-16 w-16 rounded-xl object-cover shrink-0" />
+                )}
+                <label className="flex-1 cursor-pointer rounded-xl border border-dashed border-gray-300 bg-white p-3 text-center text-sm text-gray-500 hover:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-400">
+                  {imageFile ? imageFile.name : t("customRecipe.fields.imagePlaceholder")}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      setImageFile(f);
+                      if (f) {
+                        const url = URL.createObjectURL(f);
+                        setImagePreview(url);
+                      } else {
+                        setImagePreview(null);
+                      }
+                    }}
+                  />
+                </label>
+                {imageFile && (
+                  <button
+                    type="button"
+                    className="text-xs text-red-500 hover:text-red-700"
+                    onClick={() => { setImageFile(null); setImagePreview(null); }}
+                  >
+                    {t("customRecipe.actions.removeImage")}
+                  </button>
+                )}
+              </div>
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium">{t("customRecipe.fields.title")}</label>
               <input

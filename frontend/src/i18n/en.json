@@ -117,11 +117,14 @@
       "ingredients": "Ingredients",
       "ingredientName": "Ingredient Name",
       "quantity": "Qty",
-      "unit": "Unit"
+      "unit": "Unit",
+      "image": "Photo (optional)",
+      "imagePlaceholder": "Click to choose a photo (JPEG, PNG or WebP, max 10 MB)"
     },
     "actions": {
       "add": "Add",
       "remove": "Remove",
+      "removeImage": "Remove",
       "cancel": "Cancel",
       "create": "Create Recipe",
       "creating": "Creating..."

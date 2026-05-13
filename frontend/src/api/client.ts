@@ -100,6 +100,15 @@ export async function createCustomRecipe(payload: RecipeCreate) {
   return data;
 }
 
+export async function uploadRecipeImage(recipeId: number, file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await api.post<RecipeDetail>(`/recipes/${recipeId}/image`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
 export async function queueScrape(url: string, force = false) {
   const { data } = await api.post<ScrapeResponse>("/scrape", { url, force });
   return data;

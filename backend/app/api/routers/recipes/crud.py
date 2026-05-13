@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -209,11 +209,81 @@ async def create_custom_recipe(
     return _recipe_to_detail(recipe)
 
 
+# ── Recipe image upload ───────────────────────────────────────────────────────
+
+_IMAGE_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+_IMAGE_ALLOWED = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+
+
+def _check_image_magic(data: bytes, content_type: str) -> bool:
+    if content_type == "image/jpeg":
+        return data[:3] == b"\xff\xd8\xff"
+    if content_type == "image/png":
+        return data[:8] == b"\x89PNG\r\n\x1a\n"
+    if content_type == "image/webp":
+        return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
+@router.post("/recipes/{recipe_id}/image", response_model=RecipeDetail)
+async def upload_recipe_image(
+    recipe_id: int,
+    file: UploadFile = File(...),
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    from ....config import settings
+
+    recipe = await db.scalar(
+        select(Recipe).options(*_recipe_detail_opts()).where(Recipe.id == recipe_id)
+    )
+    if not recipe:
+        raise HTTPException(status_code=404, detail=_RECIPE_NOT_FOUND)
+
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type not in _IMAGE_ALLOWED:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unsupported image type. Use JPEG, PNG, or WebP.",
+        )
+
+    data = await file.read(_IMAGE_MAX_BYTES + 1)
+    if len(data) > _IMAGE_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image too large (max 10 MB).",
+        )
+
+    if not _check_image_magic(data, content_type):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="File content does not match declared type.",
+        )
+
+    ext = _IMAGE_ALLOWED[content_type]
+    filename = f"recipe_{recipe_id}{ext}"
+    dest = settings.images_dir / filename
+    dest.write_bytes(data)
+
+    recipe.image_local_path = f"images/{filename}"
+    await db.commit()
+
+    updated = await db.scalar(
+        select(Recipe).options(*_recipe_detail_opts()).where(Recipe.id == recipe_id)
+    )
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to retrieve updated recipe")
+    return _recipe_to_detail(updated)
+
+
 @router.patch("/recipes/{recipe_id}", response_model=RecipeDetail)
 async def patch_recipe(
     recipe_id: int,
     payload: RecipePatch,
-    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     recipe = await db.scalar(
