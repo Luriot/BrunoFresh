@@ -354,8 +354,9 @@
       "recipes": "Recettes"
     },
     "recipes": {
-      "title": "Toutes les recettes",
+      "title": "Récupération des recettes",
       "searchPlaceholder": "Rechercher une recette...",
+      "show": "Afficher",
       "update": "Récup. rapide",
       "updating": "Récupération...",
       "reformat": "Mise à jour complète",
@@ -370,6 +371,22 @@
       "recipes": "Recettes",
       "sources": "Sources",
       "actions": "Actions"
+    },
+    "images": {
+      "title": "Images des recettes",
+      "show": "Afficher",
+      "retryAll": "Tout re-télécharger",
+      "status": "Statut",
+      "statusOk": "Image OK",
+      "statusMissing": "URL disponible, pas d'image locale",
+      "statusNoUrl": "Aucune URL d'image",
+      "retry": "Re-télécharger",
+      "upload": "Envoyer une image",
+      "convertToWebp": "Convertir en WebP",
+      "convertResult": "{{converted}} convertie(s), {{skipped}} déjà WebP, {{failed}} échouée(s)",
+      "convertError": "Erreur lors de la conversion",
+      "selectedCount": "{{count}} sélectionnée(s)",
+      "retrySelected": "Relancer {{count}} téléchargement(s)"
     },
     "db": {
       "title": "Base de données",

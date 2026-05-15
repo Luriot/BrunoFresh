@@ -1,8 +1,8 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { buildImageUrl, buildJobStreamUrl, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe, retryAllMissingImages, retryRecipeImage, uploadRecipeImage } from "../../api/client";
+import { buildJobStreamUrl, buildThumbUrl, convertImagesToWebp, convertSingleImageToWebp, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe, retryAllMissingImages, retryRecipeImage, uploadRecipeImage } from "../../api/client";
 import type { RecipeListItem, RecipeSimilarPair } from "../../types";
-import { AlertTriangle, BookOpen, Check, CheckCircle, Image, RefreshCw, Search, Sparkles, Trash2, Upload, XCircle } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, CheckCircle, Image, RefreshCw, Search, Sparkles, Trash2, Upload, Wand2, XCircle } from "lucide-react";
 
 type RowStatus = { loading: boolean; msg: string; isError: boolean };
 
@@ -22,7 +22,11 @@ export function RecipesTab() {
   const [imageRowStatus, setImageRowStatus] = useState<Record<number, RowStatus>>({});
   const [bulkRetryMsg, setBulkRetryMsg] = useState<string | null>(null);
   const [bulkRetryLoading, setBulkRetryLoading] = useState(false);
+  const [convertWebpMsg, setConvertWebpMsg] = useState<string | null>(null);
+  const [convertWebpLoading, setConvertWebpLoading] = useState(false);
   const uploadRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const [showFetchPanel, setShowFetchPanel] = useState(true);
+  const [imgConvertStatus, setImgConvertStatus] = useState<Record<number, RowStatus>>({});
 
   function setRowStatus(id: number, patch: Partial<RowStatus>) {
     setRecipeRowStatus((prev) => {
@@ -83,6 +87,40 @@ export function RecipesTab() {
       setBulkRetryMsg("Erreur lors du retry");
     } finally {
       setBulkRetryLoading(false);
+    }
+  }
+
+  async function handleConvertToWebp() {
+    setConvertWebpLoading(true);
+    setConvertWebpMsg(null);
+    try {
+      const res = await convertImagesToWebp();
+      setConvertWebpMsg(t("admin.images.convertResult", { converted: res.converted, skipped: res.skipped, failed: res.failed }));
+      if (res.converted > 0) {
+        const updated = await fetchRecipes({ limit: 1000 });
+        setAdminRecipes(updated);
+      }
+    } catch {
+      setConvertWebpMsg(t("admin.images.convertError"));
+    } finally {
+      setConvertWebpLoading(false);
+    }
+  }
+
+  async function handleConvertSingleImage(id: number) {
+    setImgConvertStatus((prev) => ({ ...prev, [id]: { loading: true, msg: "", isError: false } }));
+    try {
+      const res = await convertSingleImageToWebp(id);
+      if (res.converted === 1 && res.image_local_path) {
+        setAdminRecipes((prev) => prev.map((r) => r.id === id ? { ...r, image_local_path: res.image_local_path! } : r));
+        setImgConvertStatus((prev) => ({ ...prev, [id]: { loading: false, msg: "→ WebP", isError: false } }));
+      } else if (res.skipped === 1) {
+        setImgConvertStatus((prev) => ({ ...prev, [id]: { loading: false, msg: "", isError: false } }));
+      } else {
+        setImgConvertStatus((prev) => ({ ...prev, [id]: { loading: false, msg: t("admin.images.convertError"), isError: true } }));
+      }
+    } catch {
+      setImgConvertStatus((prev) => ({ ...prev, [id]: { loading: false, msg: t("admin.images.convertError"), isError: true } }));
     }
   }
 
@@ -232,19 +270,30 @@ export function RecipesTab() {
 
   return (
     <>
-      <section className={selectedIds.size > 0 ? "pb-32 sm:pb-0" : ""}>
-        <h2 className="mb-4 flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
-          <BookOpen className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-          {t("admin.recipes.title")}
-        </h2>
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
+            <BookOpen className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            {t("admin.recipes.title")}
+          </h2>
+          <button
+            type="button"
+            onClick={() => setShowFetchPanel((v) => !v)}
+            className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+          >
+            {showFetchPanel ? t("app.close") : t("admin.recipes.show")}
+          </button>
+        </div>
 
-        <input
-          type="search"
-          value={recipeSearch}
-          onChange={(e) => setRecipeSearch(e.target.value)}
-          placeholder={t("admin.recipes.searchPlaceholder")}
-          className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
-        />
+        {showFetchPanel && (
+          <div className={selectedIds.size > 0 ? "pb-32 sm:pb-0" : ""}>
+            <input
+              type="search"
+              value={recipeSearch}
+              onChange={(e) => setRecipeSearch(e.target.value)}
+              placeholder={t("admin.recipes.searchPlaceholder")}
+              className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            />
 
         {selectedIds.size > 0 && (
           <div className="fixed bottom-0 inset-x-0 z-40 flex flex-col gap-2 border-t border-gray-200 bg-white px-4 pb-8 pt-3 shadow-2xl dark:border-[#3e3e42] dark:bg-[#252526] sm:static sm:inset-auto sm:z-auto sm:mb-3 sm:flex-row sm:items-center sm:rounded-xl sm:border sm:border-accent/30 sm:bg-accent/5 sm:px-3 sm:py-2 sm:shadow-none sm:dark:border-accent/20 sm:dark:bg-accent/10">
@@ -283,9 +332,9 @@ export function RecipesTab() {
         {recipesLoading ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">{t("app.loading")}</p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-[#3e3e42]">
+          <div className="max-h-[520px] overflow-y-auto overflow-x-auto rounded-2xl border border-gray-200 dark:border-[#3e3e42]">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 text-left text-xs text-gray-500 dark:bg-[#252526] dark:text-gray-400">
                   <th className="w-14 px-2 py-2">
                     <label className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg transition hover:bg-gray-200 dark:hover:bg-[#3e3e42]" aria-label={t("admin.recipes.selectAll")}>
@@ -318,7 +367,7 @@ export function RecipesTab() {
                         <div className="relative h-10 w-10">
                           {recipe.image_local_path ? (
                             <img
-                              src={buildImageUrl(recipe.image_local_path)}
+                              src={buildThumbUrl(recipe.image_local_path)}
                               alt=""
                               className="h-full w-full rounded-lg object-cover"
                             />
@@ -391,6 +440,8 @@ export function RecipesTab() {
             </table>
           </div>
         )}
+          </div>
+        )}
       </section>
 
       {/* Images section */}
@@ -411,11 +462,12 @@ export function RecipesTab() {
 
         {showImagesPanel && (
           <div>
-            {/* Bulk retry */}
+            {/* Bulk action buttons */}
             {(() => {
               const canRetry = adminRecipes.some((r) => !r.image_local_path && r.image_original_url);
+              const canConvert = adminRecipes.some((r) => r.image_local_path && !r.image_local_path.endsWith(".webp"));
               return (
-                <div className="mb-4 flex items-center gap-3">
+                <div className="mb-4 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     disabled={bulkRetryLoading || !canRetry}
@@ -428,15 +480,27 @@ export function RecipesTab() {
                   {bulkRetryMsg && (
                     <span className="text-sm text-gray-600 dark:text-gray-400">{bulkRetryMsg}</span>
                   )}
+                  <button
+                    type="button"
+                    disabled={convertWebpLoading || !canConvert}
+                    onClick={() => void handleConvertToWebp()}
+                    className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                  >
+                    <Wand2 className={`h-4 w-4 ${convertWebpLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+                    {t("admin.images.convertToWebp")}
+                  </button>
+                  {convertWebpMsg && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{convertWebpMsg}</span>
+                  )}
                 </div>
               );
             })()}
 
-            <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-[#3e3e42]">
+            <div className="max-h-[520px] overflow-y-auto overflow-x-auto rounded-2xl border border-gray-200 dark:border-[#3e3e42]">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 text-left text-xs text-gray-500 dark:bg-[#252526] dark:text-gray-400">
-                    <th className="w-12 px-3 py-2">{t("admin.images.status")}</th>
+                    <th className="w-12 px-2 py-2" />
                     <th className="px-3 py-2">{t("admin.recipes.recipes")}</th>
                     <th className="px-3 py-2 text-right">{t("admin.recipes.actions")}</th>
                   </tr>
@@ -445,22 +509,25 @@ export function RecipesTab() {
                   {adminRecipes.map((recipe) => {
                     const hasLocal = !!recipe.image_local_path;
                     const hasUrl = !!recipe.image_original_url;
+                    const isWebp = hasLocal && recipe.image_local_path!.endsWith(".webp");
                     const row = imageRowStatus[recipe.id];
+                    const convertRow = imgConvertStatus[recipe.id];
                     const isLoading = row?.loading ?? false;
+                    const isConverting = convertRow?.loading ?? false;
 
                     let statusIcon: ReactNode;
                     let statusColor: string;
                     let statusText: string;
                     if (hasLocal) {
-                      statusIcon = <CheckCircle className="h-4 w-4 text-green-500" aria-hidden="true" />;
+                      statusIcon = <CheckCircle className="h-3.5 w-3.5 text-green-500" aria-hidden="true" />;
                       statusColor = "text-green-600 dark:text-green-400";
                       statusText = t("admin.images.statusOk");
                     } else if (hasUrl) {
-                      statusIcon = <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden="true" />;
+                      statusIcon = <AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-hidden="true" />;
                       statusColor = "text-amber-600 dark:text-amber-400";
                       statusText = t("admin.images.statusMissing");
                     } else {
-                      statusIcon = <XCircle className="h-4 w-4 text-red-500" aria-hidden="true" />;
+                      statusIcon = <XCircle className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />;
                       statusColor = "text-red-600 dark:text-red-400";
                       statusText = t("admin.images.statusNoUrl");
                     }
@@ -470,32 +537,43 @@ export function RecipesTab() {
                         key={recipe.id}
                         className="bg-white hover:bg-gray-50 dark:bg-[#1e1e1e] dark:hover:bg-[#252526]"
                       >
-                        <td className="px-3 py-2">
-                          <div className="flex h-9 w-9 items-center justify-center">
-                            {recipe.image_local_path ? (
-                              <img
-                                src={buildImageUrl(recipe.image_local_path)}
-                                alt=""
-                                className="h-9 w-9 rounded-lg object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-[#3e3e42]">
-                                {statusIcon}
-                              </div>
-                            )}
-                          </div>
+                        <td className="px-2 py-2">
+                          {recipe.image_local_path ? (
+                            <img
+                              src={buildThumbUrl(recipe.image_local_path)}
+                              alt=""
+                              className="h-10 w-10 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-[#3e3e42]">
+                              {statusIcon}
+                            </div>
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           <p className="font-medium text-ink dark:text-gray-200 line-clamp-1">{recipe.title}</p>
-                          <div className="mt-0.5 flex items-center gap-1">
-                            {statusIcon}
-                            <span className={`text-xs ${statusColor}`}>
-                              {statusText}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className={`flex items-center gap-1 text-xs ${statusColor}`}>
+                              {statusIcon}{statusText}
                             </span>
+                            {hasLocal && (
+                              <span className={`flex items-center gap-1 text-xs ${
+                                isWebp ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
+                              }`}>
+                                {isWebp
+                                  ? <><CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />WebP</>                                  : <><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />Non-WebP</>
+                                }
+                              </span>
+                            )}
                           </div>
                           {row?.msg && (
                             <p className={`mt-0.5 text-xs ${row.isError ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>
                               {row.msg}
+                            </p>
+                          )}
+                          {convertRow?.msg && (
+                            <p className={`mt-0.5 text-xs ${convertRow.isError ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>
+                              {convertRow.msg}
                             </p>
                           )}
                         </td>
@@ -511,6 +589,18 @@ export function RecipesTab() {
                               >
                                 <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
                                 <span className="hidden sm:inline">{t("admin.images.retry")}</span>
+                              </button>
+                            )}
+                            {hasLocal && (
+                              <button
+                                type="button"
+                                title={t("admin.images.convertToWebp")}
+                                disabled={isWebp || isConverting}
+                                onClick={() => void handleConvertSingleImage(recipe.id)}
+                                className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                              >
+                                <Wand2 className={`h-3.5 w-3.5 ${isConverting ? "animate-spin" : ""}`} aria-hidden="true" />
+                                <span className="hidden sm:inline">WebP</span>
                               </button>
                             )}
                             <button
@@ -590,7 +680,7 @@ export function RecipesTab() {
                       <div key={recipe.id} className="flex flex-1 items-center gap-3 rounded-xl bg-white p-3 dark:bg-[#1e1e1e]">
                         {recipe.image && (
                           <img
-                            src={buildImageUrl(recipe.image)}
+                            src={buildThumbUrl(recipe.image)}
                             alt=""
                             className="h-12 w-12 rounded-lg object-cover"
                           />

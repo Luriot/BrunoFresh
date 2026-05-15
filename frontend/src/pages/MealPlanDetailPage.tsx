@@ -12,7 +12,7 @@ import {
   patchMealPlan,
   patchMealPlanEntry,
   deleteMealPlan,
-  buildImageUrl,
+  buildThumbUrl,
 } from "../api/client";
 import type { MealPlan, MealPlanEntry, RecipeListItem, ShoppingList, Tag } from "../types";
 
@@ -748,7 +748,7 @@ function RecipePickerRow({ recipe, onDragStart, onDragEnd, onTouchDragBegin }: R
     >
       {recipe.image_local_path ? (
         <img
-          src={buildImageUrl(recipe.image_local_path)}
+          src={buildThumbUrl(recipe.image_local_path)}
           alt=""
           className="h-8 w-8 flex-shrink-0 rounded-lg object-cover"
         />

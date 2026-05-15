@@ -441,6 +441,69 @@ class BulkImageRetryResult(BaseModel):
     failed: list[ImageRetryResult]
 
 
+class ConvertImagesResult(BaseModel):
+    converted: int
+    skipped: int
+    failed: int
+    image_local_path: str | None = None
+
+
+@router.post("/recipes/{recipe_id}/convert-image-to-webp", response_model=ConvertImagesResult)
+async def convert_single_recipe_image_to_webp(recipe_id: int, db: AsyncSession = Depends(get_db)):
+    """Convert one recipe's image to WebP and update its DB path."""
+    from ...services.images import migrate_to_webp  # noqa: PLC0415
+
+    recipe = await db.get(Recipe, recipe_id)
+    if not recipe or not recipe.image_local_path:
+        return ConvertImagesResult(converted=0, skipped=0, failed=1)
+    rel = Path(recipe.image_local_path)
+    if rel.suffix.lower() == ".webp":
+        return ConvertImagesResult(converted=0, skipped=1, failed=0, image_local_path=recipe.image_local_path)
+    src = settings.images_dir / rel.name
+    if not src.exists():
+        return ConvertImagesResult(converted=0, skipped=0, failed=1)
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(None, migrate_to_webp, src)
+    if result:
+        new_path = f"images/{result.name}"
+        recipe.image_local_path = new_path
+        await db.commit()
+        return ConvertImagesResult(converted=1, skipped=0, failed=0, image_local_path=new_path)
+    return ConvertImagesResult(converted=0, skipped=0, failed=1)
+
+
+@router.post("/recipes/convert-images-to-webp", response_model=ConvertImagesResult)
+async def convert_images_to_webp(db: AsyncSession = Depends(get_db)):
+    """Convert all non-WebP recipe images to WebP, update DB paths."""
+    from ...services.images import migrate_to_webp  # noqa: PLC0415
+
+    recipes = (
+        await db.scalars(select(Recipe).where(Recipe.image_local_path.isnot(None)))
+    ).all()
+
+    converted = skipped = failed = 0
+    loop = asyncio.get_running_loop()
+
+    for recipe in recipes:
+        rel = Path(recipe.image_local_path)
+        if rel.suffix.lower() == ".webp":
+            skipped += 1
+            continue
+        src = settings.images_dir / rel.name
+        if not src.exists():
+            failed += 1
+            continue
+        result = await loop.run_in_executor(None, migrate_to_webp, src)
+        if result:
+            recipe.image_local_path = f"images/{result.name}"
+            converted += 1
+        else:
+            failed += 1
+
+    await db.commit()
+    return ConvertImagesResult(converted=converted, skipped=skipped, failed=failed)
+
+
 @router.post("/recipes/retry-images", response_model=BulkImageRetryResult)
 async def bulk_retry_images(db: AsyncSession = Depends(get_db)):
     """Re-download images for all recipes that have an original URL but no local file."""
@@ -455,20 +518,17 @@ async def bulk_retry_images(db: AsyncSession = Depends(get_db)):
         )
     ).all()
 
-    results: list[ImageRetryResult] = []
-    for recipe in recipes:
-        # Remove stale local file if it exists somehow
-        if recipe.image_local_path:
-            old_path = settings.images_dir / Path(recipe.image_local_path).name
-            old_path.unlink(missing_ok=True)
-            recipe.image_local_path = None
+    sem = asyncio.Semaphore(5)
 
-        local_path = await download_image(recipe.image_original_url, recipe.id)
+    async def _retry_one(recipe: Recipe) -> ImageRetryResult:
+        async with sem:
+            local_path = await download_image(recipe.image_original_url, recipe.id)
         if local_path:
             recipe.image_local_path = local_path
-            results.append(ImageRetryResult(recipe_id=recipe.id, success=True, image_local_path=local_path))
-        else:
-            results.append(ImageRetryResult(recipe_id=recipe.id, success=False, error="Download failed"))
+            return ImageRetryResult(recipe_id=recipe.id, success=True, image_local_path=local_path)
+        return ImageRetryResult(recipe_id=recipe.id, success=False, error="Download failed")
+
+    results: list[ImageRetryResult] = list(await asyncio.gather(*(_retry_one(r) for r in recipes)))
 
     await db.commit()
 
@@ -487,9 +547,11 @@ async def retry_recipe_image(recipe_id: int, db: AsyncSession = Depends(get_db))
     if not recipe.image_original_url:
         raise HTTPException(status_code=400, detail="Recipe has no original image URL to retry")
 
-    # Remove old local file before downloading
+    # Remove old local file and its thumbnail before downloading
+    from ...services.images import thumb_path_for  # noqa: PLC0415
     if recipe.image_local_path:
         old_path = settings.images_dir / Path(recipe.image_local_path).name
+        thumb_path_for(old_path).unlink(missing_ok=True)
         old_path.unlink(missing_ok=True)
         recipe.image_local_path = None
 

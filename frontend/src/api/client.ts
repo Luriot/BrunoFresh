@@ -55,6 +55,16 @@ export function buildImageUrl(path: string): string {
   return `${API_BASE_URL}/api/images/${encodeURIComponent(fileName)}`;
 }
 
+export function buildThumbUrl(path: string): string {
+  const normalized = path.replace(/^\/+/, "");
+  const fileName = normalized.split("/").pop() || normalized;
+  const dotIndex = fileName.lastIndexOf(".");
+  const thumbName = dotIndex === -1
+    ? `${fileName}_thumb.webp`
+    : `${fileName.slice(0, dotIndex)}_thumb.webp`;
+  return `${API_BASE_URL}/api/images/${encodeURIComponent(thumbName)}`;
+}
+
 export function buildJobStreamUrl(jobId: number): string {
   return `${API_BASE_URL}/api/jobs/${jobId}/stream`;
 }
@@ -119,6 +129,20 @@ export async function retryRecipeImage(recipeId: number) {
 export async function retryAllMissingImages() {
   const { data } = await api.post<{ retried: number; success: number; failed: { recipe_id: number; success: boolean; error: string | null }[] }>(
     "/admin/recipes/retry-images",
+  );
+  return data;
+}
+
+export async function convertImagesToWebp() {
+  const { data } = await api.post<{ converted: number; skipped: number; failed: number }>(
+    "/admin/recipes/convert-images-to-webp",
+  );
+  return data;
+}
+
+export async function convertSingleImageToWebp(recipeId: number) {
+  const { data } = await api.post<{ converted: number; skipped: number; failed: number; image_local_path: string | null }>(
+    `/admin/recipes/${recipeId}/convert-image-to-webp`,
   );
   return data;
 }

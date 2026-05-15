@@ -5,7 +5,7 @@ import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
-import { buildImageUrl, toggleFavorite, searchHelloFresh } from "../api/client";
+import { buildThumbUrl, toggleFavorite, searchHelloFresh } from "../api/client";
 import { useRecipeFilters } from "../hooks/useRecipeFilters";
 import type { CartEntry } from "../hooks/useCart";
 import type { HFSearchResult, RecipeListItem } from "../types";
@@ -51,7 +51,7 @@ function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<R
     >
       <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-green-50 dark:bg-[#1e1e1e]">
         {recipe.image_local_path ? (
-          <img className="h-full w-full object-cover" src={buildImageUrl(recipe.image_local_path)} alt="" />
+          <img className="h-full w-full object-cover" src={buildThumbUrl(recipe.image_local_path)} alt="" />
         ) : (
           <div className="flex h-full items-center justify-center text-[9px] text-green-600 dark:text-gray-500">
             {t("recipe.noImage")}

@@ -354,8 +354,9 @@
       "recipes": "Recipes"
     },
     "recipes": {
-      "title": "All Recipes",
+      "title": "Recipe Fetches",
       "searchPlaceholder": "Search recipes...",
+      "show": "Show",
       "update": "Fast Fetch",
       "updating": "Fetching...",
       "reformat": "Full Update",
@@ -370,6 +371,22 @@
       "recipes": "Recipes",
       "sources": "Sources",
       "actions": "Actions"
+    },
+    "images": {
+      "title": "Recipe Images",
+      "show": "Show",
+      "retryAll": "Retry all downloads",
+      "status": "Status",
+      "statusOk": "Image OK",
+      "statusMissing": "URL available, no local image",
+      "statusNoUrl": "No image URL",
+      "retry": "Re-download",
+      "upload": "Upload image",
+      "convertToWebp": "Convert to WebP",
+      "convertResult": "{{converted}} converted, {{skipped}} already WebP, {{failed}} failed",
+      "convertError": "Conversion error",
+      "selectedCount": "{{count}} selected",
+      "retrySelected": "Retry {{count}} download(s)"
     },
     "db": {
       "title": "Database",

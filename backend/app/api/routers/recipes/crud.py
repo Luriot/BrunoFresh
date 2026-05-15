@@ -266,15 +266,21 @@ async def upload_recipe_image(
         )
 
     ext = _IMAGE_ALLOWED[content_type]
-    filename = f"recipe_{recipe_id}{ext}"
+    filename = f"recipe_{recipe_id}.webp"  # always WebP for consistent storage
     dest = settings.images_dir / filename
 
-    # Remove any previously stored image (extension may differ)
+    # Remove any previously stored image and its thumbnail (extension may differ)
     if recipe.image_local_path:
+        from ....services.images import thumb_path_for  # noqa: PLC0415
         old_file = settings.images_dir / Path(recipe.image_local_path).name
+        thumb_path_for(old_file).unlink(missing_ok=True)
         old_file.unlink(missing_ok=True)
 
     dest.write_bytes(data)
+
+    import asyncio  # noqa: PLC0415
+    from ....services.images import process_uploaded_image  # noqa: PLC0415
+    await asyncio.get_running_loop().run_in_executor(None, process_uploaded_image, dest)
 
     recipe.image_local_path = f"images/{filename}"
     await db.commit()
