@@ -15,6 +15,8 @@ function makeEntry(
     url: `https://example.com/${id}`,
     source_domain: "example.com",
     image_local_path: null,
+    image_original_url: null,
+    image_url: null,
     base_servings: servings,
     prep_time_minutes: null,
     is_favorite_by_me: false,

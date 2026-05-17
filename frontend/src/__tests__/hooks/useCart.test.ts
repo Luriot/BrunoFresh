@@ -13,6 +13,7 @@ function makeRecipe(overrides: Partial<RecipeListItem> = {}): RecipeListItem {
     url: "http://example.com/recipe",
     source_domain: "example.com",
     image_local_path: null,
+    image_original_url: null,
     image_url: null,
     base_servings: 4,
     prep_time_minutes: null,
