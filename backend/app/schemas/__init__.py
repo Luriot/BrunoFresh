@@ -58,6 +58,7 @@ from .meal_plans import (
     MealPlanSummaryOut,
     MealPlanPatch,
     MealPlanEntryPatch,
+    MealPlanQuickGenerateIn,
 )
 
 __all__ = [
@@ -78,5 +79,5 @@ __all__ = [
     "PantryItemCreate", "PantryItemOut",
     "RecipeSourceStat", "TopRecipeStat", "TopIngredientStat", "StatsOut",
     "MealPlanCreate", "MealPlanEntryCreate", "MealPlanEntryOut", "MealPlanOut",
-    "MealPlanSummaryOut", "MealPlanPatch", "MealPlanEntryPatch",
+    "MealPlanSummaryOut", "MealPlanPatch", "MealPlanEntryPatch", "MealPlanQuickGenerateIn",
 ]

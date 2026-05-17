@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..models import Ingredient, Recipe, RecipeIngredient, Tag
-from .dedupe import looks_like_duplicate, similarity_score
+from .dedupe import similarity_score
 from .images import download_image
 from .normalizer import NormalizedIngredient, normalize_ingredients_batch
 from .scraper import scrape_recipe_url

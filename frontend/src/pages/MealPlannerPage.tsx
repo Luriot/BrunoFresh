@@ -1,11 +1,13 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Wand2 } from "lucide-react";
 import {
   createMealPlan,
   deleteMealPlan,
   fetchMealPlans,
 } from "../api/client";
+import { GenerateWeekModal } from "../components/GenerateWeekModal";
 import type { MealPlanSummary, ShoppingList } from "../types";
 
 type Props = {
@@ -26,6 +28,7 @@ export function MealPlannerPage({ onListGenerated: _onListGenerated }: Readonly<
   const [plans, setPlans] = useState<MealPlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
 
   const loadPlans = useCallback(async () => {
     setLoading(true);
@@ -149,16 +152,35 @@ export function MealPlannerPage({ onListGenerated: _onListGenerated }: Readonly<
         <h1 className="font-heading text-2xl font-bold dark:text-gray-100">
           {t("mealPlanner.title")}
         </h1>
-        <button
-          type="button"
-          onClick={() => void handleCreatePlan()}
-          disabled={creating}
-          className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
-        >
-          {creating ? "..." : `+ ${t("mealPlanner.newPlanBtn")}`}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowGenerateModal(true)}
+            className="flex items-center gap-2 rounded-xl border border-accent px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/10"
+          >
+            <Wand2 className="h-4 w-4" aria-hidden="true" />
+            {t("mealPlanner.quickGenerate")}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCreatePlan()}
+            disabled={creating}
+            className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-60"
+          >
+            {creating ? "..." : `+ ${t("mealPlanner.newPlanBtn")}`}
+          </button>
+        </div>
       </div>
       {renderBody()}
+      {showGenerateModal && (
+        <GenerateWeekModal
+          onClose={() => setShowGenerateModal(false)}
+          onSuccess={(planId) => {
+            setShowGenerateModal(false);
+            navigate(`/planner/${planId}`);
+          }}
+        />
+      )}
     </main>
   );
 }

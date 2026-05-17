@@ -266,8 +266,14 @@ async def patch_shopping_list_item(
     list_id: int,
     item_id: int,
     payload: ShoppingListItemPatch,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
+    owner_check = await db.scalar(
+        select(ShoppingList.id).where(ShoppingList.id == list_id, ShoppingList.user_id == claims.user_id)
+    )
+    if not owner_check:
+        raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
     item = await db.scalar(
         select(ShoppingListItem).where(
             ShoppingListItem.id == item_id,
@@ -288,8 +294,14 @@ async def patch_shopping_list_item(
 async def delete_shopping_list_item(
     list_id: int,
     item_id: int,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
+    owner_check = await db.scalar(
+        select(ShoppingList.id).where(ShoppingList.id == list_id, ShoppingList.user_id == claims.user_id)
+    )
+    if not owner_check:
+        raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
     item = await db.scalar(
         select(ShoppingListItem).where(
             ShoppingListItem.id == item_id,
@@ -307,9 +319,12 @@ async def delete_shopping_list_item(
 async def add_custom_shopping_list_item(
     list_id: int,
     payload: ShoppingListCustomItemIn,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
-    exists = await db.scalar(select(ShoppingList.id).where(ShoppingList.id == list_id))
+    exists = await db.scalar(
+        select(ShoppingList.id).where(ShoppingList.id == list_id, ShoppingList.user_id == claims.user_id)
+    )
     if not exists:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
 

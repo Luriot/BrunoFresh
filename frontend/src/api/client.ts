@@ -1,10 +1,8 @@
 import axios from "axios";
 import type {
   CartInput,
-  CartResponse,
   HFSearchResult,
   IngredientDetail,
-  JobStatusResponse,
   MealPlan,
   MealPlanEntry,
   MealPlanSummary,
@@ -19,12 +17,11 @@ import type {
   ShoppingListCustomItemInput,
   ShoppingListItem,
   ShoppingListSummary,
-  StatsOut,
   Tag,
   User,
 } from "../types";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 let unauthorizedHandler: (() => void) | null = null;
 
@@ -148,16 +145,6 @@ export async function searchHelloFresh(query: string): Promise<HFSearchResult[]>
   return data;
 }
 
-export async function getJobStatus(jobId: number) {
-  const { data } = await api.get<JobStatusResponse>(`/jobs/${jobId}`);
-  return data;
-}
-
-export async function generateCart(items: CartInput[]) {
-  const { data } = await api.post<CartResponse>("/cart/generate", { items });
-  return data;
-}
-
 export async function createShoppingList(items: CartInput[], label?: string) {
   const { data } = await api.post<ShoppingList>("/lists", { items, label });
   return data;
@@ -268,13 +255,6 @@ export async function removePantryItem(itemId: number) {
   await api.delete(`/pantry/${itemId}`);
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────
-
-export async function fetchStats() {
-  const { data } = await api.get<StatsOut>("/admin/stats");
-  return data;
-}
-
 // ── Meal Plans ────────────────────────────────────────────────────────────
 
 export async function fetchMealPlans() {
@@ -284,6 +264,18 @@ export async function fetchMealPlans() {
 
 export async function createMealPlan(payload: { label?: string; week_start_date?: string }) {
   const { data } = await api.post<MealPlan>("/meal-plans", payload);
+  return data;
+}
+
+export async function generateQuickWeekPlan(payload: {
+  tag_id: number;
+  label?: string;
+  week_start_date?: string;
+  meal_slot?: string;
+  days?: number;
+  target_servings?: number;
+}) {
+  const { data } = await api.post<MealPlan>("/meal-plans/quick-generate", payload);
   return data;
 }
 

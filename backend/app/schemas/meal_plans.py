@@ -54,3 +54,12 @@ class MealPlanPatch(BaseModel):
 
 class MealPlanEntryPatch(BaseModel):
     target_servings: int = Field(ge=1, le=20)
+
+
+class MealPlanQuickGenerateIn(BaseModel):
+    tag_id: int
+    label: str | None = Field(default=None, max_length=160)
+    week_start_date: date | None = None
+    meal_slot: str | None = Field(default="dinner", max_length=40)
+    days: int = Field(default=7, ge=1, le=14)
+    target_servings: int = Field(default=2, ge=1, le=20)

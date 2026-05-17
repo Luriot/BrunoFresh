@@ -1,3 +1,4 @@
+import random
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,7 +8,8 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
-from ...models import MealPlan, MealPlanEntry, PantryItem, Recipe, ShoppingList, ShoppingListItem, ShoppingListRecipe
+from ...models import MealPlan, MealPlanEntry, PantryItem, Recipe, ShoppingList, ShoppingListItem, ShoppingListRecipe, Tag, UserFavorite
+from ...models import recipe_tags as recipe_tags_table
 from ...schemas import (
     CartRecipeIn,
     MealPlanCreate,
@@ -16,6 +18,7 @@ from ...schemas import (
     MealPlanEntryPatch,
     MealPlanOut,
     MealPlanPatch,
+    MealPlanQuickGenerateIn,
     MealPlanSummaryOut,
     ShoppingListOut,
 )
@@ -112,6 +115,72 @@ async def create_meal_plan(
     await db.refresh(plan)
     plan = await db.scalar(
         select(MealPlan).options(selectinload(MealPlan.entries)).where(MealPlan.id == plan.id)
+    )
+    return _plan_to_out(plan)
+
+
+@router.post("/meal-plans/quick-generate", response_model=MealPlanOut, status_code=status.HTTP_201_CREATED)
+async def quick_generate_meal_plan(
+    payload: MealPlanQuickGenerateIn,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a meal plan pre-filled with random recipes from a tag (favorites first)."""
+    tag = await db.get(Tag, payload.tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+
+    # Load all recipes that have this tag
+    recipes = (
+        await db.scalars(
+            select(Recipe)
+            .join(recipe_tags_table, recipe_tags_table.c.recipe_id == Recipe.id)
+            .where(recipe_tags_table.c.tag_id == payload.tag_id)
+            .limit(1000)
+        )
+    ).all()
+
+    if recipes:
+        recipe_ids = [r.id for r in recipes]
+        fav_ids = set(
+            (
+                await db.scalars(
+                    select(UserFavorite.recipe_id).where(
+                        UserFavorite.user_id == claims.user_id,
+                        UserFavorite.recipe_id.in_(recipe_ids),
+                    )
+                )
+            ).all()
+        )
+        favs = [r for r in recipes if r.id in fav_ids]
+        non_favs = [r for r in recipes if r.id not in fav_ids]
+        random.shuffle(favs)
+        random.shuffle(non_favs)
+        selected = (favs + non_favs)[: payload.days]
+    else:
+        selected = []
+
+    plan_label = payload.label or tag.name
+    plan = MealPlan(user_id=claims.user_id, label=plan_label, week_start_date=payload.week_start_date)
+    db.add(plan)
+    await db.flush()
+
+    for day_idx, recipe in enumerate(selected):
+        db.add(
+            MealPlanEntry(
+                meal_plan_id=plan.id,
+                recipe_id=recipe.id,
+                day_of_week=day_idx,
+                meal_slot=payload.meal_slot,
+                target_servings=payload.target_servings,
+            )
+        )
+
+    await db.commit()
+    plan = await db.scalar(
+        select(MealPlan)
+        .options(selectinload(MealPlan.entries).selectinload(MealPlanEntry.recipe))
+        .where(MealPlan.id == plan.id)
     )
     return _plan_to_out(plan)
 
