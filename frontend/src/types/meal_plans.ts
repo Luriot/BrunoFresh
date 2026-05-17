@@ -2,7 +2,7 @@ export type MealPlanEntry = {
   id: number;
   recipe_id: number;
   recipe_title: string;
-  recipe_image_local_path: string | null;
+  recipe_image_url: string | null;
   day_of_week: number;
   meal_slot: string | null;
   target_servings: number;

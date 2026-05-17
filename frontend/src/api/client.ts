@@ -49,22 +49,6 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
 
-export function buildImageUrl(path: string): string {
-  const normalized = path.replace(/^\/+/, "");
-  const fileName = normalized.split("/").pop() || normalized;
-  return `${API_BASE_URL}/api/images/${encodeURIComponent(fileName)}`;
-}
-
-export function buildThumbUrl(path: string): string {
-  const normalized = path.replace(/^\/+/, "");
-  const fileName = normalized.split("/").pop() || normalized;
-  const dotIndex = fileName.lastIndexOf(".");
-  const thumbName = dotIndex === -1
-    ? `${fileName}_thumb.webp`
-    : `${fileName.slice(0, dotIndex)}_thumb.webp`;
-  return `${API_BASE_URL}/api/images/${encodeURIComponent(thumbName)}`;
-}
-
 export function buildJobStreamUrl(jobId: number): string {
   return `${API_BASE_URL}/api/jobs/${jobId}/stream`;
 }
@@ -85,6 +69,11 @@ export async function fetchMe(): Promise<User | null> {
   } catch {
     return null;
   }
+}
+
+export async function patchLanguage(language: string): Promise<User> {
+  const { data } = await api.patch<User>("/users/me/language", { language });
+  return data;
 }
 
 export async function fetchRecipes(params?: {

@@ -5,7 +5,6 @@ import {
   createMealPlan,
   deleteMealPlan,
   fetchMealPlans,
-  buildThumbUrl,
 } from "../api/client";
 import type { MealPlanSummary, ShoppingList } from "../types";
 
@@ -102,7 +101,7 @@ export function MealPlannerPage({ onListGenerated: _onListGenerated }: Readonly<
                 return imgPath ? (
                   <img
                     key={i}
-                    src={buildThumbUrl(imgPath)}
+                    src={imgPath}
                     alt=""
                     className="h-full w-full object-cover"
                   />

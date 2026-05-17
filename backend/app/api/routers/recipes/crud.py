@@ -68,6 +68,7 @@ def _build_list_item(
         url=r.url,
         source_domain=r.source_domain,
         image_local_path=r.image_local_path,
+        image_original_url=r.image_original_url,
         base_servings=r.base_servings,
         prep_time_minutes=r.prep_time_minutes,
         is_favorite_by_me=r.id in user_fav_set,
@@ -160,6 +161,7 @@ async def get_recipe(
         recipe,
         is_favorite_by_me=recipe_id in user_fav_set,
         recommenders=recommenders_map.get(recipe_id, []),
+        language=claims.language,
     )
 
 
@@ -207,7 +209,7 @@ async def create_custom_recipe(
     )
     if not recipe:
         raise HTTPException(status_code=500, detail="Failed to retrieve created recipe")
-    return _recipe_to_detail(recipe)
+    return _recipe_to_detail(recipe, language=claims.language)
 
 
 # ── Recipe image upload ───────────────────────────────────────────────────────
@@ -290,13 +292,14 @@ async def upload_recipe_image(
     )
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to retrieve updated recipe")
-    return _recipe_to_detail(updated)
+    return _recipe_to_detail(updated, language=claims.language)
 
 
 @router.patch("/recipes/{recipe_id}", response_model=RecipeDetail)
 async def patch_recipe(
     recipe_id: int,
     payload: RecipePatch,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     recipe = await db.scalar(
@@ -322,6 +325,7 @@ async def patch_recipe(
         recipe,
         is_favorite_by_me=recipe_id in user_fav_set,
         recommenders=recommenders_map.get(recipe_id, []),
+        language=claims.language,
     )
 
 

@@ -11,6 +11,7 @@ from ...config import settings
 from ...database import SessionLocal, get_db
 from ...models import Recipe, ScrapeJob
 from ...schemas import DuplicateWarningInfo, JobStatus, JobStatusResponse, ScrapeRequest, ScrapeResponse
+from ...services.images import resolve_image_url
 from ...services.events import JobEvent, job_event_bus
 from ...services.network import validate_public_http_url
 from ...services.orchestrator import DuplicateFound, persist_scraped_recipe
@@ -56,7 +57,7 @@ async def _run_scrape_job(job_id: int, force: bool = False) -> None:
                                 "similar_id": result.existing_id,
                                 "similar_title": result.existing_title,
                                 "similar_url": result.existing_url,
-                                "similar_image": result.existing_image,
+                                "similar_image": resolve_image_url(result.existing_image, result.existing_image_original_url, thumb=True),
                                 "title_score": result.title_score,
                                 "ingredient_score": result.ingredient_score,
                             },

@@ -29,6 +29,7 @@ class DuplicateFound:
     existing_title: str
     existing_url: str
     existing_image: str | None
+    existing_image_original_url: str | None
     title_score: float
     ingredient_score: float
 
@@ -202,6 +203,7 @@ async def persist_scraped_recipe(
                     existing_title=candidate.title,
                     existing_url=candidate.url,
                     existing_image=candidate.image_local_path,
+                    existing_image_original_url=candidate.image_original_url,
                     title_score=round(ts, 1),
                     ingredient_score=round(ing_s, 2),
                 )

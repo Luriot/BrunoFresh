@@ -375,7 +375,8 @@
     "images": {
       "title": "Images des recettes",
       "show": "Afficher",
-      "retryAll": "Tout re-télécharger",
+      "searchPlaceholder": "Rechercher une recette...",
+      "retryAll": "Relancer les images manquantes",
       "status": "Statut",
       "statusOk": "Image OK",
       "statusMissing": "URL disponible, pas d'image locale",

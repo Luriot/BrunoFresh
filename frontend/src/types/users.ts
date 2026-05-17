@@ -3,4 +3,5 @@ export type User = {
   username: string;
   role: "admin" | "user";
   avatar_url: string | null;
+  language: string;
 };

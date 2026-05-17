@@ -202,3 +202,18 @@ async def download_image(image_url: str | None, recipe_id: int) -> str | None:
     except Exception as exc:
         logger.error(f"Erreur lors du téléchargement de l'image de la recette {recipe_id}: {exc}", exc_info=True)
         return None
+
+
+def resolve_image_url(local_path: str | None, original_url: str | None, *, thumb: bool) -> str | None:
+    """Return a ready-to-use image URL.
+
+    Prefers the locally-cached copy (served via /api/images/); falls back to
+    the original remote URL stored at scrape time.  Returns None if neither is
+    available.
+    """
+    if local_path:
+        name = Path(local_path).name
+        if thumb:
+            return f"/api/images/{Path(name).stem}_thumb.webp"
+        return f"/api/images/{name}"
+    return original_url

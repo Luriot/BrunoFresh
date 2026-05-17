@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { User } from "../types";
 import { UserAvatar } from "./UserAvatar";
+import { patchLanguage } from "../api/client";
 
 type Props = {
   user: User;
@@ -21,6 +22,17 @@ export function Navbar({ user, onLogout, isDark, onToggleDark }: Readonly<Props>
 
   function closeMenu() {
     setIsMenuOpen(false);
+  }
+
+  async function switchLanguage(lang: string) {
+    const previous = i18n.language;
+    await i18n.changeLanguage(lang);
+    try {
+      await patchLanguage(lang);
+    } catch {
+      // Revert the UI language if the server update failed so they stay in sync.
+      await i18n.changeLanguage(previous);
+    }
   }
 
   const DarkToggle = () => (
@@ -71,14 +83,14 @@ export function Navbar({ user, onLogout, isDark, onToggleDark }: Readonly<Props>
           <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-[#3e3e42] dark:bg-[#252526]">
             <button
               className={`rounded-lg px-3 py-1 text-sm ${i18n.language === "en" ? "bg-accent text-white" : "text-gray-700 dark:text-gray-300"}`}
-              onClick={() => void i18n.changeLanguage("en")}
+              onClick={() => switchLanguage("en")}
               type="button"
             >
               {t("lang.switchToEn")}
             </button>
             <button
               className={`rounded-lg px-3 py-1 text-sm ${i18n.language === "fr" ? "bg-accent text-white" : "text-gray-700 dark:text-gray-300"}`}
-              onClick={() => void i18n.changeLanguage("fr")}
+              onClick={() => switchLanguage("fr")}
               type="button"
             >
               {t("lang.switchToFr")}
@@ -149,14 +161,14 @@ export function Navbar({ user, onLogout, isDark, onToggleDark }: Readonly<Props>
               <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-[#3e3e42] dark:bg-[#252526]">
                 <button
                   className={`rounded-lg px-3 py-1 text-sm ${i18n.language === "en" ? "bg-accent text-white" : "text-gray-700 dark:text-gray-300"}`}
-                  onClick={() => void i18n.changeLanguage("en")}
+                  onClick={() => switchLanguage("en")}
                   type="button"
                 >
                   {t("lang.switchToEn")}
                 </button>
                 <button
                   className={`rounded-lg px-3 py-1 text-sm ${i18n.language === "fr" ? "bg-accent text-white" : "text-gray-700 dark:text-gray-300"}`}
-                  onClick={() => void i18n.changeLanguage("fr")}
+                  onClick={() => switchLanguage("fr")}
                   type="button"
                 >
                   {t("lang.switchToFr")}

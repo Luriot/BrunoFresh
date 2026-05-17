@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..dependencies import require_auth
+from ..dependencies import require_auth, set_auth_cookie
 from ...config import settings
 from ...database import get_db
 from ...models import User
-from ...schemas import UserOut, UserPatch
-from ...services.auth import UserClaims, hash_password, verify_password
+from ...schemas import LanguagePatch, UserOut, UserPatch
+from ...services.auth import UserClaims, hash_password, issue_access_token, verify_password
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -98,4 +98,24 @@ async def upload_avatar(
     user.avatar_url = f"images/{filename}"
     await db.commit()
     await db.refresh(user)
+    return UserOut.model_validate(user)
+
+
+@router.patch("/me/language", response_model=UserOut)
+async def update_language(
+    payload: LanguagePatch,
+    response: Response,
+    claims: UserClaims = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+) -> UserOut:
+    user = await db.get(User, claims.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    user.language = payload.language
+    await db.commit()
+    await db.refresh(user)
+
+    # Reissue the auth cookie so the token carries the updated language.
+    token = issue_access_token(user.id, user.role, user.language)
+    set_auth_cookie(response, token)
     return UserOut.model_validate(user)

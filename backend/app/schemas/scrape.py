@@ -27,7 +27,7 @@ class DuplicateWarningInfo(BaseModel):
     id: int
     title: str
     url: str
-    image_local_path: str | None = None
+    image_url: str | None = None
     title_score: float
     ingredient_score: float
 

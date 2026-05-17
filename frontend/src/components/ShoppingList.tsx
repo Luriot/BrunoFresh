@@ -2,7 +2,6 @@ import { FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ShoppingList as ShoppingListType } from "../types";
 import { UnitSelector } from "./UnitSelector";
-import { formatQty } from "../utils/format";
 
 type CustomItemPayload = { name: string; quantity: number; unit: string };
 
@@ -15,7 +14,7 @@ type Props = {
 };
 
 export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCustomItem, onDeleteItem }: Readonly<Props>) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [customName, setCustomName] = useState("");
   const [customQty, setCustomQty] = useState<number>(1);
   const [customUnit, setCustomUnit] = useState("piece");
@@ -54,7 +53,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
       const catLabel = t(`category.${cat}`);
       lines.push(`── ${catLabel} ──`);
       for (const item of items) {
-        const name = i18n.language === "fr" && item.name_fr ? item.name_fr : item.name;
+        const name = item.display_name ?? item.name;
         lines.push(`• ${item.quantity} ${item.unit} ${name}`);
       }
     }
@@ -79,10 +78,10 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
           <li key={item.id} className="flex items-center gap-2">
             <span className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 dark:border-[#3e3e42] dark:bg-[#252526]">
               <span className="font-medium text-ink dark:text-gray-200">
-                {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
+                {item.display_name ?? item.name}
               </span>
               <span className="text-xs text-gray-600 dark:text-gray-400">
-                {formatQty(item.quantity)} {item.unit}
+                {item.quantity_display} {item.unit}
               </span>
             </span>
             {isOwnedTarget ? (
@@ -145,10 +144,10 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
           <li key={item.id} className="flex items-center gap-2">
             <span className="flex flex-1 items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 opacity-60 dark:border-[#3e3e42] dark:bg-[#1e1e1e]">
               <span className="font-medium line-through text-gray-500 dark:text-gray-500">
-                {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
+                {item.display_name ?? item.name}
               </span>
               <span className="text-xs text-gray-400 dark:text-gray-500">
-                {formatQty(item.quantity)} {item.unit}
+                {item.quantity_display} {item.unit}
               </span>
             </span>
             <button

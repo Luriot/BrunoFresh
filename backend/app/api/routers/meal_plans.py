@@ -19,6 +19,7 @@ from ...schemas import (
     MealPlanSummaryOut,
     ShoppingListOut,
 )
+from ...services.images import resolve_image_url as _resolve_image_url
 from ..dependencies import require_auth
 from ...services.auth import UserClaims
 
@@ -31,11 +32,16 @@ _DAY_NAMES = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dima
 
 
 def _entry_to_out(entry: MealPlanEntry) -> MealPlanEntryOut:
+    recipe = entry.recipe
     return MealPlanEntryOut(
         id=entry.id,
         recipe_id=entry.recipe_id,
-        recipe_title=entry.recipe.title if entry.recipe else "",
-        recipe_image_local_path=entry.recipe.image_local_path if entry.recipe else None,
+        recipe_title=recipe.title if recipe else "",
+        recipe_image_url=_resolve_image_url(
+            recipe.image_local_path if recipe else None,
+            recipe.image_original_url if recipe else None,
+            thumb=True,
+        ),
         day_of_week=entry.day_of_week,
         meal_slot=entry.meal_slot,
         target_servings=entry.target_servings,
@@ -76,7 +82,11 @@ async def list_meal_plans(
         for e in sorted(p.entries, key=lambda e: (e.day_of_week, e.id)):
             if e.recipe_id not in seen and len(images) < 4:
                 seen.add(e.recipe_id)
-                images.append(e.recipe.image_local_path if e.recipe else None)
+                images.append(_resolve_image_url(
+                    e.recipe.image_local_path if e.recipe else None,
+                    e.recipe.image_original_url if e.recipe else None,
+                    thumb=True,
+                ))
         result.append(
             MealPlanSummaryOut(
                 id=p.id,

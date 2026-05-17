@@ -10,7 +10,9 @@ export type ShoppingListItem = {
   id: number;
   name: string;
   name_fr: string | null;
+  display_name: string | null;
   quantity: number;
+  quantity_display: string;
   unit: string;
   category: string;
   is_custom: boolean;
@@ -24,6 +26,7 @@ export type ShoppingListRecipe = {
   url: string;
   source_domain: string;
   image_local_path: string | null;
+  image_url: string | null;
   target_servings: number;
 };
 

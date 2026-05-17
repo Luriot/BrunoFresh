@@ -19,6 +19,7 @@ from ...schemas import (
 )
 from ..dependencies import require_auth
 from ...services.auth import UserClaims
+from ...schemas.recipes import pick_display_name
 
 router = APIRouter(prefix="/api", tags=["lists"])
 
@@ -33,13 +34,18 @@ def _parse_needs_review(blob: str | None) -> list[str]:
 
 
 
-def _list_to_response(entity: ShoppingList) -> ShoppingListOut:
+def _list_to_response(entity: ShoppingList, language: str = "en") -> ShoppingListOut:
+    items: list[ShoppingListItemOut] = []
+    for item in sorted(entity.items, key=lambda i: i.sort_order):
+        display_name = pick_display_name(item.name, item.name_fr, language)
+        out = ShoppingListItemOut.model_validate(item).model_copy(update={"display_name": display_name})
+        items.append(out)
     return ShoppingListOut(
         id=entity.id,
         label=entity.label,
         created_at=entity.created_at,
         updated_at=entity.updated_at,
-        items=[ShoppingListItemOut.model_validate(item) for item in sorted(entity.items, key=lambda i: i.sort_order)],
+        items=items,
         recipes=[
             ShoppingListRecipeOut(
                 recipe_id=link.recipe.id,
@@ -47,6 +53,7 @@ def _list_to_response(entity: ShoppingList) -> ShoppingListOut:
                 url=link.recipe.url,
                 source_domain=link.recipe.source_domain,
                 image_local_path=link.recipe.image_local_path,
+                image_original_url=link.recipe.image_original_url,
                 target_servings=link.target_servings,
             )
             for link in sorted(entity.recipe_links, key=lambda i: i.id)
@@ -138,7 +145,7 @@ async def create_shopping_list(
     )
     if not entity:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
-    return _list_to_response(entity)
+    return _list_to_response(entity, language=claims.language)
 
 
 @router.get("/lists", response_model=list[ShoppingListSummaryOut])
@@ -197,7 +204,7 @@ async def get_shopping_list(
     )
     if not entity:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
-    return _list_to_response(entity)
+    return _list_to_response(entity, language=claims.language)
 
 
 @router.patch("/lists/{list_id}", response_model=ShoppingListOut)
@@ -234,7 +241,7 @@ async def patch_shopping_list(
     )
     if not entity:
         raise HTTPException(status_code=404, detail=_LIST_NOT_FOUND)
-    return _list_to_response(entity)
+    return _list_to_response(entity, language=claims.language)
 
 
 @router.delete("/lists/{list_id}", status_code=status.HTTP_204_NO_CONTENT)

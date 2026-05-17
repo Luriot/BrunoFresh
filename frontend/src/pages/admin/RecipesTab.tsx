@@ -1,8 +1,8 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { buildJobStreamUrl, buildThumbUrl, convertImagesToWebp, convertSingleImageToWebp, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe, retryAllMissingImages, retryRecipeImage, uploadRecipeImage } from "../../api/client";
+import { buildJobStreamUrl, convertImagesToWebp, convertSingleImageToWebp, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe, retryAllMissingImages, retryRecipeImage, uploadRecipeImage } from "../../api/client";
 import type { RecipeListItem, RecipeSimilarPair } from "../../types";
-import { AlertTriangle, BookOpen, Check, CheckCircle, Image, RefreshCw, Search, Sparkles, Trash2, Upload, Wand2, XCircle } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, CheckCircle, ChevronDown, Image, RefreshCw, Search, Sparkles, Trash2, Upload, Wand2, XCircle } from "lucide-react";
 
 type RowStatus = { loading: boolean; msg: string; isError: boolean };
 
@@ -25,7 +25,8 @@ export function RecipesTab() {
   const [convertWebpMsg, setConvertWebpMsg] = useState<string | null>(null);
   const [convertWebpLoading, setConvertWebpLoading] = useState(false);
   const uploadRefs = useRef<Record<number, HTMLInputElement | null>>({});
-  const [showFetchPanel, setShowFetchPanel] = useState(true);
+  const [showFetchPanel, setShowFetchPanel] = useState(false);
+  const [imageSearch, setImageSearch] = useState("");
   const [imgConvertStatus, setImgConvertStatus] = useState<Record<number, RowStatus>>({});
 
   function setRowStatus(id: number, patch: Partial<RowStatus>) {
@@ -271,19 +272,17 @@ export function RecipesTab() {
   return (
     <>
       <section>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
+        <button
+          type="button"
+          onClick={() => setShowFetchPanel((v) => !v)}
+          className="mb-4 flex w-full items-center justify-between rounded-xl px-1 py-1 text-left transition hover:bg-gray-50 dark:hover:bg-[#252526]"
+        >
+          <span className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
             <BookOpen className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
             {t("admin.recipes.title")}
-          </h2>
-          <button
-            type="button"
-            onClick={() => setShowFetchPanel((v) => !v)}
-            className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
-          >
-            {showFetchPanel ? t("app.close") : t("admin.recipes.show")}
-          </button>
-        </div>
+          </span>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200 ${showFetchPanel ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
 
         {showFetchPanel && (
           <div className={selectedIds.size > 0 ? "pb-32 sm:pb-0" : ""}>
@@ -365,9 +364,9 @@ export function RecipesTab() {
                         onClick={() => toggleSelect(recipe.id)}
                       >
                         <div className="relative h-10 w-10">
-                          {recipe.image_local_path ? (
+                          {recipe.image_url ? (
                             <img
-                              src={buildThumbUrl(recipe.image_local_path)}
+                              src={recipe.image_url}
                               alt=""
                               className="h-full w-full rounded-lg object-cover"
                             />
@@ -446,22 +445,27 @@ export function RecipesTab() {
 
       {/* Images section */}
       <section className="mt-8 border-t border-gray-200 pt-6 dark:border-[#3e3e42]">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
+        <button
+          type="button"
+          onClick={() => setShowImagesPanel((v) => !v)}
+          className="mb-4 flex w-full items-center justify-between rounded-xl px-1 py-1 text-left transition hover:bg-gray-50 dark:hover:bg-[#252526]"
+        >
+          <span className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
             <Image className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
             {t("admin.images.title")}
-          </h2>
-          <button
-            type="button"
-            onClick={() => setShowImagesPanel((v) => !v)}
-            className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
-          >
-            {showImagesPanel ? t("app.close") : t("admin.images.show")}
-          </button>
-        </div>
+          </span>
+          <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200 ${showImagesPanel ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
 
         {showImagesPanel && (
           <div>
+            <input
+              type="search"
+              value={imageSearch}
+              onChange={(e) => setImageSearch(e.target.value)}
+              placeholder={t("admin.images.searchPlaceholder")}
+              className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-accent dark:border-[#3e3e42] dark:bg-[#1e1e1e] dark:text-gray-200"
+            />
             {/* Bulk action buttons */}
             {(() => {
               const canRetry = adminRecipes.some((r) => !r.image_local_path && r.image_original_url);
@@ -506,7 +510,9 @@ export function RecipesTab() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-[#3e3e42]">
-                  {adminRecipes.map((recipe) => {
+                  {adminRecipes
+                    .filter((r) => !imageSearch || r.title.toLowerCase().includes(imageSearch.toLowerCase()))
+                    .map((recipe) => {
                     const hasLocal = !!recipe.image_local_path;
                     const hasUrl = !!recipe.image_original_url;
                     const isWebp = hasLocal && recipe.image_local_path!.endsWith(".webp");
@@ -538,9 +544,9 @@ export function RecipesTab() {
                         className="bg-white hover:bg-gray-50 dark:bg-[#1e1e1e] dark:hover:bg-[#252526]"
                       >
                         <td className="px-2 py-2">
-                          {recipe.image_local_path ? (
+                          {recipe.image_url ? (
                             <img
-                              src={buildThumbUrl(recipe.image_local_path)}
+                              src={recipe.image_url}
                               alt=""
                               className="h-10 w-10 rounded-lg object-cover"
                             />
@@ -591,18 +597,6 @@ export function RecipesTab() {
                                 <span className="hidden sm:inline">{t("admin.images.retry")}</span>
                               </button>
                             )}
-                            {hasLocal && (
-                              <button
-                                type="button"
-                                title={t("admin.images.convertToWebp")}
-                                disabled={isWebp || isConverting}
-                                onClick={() => void handleConvertSingleImage(recipe.id)}
-                                className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
-                              >
-                                <Wand2 className={`h-3.5 w-3.5 ${isConverting ? "animate-spin" : ""}`} aria-hidden="true" />
-                                <span className="hidden sm:inline">WebP</span>
-                              </button>
-                            )}
                             <button
                               type="button"
                               title={t("admin.images.upload")}
@@ -624,6 +618,18 @@ export function RecipesTab() {
                                 e.target.value = "";
                               }}
                             />
+                            {hasLocal && (
+                              <button
+                                type="button"
+                                title={t("admin.images.convertToWebp")}
+                                disabled={isWebp || isConverting}
+                                onClick={() => void handleConvertSingleImage(recipe.id)}
+                                className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 transition hover:bg-gray-100 disabled:opacity-50 dark:border-[#3e3e42] dark:text-gray-300 dark:hover:bg-[#2d2d30]"
+                              >
+                                <Wand2 className={`h-3.5 w-3.5 ${isConverting ? "animate-spin" : ""}`} aria-hidden="true" />
+                                <span className="hidden sm:inline">WebP</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -680,7 +686,7 @@ export function RecipesTab() {
                       <div key={recipe.id} className="flex flex-1 items-center gap-3 rounded-xl bg-white p-3 dark:bg-[#1e1e1e]">
                         {recipe.image && (
                           <img
-                            src={buildThumbUrl(recipe.image)}
+                            src={recipe.image}
                             alt=""
                             className="h-12 w-12 rounded-lg object-cover"
                           />

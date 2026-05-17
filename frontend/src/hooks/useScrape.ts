@@ -122,7 +122,7 @@ export function useScrape() {
             id: payload.similar_id!,
             title: payload.similar_title!,
             url: payload.similar_url!,
-            image_local_path: payload.similar_image ?? null,
+            image_url: payload.similar_image ?? null,
             title_score: payload.title_score ?? 0,
             ingredient_score: payload.ingredient_score ?? 0,
           });

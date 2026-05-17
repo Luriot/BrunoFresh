@@ -123,9 +123,9 @@ export function PantryPage() {
                 >
                   <div>
                     <span className="font-medium text-ink dark:text-gray-100">
-                      {i18n.language === "fr" && item.name_fr ? item.name_fr : item.name}
+                      {item.display_name ?? item.name}
                     </span>
-                    {item.name_fr && i18n.language !== "fr" && (
+                    {item.name_fr && item.display_name === item.name && (
                       <span className="ml-2 text-sm text-gray-400">({item.name_fr})</span>
                     )}
                   </div>

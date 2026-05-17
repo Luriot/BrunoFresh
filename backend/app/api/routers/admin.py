@@ -33,6 +33,7 @@ from ...schemas import (
 )
 from ...services.dedupe import similarity_score
 from ..dependencies import require_admin
+from ...services.images import resolve_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -414,11 +415,11 @@ async def find_duplicate_recipes(
                     recipe_a_id=a.id,
                     recipe_a_title=a.title,
                     recipe_a_url=a.url,
-                    recipe_a_image=a.image_local_path,
+                    recipe_a_image=resolve_image_url(a.image_local_path, a.image_original_url, thumb=True),
                     recipe_b_id=b.id,
                     recipe_b_title=b.title,
                     recipe_b_url=b.url,
-                    recipe_b_image=b.image_local_path,
+                    recipe_b_image=resolve_image_url(b.image_local_path, b.image_original_url, thumb=True),
                     title_score=round(ts, 1),
                     ingredient_score=round(ing_s, 2),
                 ))

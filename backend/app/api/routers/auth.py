@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..dependencies import require_auth
+from ..dependencies import require_auth, set_auth_cookie
 from ...config import settings
 from ...database import get_db
 from ...models import User
@@ -46,16 +46,8 @@ async def login(
         )
     clear_rate_limit(client_ip)
 
-    token = issue_access_token(user.id, user.role)
-    response.set_cookie(
-        key=settings.auth_cookie_name,
-        value=token,
-        max_age=settings.auth_token_ttl_minutes * 60,
-        httponly=True,
-        secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
-        path="/",
-    )
+    token = issue_access_token(user.id, user.role, user.language)
+    set_auth_cookie(response, token)
     return UserOut.model_validate(user)
 
 

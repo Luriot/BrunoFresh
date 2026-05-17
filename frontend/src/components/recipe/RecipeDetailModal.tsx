@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ChefHat, ExternalLink, ShoppingCart } from "lucide-react";
 import {
-  buildImageUrl,
   fetchRecipeDetail,
   fetchSimilarRecipes,
   fetchTags,
@@ -12,7 +11,6 @@ import { RecommenderAvatars } from "../RecommenderAvatars";
 import type { RecipeDetail, RecipeListItem, Tag } from "../../types";
 import { CookModeModal } from "../CookModeModal";
 import { isSafeUrl } from "../../utils/url";
-import { formatQty } from "../../utils/format";
 
 type Props = {
   recipeId: number;
@@ -21,7 +19,7 @@ type Props = {
 };
 
 export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<Props>) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -129,10 +127,10 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
           <>
             {/* Hero image — fixed height, never scrolls */}
             <div className="relative h-48 w-full shrink-0 overflow-hidden rounded-t-2xl bg-green-50 dark:bg-[#1e1e1e] sm:h-60">
-              {recipe.image_local_path ? (
+              {recipe.image_url ? (
                 <img
                   className="h-full w-full object-cover"
-                  src={buildImageUrl(recipe.image_local_path)}
+                  src={recipe.image_url}
                   alt={recipe.title}
                 />
               ) : (
@@ -235,13 +233,11 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                           <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
                           <div className="min-w-0 flex flex-wrap items-baseline gap-x-2">
                             <p className="font-medium text-ink dark:text-gray-200">
-                              {i18n.language === "fr" && ing.ingredient_name_fr
-                                ? ing.ingredient_name_fr
-                                : (ing.ingredient_name ?? ing.raw_string)}
+                              {ing.display_name ?? ing.ingredient_name ?? ing.raw_string}
                             </p>
                             {(ing.quantity != null || ing.unit) && (
                               <p className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
-                                {formatQty(ing.quantity)} {ing.unit}
+                                {ing.quantity_display} {ing.unit}
                               </p>
                             )}
                           </div>
@@ -277,9 +273,9 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                           key={s.id}
                           className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 dark:border-[#3e3e42] dark:bg-[#1e1e1e]"
                         >
-                          {s.image_local_path && (
+                          {s.image_url && (
                             <img
-                              src={buildImageUrl(s.image_local_path)}
+                              src={s.image_url}
                               alt={s.title}
                               className="h-10 w-10 rounded-lg object-cover"
                             />

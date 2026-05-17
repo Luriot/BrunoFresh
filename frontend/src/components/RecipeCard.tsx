@@ -1,6 +1,6 @@
 ﻿import type { RecipeListItem } from "../types";
 import { useTranslation } from "react-i18next";
-import { buildThumbUrl, toggleFavorite } from "../api/client";
+import { toggleFavorite } from "../api/client";
 import { isSafeUrl } from "../utils/url";
 import { RecommenderAvatars } from "./RecommenderAvatars";
 
@@ -30,10 +30,10 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
       onClick={() => onClick?.(recipe)}
     >
       <div className="relative mb-3 h-36 w-full overflow-hidden rounded-xl bg-green-50 dark:bg-[#1e1e1e]">
-        {recipe.image_local_path ? (
+        {recipe.image_url ? (
           <img
             className="h-full w-full object-cover"
-            src={buildThumbUrl(recipe.image_local_path)}
+            src={recipe.image_url}
             alt={recipe.title}
           />
         ) : (

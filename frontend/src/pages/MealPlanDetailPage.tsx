@@ -12,7 +12,6 @@ import {
   patchMealPlan,
   patchMealPlanEntry,
   deleteMealPlan,
-  buildThumbUrl,
 } from "../api/client";
 import type { MealPlan, MealPlanEntry, RecipeListItem, ShoppingList, Tag } from "../types";
 
@@ -296,7 +295,7 @@ export function MealPlanDetailPage({ onListGenerated }: Readonly<Props>) {
       id: tempIdRef.current--,
       recipe_id: recipeId,
       recipe_title: recipe?.title ?? `#${recipeId}`,
-      recipe_image_local_path: recipe?.image_local_path ?? null,
+      recipe_image_url: recipe?.image_url ?? null,
       day_of_week: day,
       meal_slot: slot,
       target_servings: 2,
@@ -746,9 +745,9 @@ function RecipePickerRow({ recipe, onDragStart, onDragEnd, onTouchDragBegin }: R
       style={{ touchAction: 'none' }}
       className="flex cursor-grab list-none items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm hover:border-accent hover:shadow-sm dark:border-[#3e3e42] dark:bg-[#252526] dark:hover:border-accent"
     >
-      {recipe.image_local_path ? (
+      {recipe.image_url ? (
         <img
-          src={buildThumbUrl(recipe.image_local_path)}
+          src={recipe.image_url}
           alt=""
           className="h-8 w-8 flex-shrink-0 rounded-lg object-cover"
         />

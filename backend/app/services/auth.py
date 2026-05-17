@@ -19,6 +19,7 @@ MAX_TOKEN_LENGTH = 4096
 class UserClaims(NamedTuple):
     user_id: int
     role: str
+    language: str = "en"
 
 
 def _b64url_encode(raw: bytes) -> str:
@@ -45,7 +46,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # ── Token issuance / verification ────────────────────────────────────────────
 
-def issue_access_token(user_id: int, role: str) -> str:
+def issue_access_token(user_id: int, role: str, language: str = "en") -> str:
     issued_at = datetime.now(tz=UTC)
     expires_at = issued_at + timedelta(minutes=settings.auth_token_ttl_minutes)
     payload = {
@@ -54,6 +55,7 @@ def issue_access_token(user_id: int, role: str) -> str:
         "exp": int(expires_at.timestamp()),
         "sub": user_id,
         "role": role,
+        "lang": language,
     }
     payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     payload_b64 = _b64url_encode(payload_json)
@@ -131,4 +133,8 @@ def verify_access_token(token: str) -> UserClaims | None:
     if not isinstance(role, str):
         return None
 
-    return UserClaims(user_id=sub, role=role)
+    lang = payload.get("lang", "en")
+    if not isinstance(lang, str) or lang not in {"en", "fr"}:
+        lang = "en"
+
+    return UserClaims(user_id=sub, role=role, language=lang)

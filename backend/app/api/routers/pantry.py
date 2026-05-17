@@ -9,6 +9,7 @@ from ...schemas import PantryItemCreate, PantryItemOut
 from ...services.normalizer import translate_ingredient_name
 from ..dependencies import require_auth
 from ...services.auth import UserClaims
+from ...schemas.recipes import pick_display_name
 
 router = APIRouter(prefix="/api", tags=["pantry"])
 
@@ -28,7 +29,13 @@ async def list_pantry(
             .order_by(PantryItem.name)
         )
     ).all()
-    return items
+    lang = claims.language
+    result: list[PantryItemOut] = []
+    for item in items:
+        display_name = pick_display_name(item.name, item.name_fr, lang)
+        out = PantryItemOut.model_validate(item).model_copy(update={"display_name": display_name})
+        result.append(out)
+    return result
 
 
 @router.post("/pantry", response_model=PantryItemOut, status_code=status.HTTP_201_CREATED)

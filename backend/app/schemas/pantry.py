@@ -16,6 +16,7 @@ class PantryItemOut(BaseModel):
     id: int
     name: str
     name_fr: str | None = None
+    display_name: str | None = None
     ingredient_id: int | None = None
     category: str | None = None
     added_at: datetime

@@ -375,7 +375,8 @@
     "images": {
       "title": "Recipe Images",
       "show": "Show",
-      "retryAll": "Retry all downloads",
+      "searchPlaceholder": "Search recipes...",
+      "retryAll": "Retry failed images",
       "status": "Status",
       "statusOk": "Image OK",
       "statusMissing": "URL available, no local image",

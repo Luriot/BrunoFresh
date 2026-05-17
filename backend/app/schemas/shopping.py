@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from .recipes import _format_qty
+from ..services.images import resolve_image_url
 
 
 class CartRecipeIn(BaseModel):
@@ -52,12 +55,18 @@ class ShoppingListItemOut(BaseModel):
     id: int
     name: str
     name_fr: str | None = None
+    display_name: str | None = None
     quantity: float
     unit: str
     category: str
     is_custom: bool
     is_already_owned: bool
     is_excluded: bool = False
+
+    @computed_field
+    @property
+    def quantity_display(self) -> str:
+        return _format_qty(self.quantity)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -75,8 +84,14 @@ class ShoppingListRecipeOut(BaseModel):
     title: str
     url: str
     source_domain: str
-    image_local_path: str | None
+    image_local_path: str | None = Field(default=None, exclude=True)
+    image_original_url: str | None = None
     target_servings: int
+
+    @computed_field
+    @property
+    def image_url(self) -> str | None:
+        return resolve_image_url(self.image_local_path, self.image_original_url, thumb=True)
 
 
 class ShoppingListOut(BaseModel):

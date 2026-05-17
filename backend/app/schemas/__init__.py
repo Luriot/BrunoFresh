@@ -5,7 +5,7 @@ All existing `from app.schemas import SomeClass` imports continue to work
 without any changes in the rest of the codebase.
 """
 from .tags import TagCreate, TagOut
-from .users import UserOut, UserPatch
+from .users import UserOut, UserPatch, LanguagePatch
 from .recipes import (
     RecipeIngredientCreate,
     RecipeCreate,

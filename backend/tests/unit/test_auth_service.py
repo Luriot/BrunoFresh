@@ -178,3 +178,41 @@ class TestPasswordHashing:
     def test_two_hashes_differ(self):
         """bcrypt uses random salt — same plain must produce different hashes."""
         assert hash_password("same") != hash_password("same")
+
+
+# ── language field in tokens ─────────────────────────────────────────────────
+
+class TestTokenLanguage:
+    def test_language_defaults_to_en(self):
+        token = issue_access_token(user_id=1, role="user")
+        claims = verify_access_token(token)
+        assert claims is not None
+        assert claims.language == "en"
+
+    def test_language_fr_survives_round_trip(self):
+        token = issue_access_token(user_id=1, role="user", language="fr")
+        claims = verify_access_token(token)
+        assert claims is not None
+        assert claims.language == "fr"
+
+    def test_language_is_in_claims_namedtuple(self):
+        token = issue_access_token(user_id=7, role="admin", language="fr")
+        claims = verify_access_token(token)
+        assert isinstance(claims, UserClaims)
+        assert claims.user_id == 7
+        assert claims.role == "admin"
+        assert claims.language == "fr"
+
+    def test_token_missing_lang_key_defaults_to_en(self):
+        """Tokens issued before the language feature was added must still verify."""
+        payload = _valid_payload()  # no "lang" key
+        token = _build_token(payload)
+        claims = verify_access_token(token)
+        assert claims is not None
+        assert claims.language == "en"
+
+    def test_language_does_not_affect_expiry_validation(self):
+        """An expired FR token must still be rejected."""
+        payload = {**_valid_payload(iat_offset=-7200, exp_offset=-3600), "lang": "fr"}
+        token = _build_token(payload)
+        assert verify_access_token(token) is None

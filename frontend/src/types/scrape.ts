@@ -2,7 +2,7 @@ export type DuplicateWarningInfo = {
   id: number;
   title: string;
   url: string;
-  image_local_path: string | null;
+  image_url: string | null;
   title_score: number;
   ingredient_score: number;
 };

@@ -3,7 +3,6 @@ import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import {
   addShoppingListCustomItem,
-  buildThumbUrl,
   createShoppingList,
   deleteShoppingList,
   deleteShoppingListItem,
@@ -17,6 +16,7 @@ import {
   patchShoppingListItem,
   setUnauthorizedHandler,
 } from "./api/client";
+import i18n from "./i18n/config";
 import { Login } from "./components/Login";
 import { Navbar } from "./components/Navbar";
 import { useCart } from "./hooks/useCart";
@@ -125,6 +125,9 @@ function App() {
       const me = await fetchMe();
       if (!canceled) {
         setUser(me);
+        if (me?.language) {
+          void i18n.changeLanguage(me.language);
+        }
       }
     }
 
@@ -139,6 +142,9 @@ function App() {
     try {
       const me = await login(username, password);
       setUser(me);
+      if (me.language) {
+        void i18n.changeLanguage(me.language);
+      }
       setAuthError(null);
     } catch {
       setAuthError(t("auth.invalidCredentials"));
@@ -329,9 +335,9 @@ function App() {
               {t("scrape.duplicateMessage")}
             </p>
             <div className="mb-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-700/30 dark:bg-amber-900/10">
-              {duplicateWarning.similarRecipe.image_local_path && (
+              {duplicateWarning.similarRecipe.image_url && (
                 <img
-                  src={buildThumbUrl(duplicateWarning.similarRecipe.image_local_path)}
+                  src={duplicateWarning.similarRecipe.image_url}
                   className="h-16 w-16 rounded-lg object-cover"
                   alt=""
                 />

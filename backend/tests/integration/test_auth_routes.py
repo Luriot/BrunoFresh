@@ -5,7 +5,7 @@ import pytest
 
 from app.config import settings
 from app.services.rate_limiter import _attempts as _login_attempts
-from app.services.auth import hash_password, issue_access_token
+from app.services.auth import hash_password, issue_access_token, verify_access_token
 from app.models import User
 
 
@@ -66,6 +66,53 @@ async def test_login_wrong_password_returns_401(anon_client, test_user):
         "/api/auth/login", json={"username": "testuser", "password": "wrong"}
     )
     assert response.status_code == 401
+
+
+# -- Language field in auth responses -----------------------------------------
+
+async def test_me_returns_language_field(anon_client, test_user):
+    """GET /api/auth/me must include the language field from the User model."""
+    token = issue_access_token(user_id=test_user.id, role=test_user.role, language="en")
+    anon_client.cookies.set(settings.auth_cookie_name, token)
+    response = await anon_client.get("/api/auth/me")
+    assert response.status_code == 200
+    data = response.json()
+    assert "language" in data
+    assert data["language"] == "en"
+
+
+async def test_login_response_includes_language(anon_client, test_user):
+    """POST /api/auth/login response body must include the language field."""
+    response = await anon_client.post(
+        "/api/auth/login", json={"username": "testuser", "password": "testpassword"}
+    )
+    assert response.status_code == 200
+    assert "language" in response.json()
+
+
+async def test_login_cookie_token_encodes_user_language(anon_client, db_session):
+    """The cookie issued on login must encode the user's stored language preference."""
+    fr_user = User(
+        username="fr_user",
+        hashed_password=hash_password("testpassword"),
+        role="user",
+        language="fr",
+    )
+    db_session.add(fr_user)
+    await db_session.commit()
+
+    response = await anon_client.post(
+        "/api/auth/login", json={"username": "fr_user", "password": "testpassword"}
+    )
+    assert response.status_code == 200
+    assert response.json()["language"] == "fr"
+
+    cookie_token = response.cookies.get(settings.auth_cookie_name)
+    assert cookie_token is not None
+    claims = verify_access_token(cookie_token)
+    assert claims is not None
+    assert claims.language == "fr"
+
 
 
 async def test_login_unknown_user_returns_401(anon_client):

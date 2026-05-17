@@ -21,7 +21,7 @@ class MealPlanEntryOut(BaseModel):
     id: int
     recipe_id: int
     recipe_title: str
-    recipe_image_local_path: str | None
+    recipe_image_url: str | None
     day_of_week: int
     meal_slot: str | None
     target_servings: int
