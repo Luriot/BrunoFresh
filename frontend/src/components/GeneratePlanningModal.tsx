@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Tag, Wand2, X } from "lucide-react";
-import { fetchTags, generateQuickWeekPlan } from "../api/client";
+import { fetchTags, generateQuickPlan } from "../api/client";
 import type { Tag as TagType } from "../types";
 
 type Props = {
@@ -16,7 +16,7 @@ function extractApiDetail(error: unknown): string | null {
   return null;
 }
 
-export function GenerateWeekModal({ onClose, onSuccess }: Readonly<Props>) {
+export function GeneratePlanningModal({ onClose, onSuccess }: Readonly<Props>) {
   const { t } = useTranslation();
 
   const [tags, setTags] = useState<TagType[]>([]);
@@ -72,7 +72,7 @@ export function GenerateWeekModal({ onClose, onSuccess }: Readonly<Props>) {
     setError(null);
     setSubmitting(true);
     try {
-      const plan = await generateQuickWeekPlan({
+      const plan = await generateQuickPlan({
         tag_id: Number(selectedTagId),
         label: planName.trim() || undefined,
         target_servings: servings,

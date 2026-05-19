@@ -7,7 +7,7 @@ import {
   deleteMealPlan,
   fetchMealPlans,
 } from "../api/client";
-import { GenerateWeekModal } from "../components/GenerateWeekModal";
+import { GeneratePlanningModal } from "../components/GeneratePlanningModal";
 import type { MealPlanSummary, ShoppingList } from "../types";
 
 type Props = {
@@ -173,7 +173,7 @@ export function MealPlannerPage({ onListGenerated: _onListGenerated }: Readonly<
       </div>
       {renderBody()}
       {showGenerateModal && (
-        <GenerateWeekModal
+        <GeneratePlanningModal
           onClose={() => setShowGenerateModal(false)}
           onSuccess={(planId) => {
             setShowGenerateModal(false);

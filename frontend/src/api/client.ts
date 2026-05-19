@@ -267,7 +267,7 @@ export async function createMealPlan(payload: { label?: string; week_start_date?
   return data;
 }
 
-export async function generateQuickWeekPlan(payload: {
+export async function generateQuickPlan(payload: {
   tag_id: number;
   label?: string;
   week_start_date?: string;
