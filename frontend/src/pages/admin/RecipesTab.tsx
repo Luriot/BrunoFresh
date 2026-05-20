@@ -2,9 +2,15 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { buildJobStreamUrl, convertImagesToWebp, convertSingleImageToWebp, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe, retryAllMissingImages, retryRecipeImage, uploadRecipeImage } from "../../api/client";
 import type { RecipeListItem, RecipeSimilarPair } from "../../types";
-import { AlertTriangle, BookOpen, Check, CheckCircle, ChevronDown, Image, RefreshCw, Search, Sparkles, Trash2, Upload, Wand2, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, BookOpen, Check, CheckCircle, ChevronDown, ChevronsUpDown, Image, RefreshCw, Search, Sparkles, Trash2, Upload, Wand2, XCircle } from "lucide-react";
 
 type RowStatus = { loading: boolean; msg: string; isError: boolean };
+
+function SortIcon({ active, order }: Readonly<{ active: boolean; order: "asc" | "desc" }>) {
+  if (!active) return <ChevronsUpDown className="h-3 w-3 opacity-50" aria-hidden="true" />;
+  if (order === "asc") return <ArrowUp className="h-3 w-3" aria-hidden="true" />;
+  return <ArrowDown className="h-3 w-3" aria-hidden="true" />;
+}
 
 export function RecipesTab() {
   const { t } = useTranslation();
@@ -12,6 +18,8 @@ export function RecipesTab() {
   const [recipesLoading, setRecipesLoading] = useState(false);
   const [recipeSearch, setRecipeSearch] = useState("");
   const [recipeRowStatus, setRecipeRowStatus] = useState<Record<number, RowStatus>>({});
+  const [recipeSortBy, setRecipeSortBy] = useState<"title" | "source" | null>(null);
+  const [recipeSortOrder, setRecipeSortOrder] = useState<"asc" | "desc">("asc");
 
   const [recipePairs, setRecipePairs] = useState<RecipeSimilarPair[]>([]);
   const [scanLoading, setScanLoading] = useState(false);
@@ -240,6 +248,25 @@ export function RecipesTab() {
     r.source_domain.toLowerCase().includes(recipeSearch.toLowerCase()),
   );
 
+  function handleRecipeSortClick(field: "title" | "source") {
+    if (recipeSortBy === field) {
+      if (recipeSortOrder === "asc") setRecipeSortOrder("desc");
+      else { setRecipeSortBy(null); setRecipeSortOrder("asc"); }
+    } else {
+      setRecipeSortBy(field);
+      setRecipeSortOrder("asc");
+    }
+  }
+
+  const sortedRecipes = recipeSortBy
+    ? [...filteredAdminRecipes].sort((a, b) => {
+        const va = recipeSortBy === "title" ? a.title : a.source_domain;
+        const vb = recipeSortBy === "title" ? b.title : b.source_domain;
+        const cmp = va.localeCompare(vb, undefined, { sensitivity: "base" });
+        return recipeSortOrder === "asc" ? cmp : -cmp;
+      })
+    : filteredAdminRecipes;
+
   function toggleSelect(id: number) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -348,13 +375,31 @@ export function RecipesTab() {
                       />
                     </label>
                   </th>
-                  <th className="px-3 py-2">{t("admin.recipes.recipes")}</th>
-                  <th className="hidden px-3 py-2 sm:table-cell">{t("admin.recipes.sources")}</th>
+                  <th className="px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRecipeSortClick("title")}
+                      className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      {t("admin.recipes.recipes")}
+                      <SortIcon active={recipeSortBy === "title"} order={recipeSortOrder} />
+                    </button>
+                  </th>
+                  <th className="hidden px-3 py-2 sm:table-cell">
+                    <button
+                      type="button"
+                      onClick={() => handleRecipeSortClick("source")}
+                      className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      {t("admin.recipes.sources")}
+                      <SortIcon active={recipeSortBy === "source"} order={recipeSortOrder} />
+                    </button>
+                  </th>
                   <th className="px-3 py-2 text-center">{t("admin.recipes.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#3e3e42]">
-                {filteredAdminRecipes.map((recipe) => {
+                {sortedRecipes.map((recipe) => {
                   const row = recipeRowStatus[recipe.id];
                   const isLoading = row?.loading ?? false;
                   return (

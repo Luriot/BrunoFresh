@@ -11,18 +11,13 @@ const CATEGORIES = [
 
 type EditDraft = { id: number; name: string; category: string };
 type StatusMsg = { text: string; isError: boolean } | null;
-type UsagesSort = "asc" | "desc" | null;
+type SortField = "usage_count" | "name" | "category";
+type SortOrder = "asc" | "desc";
 
-function cycleSortUsages(prev: UsagesSort): UsagesSort {
-  if (prev === "asc") return "desc";
-  if (prev === "desc") return null;
-  return "asc";
-}
-
-function UsagesSortIcon({ sort }: Readonly<{ sort: UsagesSort }>) {
-  if (sort === "asc") return <ArrowUp className="h-3 w-3" aria-hidden="true" />;
-  if (sort === "desc") return <ArrowDown className="h-3 w-3" aria-hidden="true" />;
-  return <ChevronsUpDown className="h-3 w-3 opacity-50" aria-hidden="true" />;
+function SortIcon({ active, order }: Readonly<{ active: boolean; order: SortOrder }>) {
+  if (!active) return <ChevronsUpDown className="h-3 w-3 opacity-50" aria-hidden="true" />;
+  if (order === "asc") return <ArrowUp className="h-3 w-3" aria-hidden="true" />;
+  return <ArrowDown className="h-3 w-3" aria-hidden="true" />;
 }
 
 export function IngredientsTab() {
@@ -32,7 +27,8 @@ export function IngredientsTab() {
   const [needsReview, setNeedsReview] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
-  const [sortUsages, setSortUsages] = useState<UsagesSort>(null);
+  const [sortBy, setSortBy] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
   const [status, setStatus] = useState<StatusMsg>(null);
@@ -49,8 +45,8 @@ export function IngredientsTab() {
         q: search || undefined,
         needs_review: needsReview || undefined,
         limit: 100,
-        sort_by: sortUsages ? "usage_count" : undefined,
-        sort_order: sortUsages ?? undefined,
+        sort_by: sortBy ?? undefined,
+        sort_order: sortBy ? sortOrder : undefined,
       });
       setIngredients(data);
     } catch {
@@ -58,9 +54,19 @@ export function IngredientsTab() {
     } finally {
       setLoading(false);
     }
-  }, [search, needsReview, sortUsages]);
+  }, [search, needsReview, sortBy, sortOrder]);
 
   useEffect(() => { void load(); }, [load]);
+
+  function handleSortClick(field: SortField) {
+    if (sortBy === field) {
+      if (sortOrder === "asc") setSortOrder("desc");
+      else { setSortBy(null); setSortOrder("asc"); }
+    } else {
+      setSortBy(field);
+      setSortOrder("asc");
+    }
+  }
 
   function getDisplayName(ing: IngredientDetail): string {
     return ing.translations[i18n.language] ?? ing.name_en;
@@ -289,16 +295,34 @@ export function IngredientsTab() {
             <thead className="bg-gray-50 dark:bg-[#1e1e1e]">
               <tr>
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">#</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("ingredients.name")}</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">{t("ingredients.category")}</th>
                 <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">
                   <button
                     type="button"
-                    onClick={() => setSortUsages(cycleSortUsages)}
+                    onClick={() => handleSortClick("name")}
+                    className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    {t("ingredients.name")}
+                    <SortIcon active={sortBy === "name"} order={sortOrder} />
+                  </button>
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => handleSortClick("category")}
+                    className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    {t("ingredients.category")}
+                    <SortIcon active={sortBy === "category"} order={sortOrder} />
+                  </button>
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => handleSortClick("usage_count")}
                     className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
                   >
                     {t("ingredients.usages")}
-                    <UsagesSortIcon sort={sortUsages} />
+                    <SortIcon active={sortBy === "usage_count"} order={sortOrder} />
                   </button>
                 </th>
                 <th className="px-4 py-2"></th>

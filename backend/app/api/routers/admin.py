@@ -139,6 +139,10 @@ async def list_ingredients_admin(
             .scalar_subquery()
         )
         order_expr = usage_count_subq.desc() if sort_order == "desc" else usage_count_subq.asc()
+    elif sort_by == "name":
+        order_expr = Ingredient.name_en.desc() if sort_order == "desc" else Ingredient.name_en.asc()
+    elif sort_by == "category":
+        order_expr = Ingredient.category.desc() if sort_order == "desc" else Ingredient.category.asc()
     else:
         order_expr = Ingredient.name_en
     stmt = stmt.order_by(order_expr).offset(offset).limit(limit)
