@@ -36,6 +36,16 @@ async def test_delete_nonexistent_pantry_item_returns_404(client):
     assert response.status_code == 404
 
 
+async def test_add_pantry_item_requires_auth(anon_client):
+    response = await anon_client.post("/api/pantry", json={"name": "milk", "category": "Dairy"})
+    assert response.status_code == 401
+
+
+async def test_delete_pantry_item_requires_auth(anon_client):
+    response = await anon_client.delete("/api/pantry/1")
+    assert response.status_code == 401
+
+
 async def test_pantry_display_name_fr(anon_client, db_session):
     """With a 'fr' token, display_name uses name_fr when available."""
     from app.config import settings
@@ -51,7 +61,8 @@ async def test_pantry_display_name_fr(anon_client, db_session):
     await db_session.commit()
 
     token = issue_access_token(fr_user.id, "user", "fr")
-    resp = await anon_client.get("/api/pantry", cookies={settings.auth_cookie_name: token})
+    anon_client.cookies.set(settings.auth_cookie_name, token)
+    resp = await anon_client.get("/api/pantry")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
@@ -73,6 +84,7 @@ async def test_pantry_display_name_fr_fallback(anon_client, db_session):
     await db_session.commit()
 
     token = issue_access_token(fr_user.id, "user", "fr")
-    resp = await anon_client.get("/api/pantry", cookies={settings.auth_cookie_name: token})
+    anon_client.cookies.set(settings.auth_cookie_name, token)
+    resp = await anon_client.get("/api/pantry")
     assert resp.status_code == 200
     assert resp.json()[0]["display_name"] == "milk"

@@ -67,3 +67,9 @@ class TestValidatePublicHttpUrl:
         with pytest.raises(HTTPException) as exc_info:
             await validate_public_http_url("http://192.168.1.1/api")
         assert exc_info.value.status_code == 400
+
+    async def test_valid_public_ip_url_returns_url(self):
+        """A URL with a routable public IP must be accepted and returned as-is."""
+        # Uses a numeric IP so no external DNS lookup is needed in CI.
+        result = await validate_public_http_url("http://8.8.8.8/path")
+        assert result == "http://8.8.8.8/path"

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { Login } from "../../components/Login";
 
 describe("Login", () => {
@@ -50,7 +50,9 @@ describe("Login", () => {
     fireEvent.change(screen.getByPlaceholderText("auth.passwordLabel"), { target: { value: "secret" } });
 
     const form = screen.getByPlaceholderText("auth.usernameLabel").closest("form")!;
-    fireEvent.submit(form);
+    await act(async () => {
+      fireEvent.submit(form);
+    });
 
     expect(onLogin).toHaveBeenCalledOnce();
     expect(onLogin).toHaveBeenCalledWith("alice", "secret");

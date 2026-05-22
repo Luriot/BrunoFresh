@@ -17,33 +17,36 @@ router = APIRouter(prefix="/api", tags=["tags"])
 
 async def _apply_new_tag_to_existing_recipes(tag_id: int) -> None:
     """Background task: run tag-matching for a newly created tag against all existing recipes."""
-    async with AsyncSessionLocal() as db:
-        tag = await db.get(Tag, tag_id)
-        if not tag:
-            return
-        recipes = (
-            await db.scalars(
-                select(Recipe).options(
-                    selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
-                    selectinload(Recipe.tags),
+    try:
+        async with AsyncSessionLocal() as db:
+            tag = await db.get(Tag, tag_id)
+            if not tag:
+                return
+            recipes = (
+                await db.scalars(
+                    select(Recipe).options(
+                        selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient),
+                        selectinload(Recipe.tags),
+                    )
                 )
-            )
-        ).all()
-        updated = 0
-        for recipe in recipes:
-            if any(t.id == tag.id for t in recipe.tags):
-                continue
-            ingredient_names = [
-                ri.ingredient.name_en
-                for ri in recipe.recipe_ingredients
-                if ri.ingredient
-            ]
-            if match_tags([tag], recipe.title or "", ingredient_names, recipe.prep_time_minutes):
-                recipe.tags = list(recipe.tags) + [tag]
-                updated += 1
-        if updated:
-            await db.commit()
-        logger.info("New tag '%s' applied to %d existing recipe(s).", tag.name, updated)
+            ).all()
+            updated = 0
+            for recipe in recipes:
+                if any(t.id == tag.id for t in recipe.tags):
+                    continue
+                ingredient_names = [
+                    ri.ingredient.name_en
+                    for ri in recipe.recipe_ingredients
+                    if ri.ingredient
+                ]
+                if match_tags([tag], recipe.title or "", ingredient_names, recipe.prep_time_minutes):
+                    recipe.tags = list(recipe.tags) + [tag]
+                    updated += 1
+            if updated:
+                await db.commit()
+            logger.info("New tag '%s' applied to %d existing recipe(s).", tag.name, updated)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Background tag-matching failed for tag %d: %s", tag_id, exc)
 
 
 @router.get("/tags", response_model=list[TagOut])

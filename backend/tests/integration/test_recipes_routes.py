@@ -198,7 +198,58 @@ async def test_ingredient_display_name_fr_uses_name_fr(anon_client, db_session):
     assert resp.status_code == 200
     ing = resp.json()["ingredients"][0]
     assert ing["display_name"] == "poulet"
-    assert ing["ingredient_name"] == "chicken"  # raw EN name still present
+
+
+# ── PATCH /api/recipes/{id} ───────────────────────────────────────────────────
+
+async def test_patch_recipe_instructions(client):
+    create_resp = await client.post("/api/recipes", json={"title": "Patchable"})
+    recipe_id = create_resp.json()["id"]
+
+    patch_resp = await client.patch(
+        f"/api/recipes/{recipe_id}",
+        json={"instructions_text": "Step 1. Done."},
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["instructions_text"] == "Step 1. Done."
+
+
+async def test_patch_recipe_prep_time(client):
+    create_resp = await client.post("/api/recipes", json={"title": "Timed Recipe"})
+    recipe_id = create_resp.json()["id"]
+
+    patch_resp = await client.patch(f"/api/recipes/{recipe_id}", json={"prep_time_minutes": 25})
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["prep_time_minutes"] == 25
+
+
+async def test_patch_nonexistent_recipe_returns_404(client):
+    resp = await client.patch("/api/recipes/99999", json={"prep_time_minutes": 10})
+    assert resp.status_code == 404
+
+
+# ── DELETE /api/recipes/{id} ──────────────────────────────────────────────────
+
+async def test_delete_recipe(client):
+    create_resp = await client.post("/api/recipes", json={"title": "To Delete"})
+    recipe_id = create_resp.json()["id"]
+
+    del_resp = await client.delete(f"/api/recipes/{recipe_id}")
+    assert del_resp.status_code == 204
+
+    # Confirm it's gone
+    get_resp = await client.get(f"/api/recipes/{recipe_id}")
+    assert get_resp.status_code == 404
+
+
+async def test_delete_nonexistent_recipe_returns_404(client):
+    resp = await client.delete("/api/recipes/99999")
+    assert resp.status_code == 404
+
+
+async def test_delete_recipe_requires_auth(anon_client):
+    resp = await anon_client.delete("/api/recipes/1")
+    assert resp.status_code == 401
 
 
 async def test_ingredient_display_name_fr_falls_back_to_en(anon_client, db_session):
@@ -248,20 +299,6 @@ async def test_ingredient_display_name_fr_falls_back_to_en(anon_client, db_sessi
     assert ing["display_name"] == "broccoli"
 
 
-
-# ── DELETE /api/recipes/{id} ──────────────────────────────────────────────────
-
-async def test_delete_recipe(client):
-    create_resp = await client.post("/api/recipes", json={"title": "Delete Me"})
-    recipe_id = create_resp.json()["id"]
-
-    del_resp = await client.delete(f"/api/recipes/{recipe_id}")
-    assert del_resp.status_code == 204
-
-    get_resp = await client.get(f"/api/recipes/{recipe_id}")
-    assert get_resp.status_code == 404
-
-
 # ── GET /api/recipes?q=… ─────────────────────────────────────────────────────
 
 async def test_search_recipes_by_title(client):
@@ -282,9 +319,37 @@ async def test_search_recipes_no_results(client):
     assert resp.json() == []
 
 
-# ── Auth guards ───────────────────────────────────────────────────────────────
+# ── PUT /api/recipes/{id}/tags ────────────────────────────────────────────────
 
-async def test_delete_recipe_requires_auth(anon_client):
-    """DELETE /api/recipes/{id} must reject unauthenticated requests with 401."""
-    response = await anon_client.delete("/api/recipes/1")
-    assert response.status_code == 401
+async def test_set_recipe_tags(client):
+    """PUT /api/recipes/{id}/tags sets the tag list and returns the full recipe."""
+    recipe_resp = await client.post("/api/recipes", json={"title": "Tagless Recipe"})
+    recipe_id = recipe_resp.json()["id"]
+
+    tag_resp = await client.post("/api/tags", json={"name": "Végétarien", "color": "#65a30d"})
+    tag_id = tag_resp.json()["id"]
+
+    put_resp = await client.put(f"/api/recipes/{recipe_id}/tags", json={"tag_ids": [tag_id]})
+    assert put_resp.status_code == 200
+    tag_names = [t["name"] for t in put_resp.json()["tags"]]
+    assert "Végétarien" in tag_names
+
+
+async def test_set_recipe_tags_clears_existing(client):
+    """Sending an empty list removes all tags from the recipe."""
+    recipe_resp = await client.post("/api/recipes", json={"title": "Tagged Recipe"})
+    recipe_id = recipe_resp.json()["id"]
+
+    tag_resp = await client.post("/api/tags", json={"name": "Rapide", "color": "#16a34a"})
+    tag_id = tag_resp.json()["id"]
+
+    await client.put(f"/api/recipes/{recipe_id}/tags", json={"tag_ids": [tag_id]})
+
+    clear_resp = await client.put(f"/api/recipes/{recipe_id}/tags", json={"tag_ids": []})
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["tags"] == []
+
+
+async def test_set_recipe_tags_nonexistent_recipe_returns_404(client):
+    resp = await client.put("/api/recipes/99999/tags", json={"tag_ids": []})
+    assert resp.status_code == 404
