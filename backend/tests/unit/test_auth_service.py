@@ -81,11 +81,10 @@ class TestIssueAccessToken:
         assert claims.role == "admin"
 
     def test_two_tokens_differ(self):
-        """Tokens issued at different moments must differ (different timestamps)."""
-        import time
+        """Different inputs must produce different token strings."""
         t1 = issue_access_token(user_id=1, role="user")
-        time.sleep(0.01)
-        t2 = issue_access_token(user_id=1, role="user")
+        t2 = issue_access_token(user_id=2, role="user")
+        assert t1 != t2
         assert verify_access_token(t1) is not None
         assert verify_access_token(t2) is not None
 

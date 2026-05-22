@@ -280,3 +280,11 @@ async def test_search_recipes_no_results(client):
     resp = await client.get("/api/recipes?q=xyznotfound999")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+# ── Auth guards ───────────────────────────────────────────────────────────────
+
+async def test_delete_recipe_requires_auth(anon_client):
+    """DELETE /api/recipes/{id} must reject unauthenticated requests with 401."""
+    response = await anon_client.delete("/api/recipes/1")
+    assert response.status_code == 401

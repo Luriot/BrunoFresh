@@ -359,6 +359,7 @@ async def toggle_favorite(
 @router.delete("/recipes/{recipe_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_recipe(
     recipe_id: int,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Recipe).where(Recipe.id == recipe_id))

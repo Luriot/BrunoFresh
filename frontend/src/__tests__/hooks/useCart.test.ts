@@ -138,6 +138,36 @@ describe("useCart", () => {
     expect(JSON.parse(stored!)).toEqual([]);
   });
 
+  // ── toCartInput ────────────────────────────────────────────────────────────
+  it("toCartInput: returns empty array for empty cart", () => {
+    const { result } = renderHook(() => useCart());
+    expect(result.current.toCartInput()).toEqual([]);
+  });
+
+  it("toCartInput: maps cart entries to { recipe_id, target_servings }", () => {
+    const { result } = renderHook(() => useCart());
+    const recipe = makeRecipe({ id: 5, base_servings: 3 });
+
+    act(() => result.current.addToCart(recipe));
+    act(() => result.current.updateServings(5, 2));
+
+    expect(result.current.toCartInput()).toEqual([{ recipe_id: 5, target_servings: 2 }]);
+  });
+
+  it("toCartInput: includes all cart entries", () => {
+    const { result } = renderHook(() => useCart());
+    const r1 = makeRecipe({ id: 1, base_servings: 2 });
+    const r2 = makeRecipe({ id: 2, base_servings: 4, title: "Recipe 2" });
+
+    act(() => result.current.addToCart(r1));
+    act(() => result.current.addToCart(r2));
+
+    const input = result.current.toCartInput();
+    expect(input).toHaveLength(2);
+    expect(input[0]).toEqual({ recipe_id: 1, target_servings: 2 });
+    expect(input[1]).toEqual({ recipe_id: 2, target_servings: 4 });
+  });
+
   // ── localStorage persistence ───────────────────────────────────────────────
   it("persists cart changes to localStorage automatically", () => {
     const { result } = renderHook(() => useCart());

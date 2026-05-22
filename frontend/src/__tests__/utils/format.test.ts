@@ -104,4 +104,11 @@ describe("formatQty", () => {
     // 1.20 has no fraction match → toFixed(2) → "1.20" → parseFloat → 1.2
     expect(formatQty(1.2)).toBe("1.2");
   });
+
+  // ── Negative numbers ────────────────────────────────────────────────────────
+  it("returns '-2' for -2 (negative whole number)", () => {
+    // Negative quantities shouldn't appear in practice but must not crash.
+    // Math.floor(-2) = -2, frac = 0, returns whole.toString().
+    expect(formatQty(-2)).toBe("-2");
+  });
 });

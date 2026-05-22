@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.config import settings
-from app.services.rate_limiter import _attempts as _login_attempts
+from app.services.rate_limiter import _attempts as _login_attempts, MAX_ATTEMPTS
 from app.services.auth import hash_password, issue_access_token, verify_access_token
 from app.models import User
 
@@ -138,3 +138,42 @@ async def test_login_empty_password_rejected(anon_client):
 async def test_logout_clears_cookie(anon_client):
     response = await anon_client.post("/api/auth/logout")
     assert response.status_code == 200
+
+
+# -- Rate limiter -------------------------------------------------------------
+
+async def test_rate_limit_triggers_after_max_failed_attempts(anon_client, test_user):
+    """POST /api/auth/login must return 429 after MAX_ATTEMPTS consecutive failures."""
+    for _ in range(MAX_ATTEMPTS):
+        resp = await anon_client.post(
+            "/api/auth/login", json={"username": "testuser", "password": "wrongpassword"}
+        )
+        assert resp.status_code == 401
+
+    # The next attempt should be rate-limited
+    resp = await anon_client.post(
+        "/api/auth/login", json={"username": "testuser", "password": "wrongpassword"}
+    )
+    assert resp.status_code == 429
+
+
+async def test_rate_limit_resets_on_successful_login(anon_client, test_user):
+    """A successful login clears the rate-limit counter for that IP."""
+    # Exhaust attempts up to MAX_ATTEMPTS - 1 (still under the limit)
+    for _ in range(MAX_ATTEMPTS - 1):
+        await anon_client.post(
+            "/api/auth/login", json={"username": "testuser", "password": "wrong"}
+        )
+
+    # A correct login should succeed and clear the counter
+    resp = await anon_client.post(
+        "/api/auth/login", json={"username": "testuser", "password": "testpassword"}
+    )
+    assert resp.status_code == 200
+
+    # After a successful login the counter is cleared — another wrong attempt should
+    # return 401, not 429
+    resp = await anon_client.post(
+        "/api/auth/login", json={"username": "testuser", "password": "wrong"}
+    )
+    assert resp.status_code == 401

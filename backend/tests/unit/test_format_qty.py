@@ -119,3 +119,11 @@ class TestFormatQtyDecimalFallback:
         # A value rounded to an integer via the fallback path should not end in '.'
         # (whole=2, frac=0.0 is handled by the <tolerance branch, so this is 2.0 → "2")
         assert _format_qty(2.0) == "2"
+
+
+class TestFormatQtyNegativeNumbers:
+    """Negative quantities don't occur in practice but must not crash."""
+
+    def test_negative_whole_number(self):
+        # int(-2) = -2, frac = 0 → returns str(-2) = "-2"
+        assert _format_qty(-2) == "-2"
