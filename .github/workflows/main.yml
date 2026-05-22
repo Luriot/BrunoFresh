@@ -101,7 +101,7 @@ jobs:
             ${{ steps.vars.outputs.image }}:sha-${{ github.sha }}
 
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.vars.outputs.image }}:sha-${{ github.sha }}
           format: table
