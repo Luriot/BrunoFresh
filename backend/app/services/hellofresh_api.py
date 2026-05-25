@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass, field
 
 import httpx
+from rapidfuzz import fuzz
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,31 @@ def _parse_iso_duration(value: object) -> int | None:
     return None
 
 
+def _normalize_name(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s]", " ", text)  # remove punctuation (,  & ' etc.) but keep accented chars
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _dedupe_by_name_similarity(
+    hits: list[HFRecipeHit],
+    threshold: int = 80,
+) -> list[HFRecipeHit]:
+    """Remove hits whose name is too similar to an already-accepted hit.
+
+    Uses fuzz.token_set_ratio so that subset-names (e.g. 'Poulet rôti' vs
+    'Poulet rôti aux herbes de Provence') are also caught.
+    """
+    accepted: list[HFRecipeHit] = []
+    for hit in hits:
+        norm = _normalize_name(hit.name)
+        if any(fuzz.token_set_ratio(norm, _normalize_name(a.name)) >= threshold for a in accepted):
+            continue
+        accepted.append(hit)
+    return accepted
+
+
 def _items_to_hits(items: list[dict]) -> list[HFRecipeHit]:
     seen_slugs: set[str] = set()
     hits: list[HFRecipeHit] = []
@@ -176,6 +202,14 @@ async def _search_via_api(query: str, take: int) -> list[HFRecipeHit] | None:
 
 # ─── Public API ───────────────────────────────────────────────────────────────
 async def search_hf_recipes(query: str, take: int = 20) -> list[HFRecipeHit]:
-    """Search HelloFresh recipes (fr-FR). Fetches guest token from hellofresh.fr."""
-    result = await _search_via_api(query, take)
-    return result if result is not None else []
+    """Search HelloFresh recipes (fr-FR). Fetches guest token from hellofresh.fr.
+
+    Fetches up to take*3 results from the HF API (capped at 60) so that
+    name-similarity deduplication still yields ~take distinct recipes.
+    """
+    fetch = min(take * 3, 60)
+    result = await _search_via_api(query, fetch)
+    if result is None:
+        return []
+    unique = _dedupe_by_name_similarity(result)
+    return unique[:take]
