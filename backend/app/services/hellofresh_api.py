@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 import httpx
 from rapidfuzz import fuzz
 
+from .dedupe import extract_image_base_key
+
 logger = logging.getLogger(__name__)
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -116,21 +118,53 @@ def _normalize_name(text: str) -> str:
     return text.strip()
 
 
+_LABEL_ROUGE_RE = re.compile(r"\blabel\s+rouge\b", re.IGNORECASE)
+
+
+def _is_label_rouge(hit: HFRecipeHit) -> bool:
+    """Return True if the hit is a 'Label Rouge' variant (name or tags)."""
+    if _LABEL_ROUGE_RE.search(hit.name):
+        return True
+    return any(_LABEL_ROUGE_RE.search(t) for t in hit.tags)
+
+
 def _dedupe_by_name_similarity(
     hits: list[HFRecipeHit],
     threshold: int = 80,
 ) -> list[HFRecipeHit]:
-    """Remove hits whose name is too similar to an already-accepted hit.
+    """Remove hits whose image or name is too similar to an already-accepted hit.
 
-    Uses fuzz.token_set_ratio so that subset-names (e.g. 'Poulet rôti' vs
-    'Poulet rôti aux herbes de Provence') are also caught.
+    **Tier 1 – image base key** (zero cost, no downloads): if two hits share the
+    same stable image filename (after stripping the CDN version-hash suffix), they
+    are the same recipe regardless of their title.
+
+    **Tier 2 – name similarity**: uses fuzz.token_set_ratio so that subset-names
+    (e.g. 'Poulet rôti' vs 'Poulet rôti aux herbes de Provence') are also caught.
     """
     accepted: list[HFRecipeHit] = []
+    accepted_base_keys: list[str | None] = []
+
+    # Label Rouge variants are deprioritised: sort them to the end so that when
+    # a duplicate is detected the non-label-rouge version is always kept first.
+    hits = sorted(hits, key=_is_label_rouge)
+
     for hit in hits:
+        hit_key = extract_image_base_key(hit.image_url)
+
+        # ── Tier 1: identical image base key → definite duplicate ────────────
+        if hit_key and any(hit_key == k for k in accepted_base_keys if k):
+            logger.debug("HF dedup (image key): skipping '%s' (key=%s)", hit.name, hit_key)
+            continue
+
+        # ── Tier 2: name similarity ───────────────────────────────────────────
         norm = _normalize_name(hit.name)
         if any(fuzz.token_set_ratio(norm, _normalize_name(a.name)) >= threshold for a in accepted):
+            logger.debug("HF dedup (name): skipping '%s'", hit.name)
             continue
+
         accepted.append(hit)
+        accepted_base_keys.append(hit_key)
+
     return accepted
 
 
