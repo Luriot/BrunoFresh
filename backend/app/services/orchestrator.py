@@ -220,6 +220,10 @@ async def persist_scraped_recipe(
         instruction_steps_json=json.dumps(scraped.instruction_steps) if scraped.instruction_steps else None,
         base_servings=scraped.base_servings,
         prep_time_minutes=scraped.prep_time_minutes,
+        kcal=scraped.kcal,
+        protein_g=scraped.protein_g,
+        carbs_g=scraped.carbs_g,
+        fat_g=scraped.fat_g,
     )
     db.add(recipe)
     await db.flush()

@@ -375,6 +375,16 @@ export function DashboardPage({
                                 {hit.total_time_minutes} {t("recipe.minutes")}
                               </span>
                             )}
+                            {hit.kcal != null && (
+                              <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                {hit.kcal} {t("recipe.kcal")}
+                              </span>
+                            )}
+                            {hit.protein_g != null && (
+                              <span className="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                {hit.protein_g}g {t("recipe.protein")}
+                              </span>
+                            )}
                             {hit.tags.slice(0, 3).map((tag) => (
                               <span
                                 key={tag}
@@ -458,6 +468,39 @@ export function DashboardPage({
                               {tag}
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {(selectedHfResult.kcal != null || selectedHfResult.protein_g != null || selectedHfResult.carbs_g != null || selectedHfResult.fat_g != null) && (
+                        <div className="mt-3">
+                          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            {t("recipe.nutritionalInfo")}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedHfResult.kcal != null && (
+                              <div className="flex items-center gap-1 rounded-xl bg-amber-50 px-2.5 py-1 dark:bg-amber-900/20">
+                                <span className="text-sm font-bold text-amber-700 dark:text-amber-300">{selectedHfResult.kcal}</span>
+                                <span className="text-xs text-amber-600 dark:text-amber-400">{t("recipe.kcal")}</span>
+                              </div>
+                            )}
+                            {selectedHfResult.protein_g != null && (
+                              <div className="flex items-center gap-1 rounded-xl bg-red-50 px-2.5 py-1 dark:bg-red-900/20">
+                                <span className="text-sm font-bold text-red-700 dark:text-red-300">{selectedHfResult.protein_g}g</span>
+                                <span className="text-xs text-red-600 dark:text-red-400">{t("recipe.protein")}</span>
+                              </div>
+                            )}
+                            {selectedHfResult.carbs_g != null && (
+                              <div className="flex items-center gap-1 rounded-xl bg-sky-50 px-2.5 py-1 dark:bg-sky-900/20">
+                                <span className="text-sm font-bold text-sky-700 dark:text-sky-300">{selectedHfResult.carbs_g}g</span>
+                                <span className="text-xs text-sky-600 dark:text-sky-400">{t("recipe.carbs")}</span>
+                              </div>
+                            )}
+                            {selectedHfResult.fat_g != null && (
+                              <div className="flex items-center gap-1 rounded-xl bg-yellow-50 px-2.5 py-1 dark:bg-yellow-900/20">
+                                <span className="text-sm font-bold text-yellow-700 dark:text-yellow-300">{selectedHfResult.fat_g}g</span>
+                                <span className="text-xs text-yellow-600 dark:text-yellow-400">{t("recipe.fat")}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

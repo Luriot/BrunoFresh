@@ -61,11 +61,19 @@ class RecipeCreate(BaseModel):
     base_servings: int = Field(default=2, ge=1, le=100)
     prep_time_minutes: int | None = Field(default=None, ge=0, le=1440)
     ingredients: list[RecipeIngredientCreate] = Field(default_factory=list, max_length=100)
+    kcal: int | None = Field(default=None, ge=0)
+    protein_g: int | None = Field(default=None, ge=0)
+    carbs_g: int | None = Field(default=None, ge=0)
+    fat_g: int | None = Field(default=None, ge=0)
 
 
 class RecipePatch(BaseModel):
     instructions_text: str | None = Field(default=None, max_length=50_000)
     prep_time_minutes: int | None = Field(default=None, ge=0, le=1440)
+    kcal: int | None = Field(default=None, ge=0)
+    protein_g: int | None = Field(default=None, ge=0)
+    carbs_g: int | None = Field(default=None, ge=0)
+    fat_g: int | None = Field(default=None, ge=0)
 
 
 # ── Output ────────────────────────────────────────────────────────────────────
@@ -114,6 +122,10 @@ class RecipeListItem(BaseModel):
     image_original_url: str | None = None
     base_servings: int
     prep_time_minutes: int | None
+    kcal: int | None = None
+    protein_g: int | None = None
+    carbs_g: int | None = None
+    fat_g: int | None = None
     is_favorite_by_me: bool = False
     recommenders: list[RecommenderOut] = []
     tags: list["TagOut"] = []  # noqa: F821 — resolved at model_rebuild time
@@ -136,6 +148,10 @@ class RecipeDetail(BaseModel):
     instructions_text: str
     base_servings: int
     prep_time_minutes: int | None
+    kcal: int | None = None
+    protein_g: int | None = None
+    carbs_g: int | None = None
+    fat_g: int | None = None
     is_favorite_by_me: bool = False
     recommenders: list[RecommenderOut] = []
     tags: list["TagOut"] = []  # noqa: F821 — resolved at model_rebuild time

@@ -85,6 +85,10 @@ class HFRecipeHit:
     tags: list[str] = field(default_factory=list)
     total_time_minutes: int | None = None
     hf_url: str = ""
+    kcal: int | None = None
+    protein_g: int | None = None
+    carbs_g: int | None = None
+    fat_g: int | None = None
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -168,6 +172,19 @@ def _dedupe_by_name_similarity(
     return accepted
 
 
+def _parse_nutrition_int(value: object) -> int | None:
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        digits = "".join(ch for ch in value if ch.isdigit() or ch == ".")
+        if digits:
+            try:
+                return int(round(float(digits)))
+            except ValueError:
+                return None
+    return None
+
+
 def _items_to_hits(items: list[dict]) -> list[HFRecipeHit]:
     seen_slugs: set[str] = set()
     hits: list[HFRecipeHit] = []
@@ -193,6 +210,13 @@ def _items_to_hits(items: list[dict]) -> list[HFRecipeHit]:
         )
         tags = [t.get("name", "") for t in item.get("tags", []) if t.get("name")]
         total_time = _parse_iso_duration(item.get("totalTime"))
+        nutrition = item.get("nutrition") or {}
+        if not nutrition:
+            nutrition = item.get("calories") or {}
+        kcal = _parse_nutrition_int(nutrition.get("kcal") or nutrition.get("calories") or nutrition.get("caloriesPerServing"))
+        protein_g = _parse_nutrition_int(nutrition.get("protein") or nutrition.get("proteinContent"))
+        carbs_g = _parse_nutrition_int(nutrition.get("carbs") or nutrition.get("carbohydrateContent"))
+        fat_g = _parse_nutrition_int(nutrition.get("fat") or nutrition.get("fatContent"))
         hits.append(HFRecipeHit(
             id=recipe_id,
             name=item.get("name", ""),
@@ -200,6 +224,10 @@ def _items_to_hits(items: list[dict]) -> list[HFRecipeHit]:
             tags=tags,
             total_time_minutes=total_time,
             hf_url=hf_url,
+            kcal=kcal,
+            protein_g=protein_g,
+            carbs_g=carbs_g,
+            fat_g=fat_g,
         ))
     return hits
 

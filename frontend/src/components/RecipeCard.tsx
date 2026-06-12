@@ -106,6 +106,30 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
             </span>
           )}
         </div>
+        {(recipe.kcal != null || recipe.protein_g != null) && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {recipe.kcal != null && (
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                {recipe.kcal} {t("recipe.kcal")}
+              </span>
+            )}
+            {recipe.protein_g != null && (
+              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                {recipe.protein_g}g {t("recipe.protein")}
+              </span>
+            )}
+            {recipe.carbs_g != null && (
+              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                {recipe.carbs_g}g {t("recipe.carbs")}
+              </span>
+            )}
+            {recipe.fat_g != null && (
+              <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[10px] font-semibold text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
+                {recipe.fat_g}g {t("recipe.fat")}
+              </span>
+            )}
+          </div>
+        )}
         <button
           className="mt-2 w-full rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:hover:bg-accent/80"
           onClick={(e) => {

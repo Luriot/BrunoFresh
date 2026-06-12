@@ -23,6 +23,43 @@ from .types import ScrapedIngredient, ScrapedRecipe
 
 logger = logging.getLogger(__name__)
 
+_NUTRITION_KEY_MAP = {
+    "calories": "kcal",
+    "fatContent": "fat_g",
+    "proteinContent": "protein_g",
+    "carbohydrateContent": "carbs_g",
+}
+
+
+def _parse_nutrition_int(value: object) -> int | None:
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        digits = "".join(ch for ch in value if ch.isdigit() or ch == ".")
+        if digits:
+            try:
+                return int(round(float(digits)))
+            except ValueError:
+                return None
+    return None
+
+
+def _extract_nutrition(scraper) -> dict[str, int | None]:
+    try:
+        nutrients = scraper.nutrients()
+    except Exception:
+        return {}
+    if not isinstance(nutrients, dict):
+        return {}
+    result: dict[str, int | None] = {}
+    for api_key, field in _NUTRITION_KEY_MAP.items():
+        val = nutrients.get(api_key)
+        if val is not None:
+            parsed = _parse_nutrition_int(val)
+            if parsed is not None:
+                result[field] = parsed
+    return result
+
 
 def _try_recipe_scrapers(url: str) -> ScrapedRecipe | None:
     """Attempt to scrape using the recipe-scrapers library (600+ sites)."""
@@ -74,6 +111,7 @@ def _try_recipe_scrapers(url: str) -> ScrapedRecipe | None:
             if line.strip()
         ]
         instruction_steps = extract_steps_from_html(resp.text)
+        nutrition = _extract_nutrition(scraper)
         return ScrapedRecipe(
             title=title,
             source_domain=domain,
@@ -83,6 +121,7 @@ def _try_recipe_scrapers(url: str) -> ScrapedRecipe | None:
             prep_time_minutes=prep_time_minutes,
             ingredients=ingredients,
             instruction_steps=instruction_steps,
+            **nutrition,
         )
     except Exception as exc:
         logger.debug(f"recipe-scrapers n'a pas pu parser '{url}': {exc}")

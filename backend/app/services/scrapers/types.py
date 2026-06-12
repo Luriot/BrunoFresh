@@ -18,3 +18,7 @@ class ScrapedRecipe:
     prep_time_minutes: int | None
     ingredients: list[ScrapedIngredient]
     instruction_steps: list[dict] = field(default_factory=list)
+    kcal: int | None = None
+    protein_g: int | None = None
+    carbs_g: int | None = None
+    fat_g: int | None = None

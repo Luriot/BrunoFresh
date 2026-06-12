@@ -13,6 +13,42 @@ from bs4 import BeautifulSoup
 
 from .types import ScrapedIngredient, ScrapedRecipe
 
+_NUTRITION_JSONLD_KEY_MAP = {
+    "calories": "kcal",
+    "fatContent": "fat_g",
+    "proteinContent": "protein_g",
+    "carbohydrateContent": "carbs_g",
+}
+
+
+def _parse_nutrition_int(value: object) -> int | None:
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        digits = "".join(ch for ch in value if ch.isdigit() or ch == ".")
+        if digits:
+            try:
+                return int(round(float(digits)))
+            except ValueError:
+                return None
+    return None
+
+
+def extract_nutrition_from_jsonld(jsonld: dict | None) -> dict[str, int | None]:
+    if not jsonld or not isinstance(jsonld, dict):
+        return {}
+    nutrition = jsonld.get("nutrition")
+    if not isinstance(nutrition, dict):
+        return {}
+    result: dict[str, int | None] = {}
+    for jsonld_key, field in _NUTRITION_JSONLD_KEY_MAP.items():
+        val = nutrition.get(jsonld_key)
+        if val is not None:
+            parsed = _parse_nutrition_int(val)
+            if parsed is not None:
+                result[field] = parsed
+    return result
+
 # ── Unicode fraction normalisation ────────────────────────────────────────────
 _UNICODE_FRACS: dict[str, str] = {
     "½": "0.5",

@@ -13,6 +13,10 @@ export type HFSearchResult = {
   total_time_minutes: number | null;
   hf_url: string;
   already_imported: boolean;
+  kcal: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
 };
 
 export type RecipeListItem = {
@@ -25,6 +29,10 @@ export type RecipeListItem = {
   image_url: string | null;
   base_servings: number;
   prep_time_minutes: number | null;
+  kcal: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
   is_favorite_by_me: boolean;
   recommenders: Recommender[];
   tags: Tag[];

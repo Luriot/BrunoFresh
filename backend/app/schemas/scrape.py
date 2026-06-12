@@ -16,6 +16,10 @@ class HFSearchResultResponse(BaseModel):
     total_time_minutes: int | None
     hf_url: str
     already_imported: bool
+    kcal: int | None = None
+    protein_g: int | None = None
+    carbs_g: int | None = None
+    fat_g: int | None = None
 
 
 class ScrapeRequest(BaseModel):

@@ -71,6 +71,10 @@ def _build_list_item(
         image_original_url=r.image_original_url,
         base_servings=r.base_servings,
         prep_time_minutes=r.prep_time_minutes,
+        kcal=r.kcal,
+        protein_g=r.protein_g,
+        carbs_g=r.carbs_g,
+        fat_g=r.fat_g,
         is_favorite_by_me=r.id in user_fav_set,
         recommenders=recommenders_map.get(r.id, []),
         tags=[TagOut.model_validate(t) for t in r.tags],
@@ -179,6 +183,10 @@ async def create_custom_recipe(
         instructions_text=payload.instructions_text,
         base_servings=payload.base_servings,
         prep_time_minutes=payload.prep_time_minutes,
+        kcal=payload.kcal,
+        protein_g=payload.protein_g,
+        carbs_g=payload.carbs_g,
+        fat_g=payload.fat_g,
     )
     db.add(new_recipe)
 
@@ -312,6 +320,14 @@ async def patch_recipe(
         recipe.instructions_text = payload.instructions_text
     if payload.prep_time_minutes is not None:
         recipe.prep_time_minutes = payload.prep_time_minutes
+    if payload.kcal is not None:
+        recipe.kcal = payload.kcal
+    if payload.protein_g is not None:
+        recipe.protein_g = payload.protein_g
+    if payload.carbs_g is not None:
+        recipe.carbs_g = payload.carbs_g
+    if payload.fat_g is not None:
+        recipe.fat_g = payload.fat_g
     await db.commit()
 
     recipe = await db.scalar(

@@ -169,6 +169,40 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                   </div>
                 </div>
 
+                {(recipe.kcal != null || recipe.protein_g != null || recipe.carbs_g != null || recipe.fat_g != null) && (
+                  <div className="mb-4">
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {t("recipe.nutritionalInfo")}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {recipe.kcal != null && (
+                        <div className="flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-1.5 dark:bg-amber-900/20">
+                          <span className="text-sm font-bold text-amber-700 dark:text-amber-300">{recipe.kcal}</span>
+                          <span className="text-xs text-amber-600 dark:text-amber-400">{t("recipe.kcal")}</span>
+                        </div>
+                      )}
+                      {recipe.protein_g != null && (
+                        <div className="flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-1.5 dark:bg-red-900/20">
+                          <span className="text-sm font-bold text-red-700 dark:text-red-300">{recipe.protein_g}g</span>
+                          <span className="text-xs text-red-600 dark:text-red-400">{t("recipe.protein")}</span>
+                        </div>
+                      )}
+                      {recipe.carbs_g != null && (
+                        <div className="flex items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-1.5 dark:bg-sky-900/20">
+                          <span className="text-sm font-bold text-sky-700 dark:text-sky-300">{recipe.carbs_g}g</span>
+                          <span className="text-xs text-sky-600 dark:text-sky-400">{t("recipe.carbs")}</span>
+                        </div>
+                      )}
+                      {recipe.fat_g != null && (
+                        <div className="flex items-center gap-1.5 rounded-xl bg-yellow-50 px-3 py-1.5 dark:bg-yellow-900/20">
+                          <span className="text-sm font-bold text-yellow-700 dark:text-yellow-300">{recipe.fat_g}g</span>
+                          <span className="text-xs text-yellow-600 dark:text-yellow-400">{t("recipe.fat")}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Tags */}
                 <div className="mb-4">
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">

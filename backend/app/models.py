@@ -58,6 +58,10 @@ class Recipe(Base):
     instruction_steps_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_servings: Mapped[int] = mapped_column(Integer, default=2)
     prep_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    kcal: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    protein_g: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    carbs_g: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fat_g: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     recipe_ingredients: Mapped[list["RecipeIngredient"]] = relationship(
         "RecipeIngredient", back_populates="recipe", cascade="all, delete-orphan"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from .base import BaseScraper
+from .base import BaseScraper, extract_nutrition_from_jsonld
 from .types import ScrapedIngredient, ScrapedRecipe
 
 
@@ -78,6 +78,8 @@ class StaticRecipeScraper(BaseScraper):
 
         instruction_steps = self._extract_instruction_steps(jsonld) if jsonld else []
 
+        nutrition = extract_nutrition_from_jsonld(jsonld)
+
         return ScrapedRecipe(
             title=title,
             source_domain=self.domain,
@@ -87,4 +89,5 @@ class StaticRecipeScraper(BaseScraper):
             prep_time_minutes=None,
             ingredients=ingredients or self._fallback_recipe().ingredients,
             instruction_steps=instruction_steps,
+            **nutrition,
         )

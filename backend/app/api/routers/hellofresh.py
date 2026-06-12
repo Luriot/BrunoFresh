@@ -32,6 +32,10 @@ async def search_hellofresh(
             total_time_minutes=h.total_time_minutes,
             hf_url=h.hf_url,
             already_imported=h.hf_url in imported_urls,
+            kcal=h.kcal,
+            protein_g=h.protein_g,
+            carbs_g=h.carbs_g,
+            fat_g=h.fat_g,
         )
         for h in hits
     ]

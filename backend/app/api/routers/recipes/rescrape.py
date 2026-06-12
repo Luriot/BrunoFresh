@@ -66,6 +66,14 @@ async def rescrape_recipe(
                 )
                 target_recipe.base_servings = scraped.base_servings
                 target_recipe.prep_time_minutes = scraped.prep_time_minutes
+                if scraped.kcal is not None:
+                    target_recipe.kcal = scraped.kcal
+                if scraped.protein_g is not None:
+                    target_recipe.protein_g = scraped.protein_g
+                if scraped.carbs_g is not None:
+                    target_recipe.carbs_g = scraped.carbs_g
+                if scraped.fat_g is not None:
+                    target_recipe.fat_g = scraped.fat_g
                 if scraped.image_url and scraped.image_url != target_recipe.image_original_url:
                     target_recipe.image_original_url = scraped.image_url
                     local_path = await download_image(scraped.image_url, recipe_id)
