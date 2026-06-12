@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .recipes import BilingualNamedItem
+
 
 class PantryItemCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -12,11 +14,8 @@ class PantryItemCreate(BaseModel):
     category: str | None = Field(default=None, max_length=80)
 
 
-class PantryItemOut(BaseModel):
+class PantryItemOut(BilingualNamedItem):
     id: int
-    name: str
-    name_fr: str | None = None
-    display_name: str | None = None
     ingredient_id: int | None = None
     category: str | None = None
     added_at: datetime

@@ -23,6 +23,8 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
+export { API_BASE_URL };
+
 let unauthorizedHandler: (() => void) | null = null;
 
 const api = axios.create({

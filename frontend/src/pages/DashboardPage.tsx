@@ -5,10 +5,11 @@ import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
 import { RecipeDetailModal } from "../components/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
+import { useFavorite } from "../hooks/useFavorite";
 import { toggleFavorite, searchHelloFresh } from "../api/client";
 import { useRecipeFilters } from "../hooks/useRecipeFilters";
 import type { CartEntry } from "../hooks/useCart";
-import type { HFSearchResult, RecipeListItem } from "../types";
+import type { HFSearchResult, RecipeListItem, RecipeItemCallbacks } from "../types";
 
 type Props = {
   loading: boolean;
@@ -24,25 +25,9 @@ type Props = {
   onRecipesChanged: (recipes: RecipeListItem[]) => void;
 };
 
-type RecipeRowProps = {
-  recipe: RecipeListItem;
-  onAdd: (recipe: RecipeListItem) => void;
-  onClick?: (recipe: RecipeListItem) => void;
-  onFavoriteToggled?: (updated: RecipeListItem) => void;
-};
-
-function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<RecipeRowProps>) {
+function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<RecipeItemCallbacks & { recipe: RecipeListItem }>) {
   const { t } = useTranslation();
-
-  async function handleFavorite(e: React.MouseEvent) {
-    e.stopPropagation();
-    try {
-      const { is_favorite_by_me } = await toggleFavorite(recipe.id);
-      onFavoriteToggled?.({ ...recipe, is_favorite_by_me });
-    } catch {
-      // silently fail
-    }
-  }
+  const handleFavorite = useFavorite(onFavoriteToggled);
 
   return (
     <article
@@ -75,8 +60,8 @@ function RecipeListRow({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<R
       <button
         type="button"
         aria-label={recipe.is_favorite_by_me ? t("recipe.unfavorite") : t("recipe.favorite")}
-        className="shrink-0 rounded-full p-1 text-gray-400 transition hover:text-red-500 dark:text-gray-500"
-        onClick={handleFavorite}
+className="shrink-0 rounded-full p-1 text-gray-400 transition hover:text-red-500 dark:text-gray-500"
+          onClick={(e) => handleFavorite(recipe, e)}
       >
         {recipe.is_favorite_by_me ? (
           <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">

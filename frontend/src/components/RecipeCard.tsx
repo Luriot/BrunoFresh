@@ -1,28 +1,17 @@
-﻿import type { RecipeListItem } from "../types";
+﻿import type { RecipeListItem, RecipeItemCallbacks } from "../types";
 import { useTranslation } from "react-i18next";
-import { toggleFavorite } from "../api/client";
+import { useFavorite } from "../hooks/useFavorite";
 import { isSafeUrl } from "../utils/url";
 import { RecommenderAvatars } from "./RecommenderAvatars";
+import { NutritionBadges } from "./NutritionBadges";
 
-type Props = {
+type Props = RecipeItemCallbacks & {
   recipe: RecipeListItem;
-  onAdd: (recipe: RecipeListItem) => void;
-  onClick?: (recipe: RecipeListItem) => void;
-  onFavoriteToggled?: (updated: RecipeListItem) => void;
 };
 
 export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readonly<Props>) {
   const { t } = useTranslation();
-
-  async function handleFavorite(e: React.MouseEvent) {
-    e.stopPropagation();
-    try {
-      const { is_favorite_by_me } = await toggleFavorite(recipe.id);
-      onFavoriteToggled?.({ ...recipe, is_favorite_by_me });
-    } catch {
-      // silently fail
-    }
-  }
+  const handleFavorite = useFavorite(onFavoriteToggled);
 
   return (
     <article
@@ -46,7 +35,7 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
           type="button"
           aria-label={recipe.is_favorite_by_me ? t("recipe.unfavorite") : t("recipe.favorite")}
           className="absolute right-2 top-2 rounded-full bg-white/80 p-1 text-gray-600 shadow transition hover:bg-white dark:bg-[#252526]/80 dark:text-gray-300 dark:hover:bg-[#252526]"
-          onClick={handleFavorite}
+          onClick={(e) => handleFavorite(recipe, e)}
         >
           {recipe.is_favorite_by_me ? (
             <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
@@ -107,27 +96,8 @@ export function RecipeCard({ recipe, onAdd, onClick, onFavoriteToggled }: Readon
           )}
         </div>
         {(recipe.kcal != null || recipe.protein_g != null) && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {recipe.kcal != null && (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                {recipe.kcal} {t("recipe.kcal")}
-              </span>
-            )}
-            {recipe.protein_g != null && (
-              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                {recipe.protein_g}g {t("recipe.protein")}
-              </span>
-            )}
-            {recipe.carbs_g != null && (
-              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                {recipe.carbs_g}g {t("recipe.carbs")}
-              </span>
-            )}
-            {recipe.fat_g != null && (
-              <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[10px] font-semibold text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
-                {recipe.fat_g}g {t("recipe.fat")}
-              </span>
-            )}
+          <div className="mb-2">
+            <NutritionBadges kcal={recipe.kcal} protein_g={recipe.protein_g} carbs_g={recipe.carbs_g} fat_g={recipe.fat_g} />
           </div>
         )}
         <button

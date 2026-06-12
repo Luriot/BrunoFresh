@@ -1,4 +1,4 @@
-"""Unit tests for _format_qty() in app.schemas.recipes.
+"""Unit tests for format_qty() in app.utils.format_qty.
 
 Mirrors the frontend format.test.ts exactly to guarantee byte-for-byte
 consistency between the Python and TypeScript implementations.
@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from app.schemas.recipes import _format_qty
+from app.utils.format_qty import format_qty as _format_qty
 
 
 class TestFormatQtyNullAndNonFinite:

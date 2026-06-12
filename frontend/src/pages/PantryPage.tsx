@@ -2,11 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { addPantryItem, fetchPantry, removePantryItem } from "../api/client";
 import type { PantryItem } from "../types";
-
-const CATEGORIES = [
-  "Produce", "Meat", "Fish", "Dairy", "Pantry",
-  "Spices", "Bakery", "Frozen", "Beverages", "Condiments", "Other",
-];
+import { CATEGORIES } from "../constants/categories";
 
 export function PantryPage() {
   const { t, i18n } = useTranslation();

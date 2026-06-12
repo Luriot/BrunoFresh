@@ -5,6 +5,12 @@ export type Recommender = {
   avatar_url: string | null;
 };
 
+export type RecipeItemCallbacks = {
+  onAdd: (recipe: RecipeListItem) => void;
+  onClick?: (recipe: RecipeListItem) => void;
+  onFavoriteToggled?: (updated: RecipeListItem) => void;
+};
+
 export type HFSearchResult = {
   id: string;
   name: string;

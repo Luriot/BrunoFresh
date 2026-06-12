@@ -9,7 +9,6 @@ from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
-from pydantic import BaseModel
 from rapidfuzz import fuzz
 from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, select, update
@@ -30,6 +29,9 @@ from ...schemas import (
     StatsOut,
     TopIngredientStat,
     TopRecipeStat,
+    ImageRetryResult,
+    BulkImageRetryResult,
+    ConvertImagesResult,
 )
 from ...services.dedupe import similarity_score
 from ..dependencies import require_admin
@@ -432,26 +434,7 @@ async def find_duplicate_recipes(
 
 
 # ── Recipe image retry ───────────────────────────────────────────────────────
-
-class ImageRetryResult(BaseModel):
-    recipe_id: int
-    success: bool
-    image_local_path: str | None = None
-    error: str | None = None
-
-
-class BulkImageRetryResult(BaseModel):
-    retried: int
-    success: int
-    failed: list[ImageRetryResult]
-
-
-class ConvertImagesResult(BaseModel):
-    converted: int
-    skipped: int
-    failed: int
-    image_local_path: str | None = None
-
+# (ImageRetryResult, BulkImageRetryResult, ConvertImagesResult moved to schemas/admin.py)
 
 @router.post("/recipes/{recipe_id}/convert-image-to-webp", response_model=ConvertImagesResult)
 async def convert_single_recipe_image_to_webp(recipe_id: int, db: AsyncSession = Depends(get_db)):

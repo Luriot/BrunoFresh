@@ -4,6 +4,7 @@ import { createCustomRecipe, uploadRecipeImage } from "../api/client";
 import type { RecipeCreate, RecipeIngredientCreate, RecipeDetail } from "../types";
 import { UnitSelector } from "./UnitSelector";
 import { formatQty } from "../utils/format";
+import { extractApiDetail } from "../utils/error";
 
 type Props = {
   onClose: () => void;
@@ -11,33 +12,6 @@ type Props = {
 };
 
 const MAX_TITLE_LENGTH = 140;
-const MAX_ERROR_LENGTH = 180;
-
-function sanitizeInlineMessage(value: string): string {
-  return value
-    .replace(/[<>"'`]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, MAX_ERROR_LENGTH);
-}
-
-function extractApiDetail(error: unknown): string | null {
-  if (!error || typeof error !== "object") {
-    return null;
-  }
-
-  const response = (error as { response?: { data?: { detail?: unknown } } }).response;
-  if (typeof response?.data?.detail === "string") {
-    return sanitizeInlineMessage(response.data.detail);
-  }
-
-  const message = (error as { message?: unknown }).message;
-  if (typeof message === "string") {
-    return sanitizeInlineMessage(message);
-  }
-
-  return null;
-}
 
 export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
   const { t } = useTranslation();

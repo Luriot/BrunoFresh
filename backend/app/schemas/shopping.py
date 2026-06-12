@@ -4,8 +4,9 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from .recipes import _format_qty
+from .recipes import BilingualNamedItem
 from ..services.images import resolve_image_url
+from ..utils.format_qty import format_qty as _format_qty
 
 
 class CartRecipeIn(BaseModel):
@@ -51,11 +52,8 @@ class ShoppingListPatch(BaseModel):
     label: str | None = Field(default=None, max_length=160)
 
 
-class ShoppingListItemOut(BaseModel):
+class ShoppingListItemOut(BilingualNamedItem):
     id: int
-    name: str
-    name_fr: str | None = None
-    display_name: str | None = None
     quantity: float
     unit: str
     category: str

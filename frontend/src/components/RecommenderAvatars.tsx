@@ -1,30 +1,7 @@
 import type { Recommender } from "../types";
+import { Avatar } from "./Avatar";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const MAX_VISIBLE = 4;
-
-function Avatar({ r, size }: { r: Recommender; size: string }) {
-  const initial = r.username[0]?.toUpperCase() ?? "?";
-  if (r.avatar_url) {
-    const src = `${API_BASE_URL}/api/images/${r.avatar_url.replace(/^images\//, "")}`;
-    return (
-      <img
-        src={src}
-        alt={r.username}
-        title={r.username}
-        className={`${size} rounded-full border-2 border-white object-cover dark:border-[#252526]`}
-      />
-    );
-  }
-  return (
-    <span
-      title={r.username}
-      className={`${size} inline-flex items-center justify-center rounded-full border-2 border-white bg-accent text-[10px] font-bold text-white dark:border-[#252526]`}
-    >
-      {initial}
-    </span>
-  );
-}
 
 type Props = {
   recommenders: Recommender[];
@@ -46,7 +23,7 @@ export function RecommenderAvatars({ recommenders, size = "h-6 w-6" }: Readonly<
           className="block"
           style={{ marginLeft: i === 0 ? 0 : "-0.35rem" }}
         >
-          <Avatar r={r} size={size} />
+          <Avatar username={r.username} avatarUrl={r.avatar_url} size={`${size} rounded-full border-2 border-white object-cover dark:border-[#252526]`} />
         </span>
       ))}
       {overflow > 0 && (

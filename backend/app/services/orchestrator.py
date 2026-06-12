@@ -4,16 +4,16 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
 
 from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..schemas import DuplicateWarningInfo
 from ..models import Ingredient, Recipe, RecipeIngredient, Tag
 from .dedupe import similarity_score
-from .images import download_image
+from .images import download_image, resolve_image_url
 from .normalizer import NormalizedIngredient, normalize_ingredients_batch
 from .scraper import scrape_recipe_url
 from .scrapers.types import ScrapedIngredient
@@ -21,17 +21,6 @@ from .events import JobEvent, job_event_bus
 from .tag_rules import match_tags
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class DuplicateFound:
-    existing_id: int
-    existing_title: str
-    existing_url: str
-    existing_image: str | None
-    existing_image_original_url: str | None
-    title_score: float
-    ingredient_score: float
 
 
 async def save_normalized_ingredients(
@@ -145,10 +134,10 @@ async def persist_scraped_recipe(
     db: AsyncSession,
     job_id: int | None = None,
     force: bool = False,
-) -> DuplicateFound | None:
+) -> DuplicateWarningInfo | None:
     """Scrape and persist a recipe.
 
-    Returns ``DuplicateFound`` if a similar recipe exists and ``force`` is False.
+    Returns ``DuplicateWarningInfo`` if a similar recipe exists and ``force`` is False.
     Returns ``None`` on success (recipe saved).
     """
     async def notify_progress(msg: str):
@@ -198,12 +187,11 @@ async def persist_scraped_recipe(
             if ts >= 85 and ing_s >= 0.7:
                 logger.info(f"Doublon détecté: {candidate.id} - {candidate.title}. Renvoi de l'avertissement.")
                 await notify_progress("Recette similaire détectée.")
-                return DuplicateFound(
-                    existing_id=candidate.id,
-                    existing_title=candidate.title,
-                    existing_url=candidate.url,
-                    existing_image=candidate.image_local_path,
-                    existing_image_original_url=candidate.image_original_url,
+                return DuplicateWarningInfo(
+                    id=candidate.id,
+                    title=candidate.title,
+                    url=candidate.url,
+                    image_url=resolve_image_url(candidate.image_local_path, candidate.image_original_url, thumb=True),
                     title_score=round(ts, 1),
                     ingredient_score=round(ing_s, 2),
                 )

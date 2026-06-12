@@ -2,15 +2,10 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { buildJobStreamUrl, convertImagesToWebp, convertSingleImageToWebp, deleteRecipe, fetchRecipes, findDuplicateRecipes, formatRecipeInstructions, rescrapeRecipe, retryAllMissingImages, retryRecipeImage, uploadRecipeImage } from "../../api/client";
 import type { RecipeListItem, RecipeSimilarPair } from "../../types";
-import { AlertTriangle, ArrowDown, ArrowUp, BookOpen, Check, CheckCircle, ChevronDown, ChevronsUpDown, Image, RefreshCw, Search, Sparkles, Trash2, Upload, Wand2, XCircle } from "lucide-react";
+import { SortIcon } from "../../components/SortIcon";
+import { AlertTriangle, BookOpen, Check, CheckCircle, ChevronDown, ImageIcon, RefreshCw, Search, Sparkles, Trash2, Upload, Wand2, XCircle } from "lucide-react";
 
 type RowStatus = { loading: boolean; msg: string; isError: boolean };
-
-function SortIcon({ active, order }: Readonly<{ active: boolean; order: "asc" | "desc" }>) {
-  if (!active) return <ChevronsUpDown className="h-3 w-3 opacity-50" aria-hidden="true" />;
-  if (order === "asc") return <ArrowUp className="h-3 w-3" aria-hidden="true" />;
-  return <ArrowDown className="h-3 w-3" aria-hidden="true" />;
-}
 
 export function RecipesTab() {
   const { t } = useTranslation();
@@ -496,7 +491,7 @@ export function RecipesTab() {
           className="mb-4 flex w-full items-center justify-between rounded-xl px-1 py-1 text-left transition hover:bg-gray-50 dark:hover:bg-[#252526]"
         >
           <span className="flex items-center gap-1.5 font-heading text-base font-bold text-ink dark:text-gray-100">
-            <Image className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            <ImageIcon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
             {t("admin.images.title")}
           </span>
           <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform duration-200 ${showImagesPanel ? "rotate-180" : ""}`} aria-hidden="true" />

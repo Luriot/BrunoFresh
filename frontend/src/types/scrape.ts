@@ -1,3 +1,5 @@
+export type JobStatus = "pending" | "running" | "completed" | "failed" | "duplicate_warning";
+
 export type DuplicateWarningInfo = {
   id: number;
   title: string;
@@ -11,13 +13,13 @@ export type ScrapeResponse = {
   message: string;
   url: string;
   job_id?: number;
-  status: "pending" | "running" | "completed" | "failed" | "duplicate_warning";
+  status: JobStatus;
   similar_recipe?: DuplicateWarningInfo | null;
 };
 
 export type JobStatusResponse = {
   job_id: number;
-  status: "pending" | "running" | "completed" | "failed" | "duplicate_warning";
+  status: JobStatus;
   error_message?: string | null;
 };
 

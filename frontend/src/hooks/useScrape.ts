@@ -2,15 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { buildJobStreamUrl, fetchRecipes, queueScrape } from "../api/client";
 import i18n from "../i18n/config";
-import type { DuplicateWarningInfo } from "../types";
+import type { DuplicateWarningInfo, JobStatus } from "../types";
 
 type RefreshRecipes = () => Promise<void>;
 
-type JobStreamStatus = "pending" | "running" | "completed" | "failed" | "duplicate_warning";
-
 type JobStreamEvent = {
   job_id: number;
-  status: JobStreamStatus;
+  status: JobStatus;
   message?: string | null;
   error_message?: string | null;
   // duplicate_warning extras

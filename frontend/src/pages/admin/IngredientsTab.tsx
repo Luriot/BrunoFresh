@@ -2,23 +2,14 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { deleteIngredient, fetchIngredientsAdmin, mergeIngredients, patchIngredient, suggestIngredientMerges } from "../../api/client";
 import type { IngredientDetail, MergeSuggestion } from "../../types";
-import { ArrowDown, ArrowUp, ArrowRight, ChevronsUpDown, Pencil, Sparkles, Trash2, X } from "lucide-react";
-
-const CATEGORIES = [
-  "Produce", "Meat", "Fish", "Dairy", "Pantry",
-  "Spices", "Bakery", "Frozen", "Beverages", "Condiments", "Other",
-];
+import type { StatusMsg } from "../../types/ui";
+import { CATEGORIES } from "../../constants/categories";
+import { SortIcon } from "../../components/SortIcon";
+import { ArrowRight, Pencil, Sparkles, Trash2, X } from "lucide-react";
 
 type EditDraft = { id: number; name: string; category: string };
-type StatusMsg = { text: string; isError: boolean } | null;
 type SortField = "usage_count" | "name" | "category";
 type SortOrder = "asc" | "desc";
-
-function SortIcon({ active, order }: Readonly<{ active: boolean; order: SortOrder }>) {
-  if (!active) return <ChevronsUpDown className="h-3 w-3 opacity-50" aria-hidden="true" />;
-  if (order === "asc") return <ArrowUp className="h-3 w-3" aria-hidden="true" />;
-  return <ArrowDown className="h-3 w-3" aria-hidden="true" />;
-}
 
 export function IngredientsTab() {
   const { t, i18n } = useTranslation();

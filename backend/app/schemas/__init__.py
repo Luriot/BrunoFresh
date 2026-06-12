@@ -6,13 +6,19 @@ without any changes in the rest of the codebase.
 """
 from .tags import TagCreate, TagOut
 from .users import UserOut, UserPatch, LanguagePatch
+from .auth import LoginRequest, AuthStatusResponse
+from .admin import ImageRetryResult, BulkImageRetryResult, ConvertImagesResult
 from .recipes import (
+    NutritionFields,
+    BilingualNamedItem,
+    RecipeBase,
     RecipeIngredientCreate,
     RecipeCreate,
     RecipePatch,
     IngredientOut,
     RecipeIngredientOut,
     InstructionStep,
+    RecommenderOut,
     RecipeListItem,
     RecipeDetail,
     RecipeTagsUpdate,
@@ -63,9 +69,13 @@ from .meal_plans import (
 
 __all__ = [
     "TagCreate", "TagOut",
+    "UserOut", "UserPatch", "LanguagePatch",
+    "LoginRequest", "AuthStatusResponse",
+    "ImageRetryResult", "BulkImageRetryResult", "ConvertImagesResult",
+    "NutritionFields", "BilingualNamedItem", "RecipeBase",
     "RecipeIngredientCreate", "RecipeCreate", "RecipePatch",
     "IngredientOut", "RecipeIngredientOut", "InstructionStep",
-    "RecipeListItem", "RecipeDetail", "RecipeTagsUpdate",
+    "RecommenderOut", "RecipeListItem", "RecipeDetail", "RecipeTagsUpdate",
     "HFSearchResultResponse", "ScrapeRequest", "JobStatus",
     "DuplicateWarningInfo", "ScrapeResponse",
     "RecipeSimilarPair", "RecipeSimilarPairsResponse", "JobStatusResponse",

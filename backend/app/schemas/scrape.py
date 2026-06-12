@@ -4,11 +4,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl
 
+from .recipes import NutritionFields
+
 
 JobStatus = Literal["pending", "running", "completed", "failed", "duplicate_warning"]
 
 
-class HFSearchResultResponse(BaseModel):
+class HFSearchResultResponse(NutritionFields):
     id: str
     name: str
     image_url: str | None
@@ -16,10 +18,6 @@ class HFSearchResultResponse(BaseModel):
     total_time_minutes: int | None
     hf_url: str
     already_imported: bool
-    kcal: int | None = None
-    protein_g: int | None = None
-    carbs_g: int | None = None
-    fat_g: int | None = None
 
 
 class ScrapeRequest(BaseModel):

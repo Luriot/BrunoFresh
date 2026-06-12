@@ -3,18 +3,12 @@ import { useTranslation } from "react-i18next";
 import { Tag, Wand2, X } from "lucide-react";
 import { fetchTags, generateQuickPlan } from "../api/client";
 import type { Tag as TagType } from "../types";
+import { extractApiDetail } from "../utils/error";
 
 type Props = {
   onClose: () => void;
   onSuccess: (planId: number) => void;
 };
-
-function extractApiDetail(error: unknown): string | null {
-  if (!error || typeof error !== "object") return null;
-  const response = (error as { response?: { data?: { detail?: unknown } } }).response;
-  if (typeof response?.data?.detail === "string") return response.data.detail;
-  return null;
-}
 
 export function GeneratePlanningModal({ onClose, onSuccess }: Readonly<Props>) {
   const { t } = useTranslation();

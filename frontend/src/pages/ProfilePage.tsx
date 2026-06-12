@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next";
 import axios from "axios";
 import type { User } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+import { API_BASE_URL } from "../api/client";
 
 async function patchMe(payload: {
   username?: string;

@@ -9,6 +9,7 @@ export type {
   RecipeDetail,
   RecipeIngredientCreate,
   RecipeCreate,
+  RecipeItemCallbacks,
 } from "./recipes";
 export type { CartInput, CartResponse } from "./cart";
 export type {
@@ -22,6 +23,7 @@ export type {
   ScrapeResponse,
   RecipeSimilarPair,
   RecipeSimilarPairsResponse,
+  JobStatus,
 } from "./scrape";
 export type { PantryItem } from "./pantry";
 export type { MealPlanEntry, MealPlan, MealPlanSummary } from "./meal_plans";

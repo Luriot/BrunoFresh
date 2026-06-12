@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,20 +10,14 @@ from ..dependencies import require_auth, set_auth_cookie
 from ...config import settings
 from ...database import get_db
 from ...models import User
-from ...schemas import UserOut
+from ...schemas import UserOut, LoginRequest, AuthStatusResponse
 from ...services.auth import UserClaims, issue_access_token, verify_password
 from ...services.rate_limiter import check_rate_limit, clear_rate_limit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-class LoginRequest(BaseModel):
-    username: str = Field(min_length=1, max_length=80)
-    password: str = Field(min_length=1, max_length=256)
-
-
-class AuthStatusResponse(BaseModel):
-    authenticated: bool
+# LoginRequest and AuthStatusResponse moved to schemas/auth.py
 
 
 @router.post("/login", response_model=UserOut)

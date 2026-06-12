@@ -11,10 +11,9 @@ from ...config import settings
 from ...database import SessionLocal, get_db
 from ...models import Recipe, ScrapeJob
 from ...schemas import DuplicateWarningInfo, JobStatus, JobStatusResponse, ScrapeRequest, ScrapeResponse
-from ...services.images import resolve_image_url
 from ...services.events import JobEvent, job_event_bus
 from ...services.network import validate_public_http_url
-from ...services.orchestrator import DuplicateFound, persist_scraped_recipe
+from ...services.orchestrator import persist_scraped_recipe
 
 logger = logging.getLogger(__name__)
 
@@ -44,20 +43,20 @@ async def _run_scrape_job(job_id: int, force: bool = False) -> None:
         async with scrape_semaphore:
             try:
                 result = await persist_scraped_recipe(job.url, db, job_id, force=force)
-                if isinstance(result, DuplicateFound):
+                if isinstance(result, DuplicateWarningInfo):
                     job.status = "duplicate_warning"
-                    job.error_message = f"DUPLICATE:{result.existing_id}:{result.existing_title}:{result.title_score}:{result.ingredient_score}"
+                    job.error_message = f"DUPLICATE:{result.id}:{result.title}:{result.title_score}:{result.ingredient_score}"
                     await db.commit()
                     await job_event_bus.publish(
                         job_id,
                         JobEvent(
                             status="duplicate_warning",
-                            message=f"Recette similaire : {result.existing_title}",
+                            message=f"Recette similaire : {result.title}",
                             extra={
-                                "similar_id": result.existing_id,
-                                "similar_title": result.existing_title,
-                                "similar_url": result.existing_url,
-                                "similar_image": resolve_image_url(result.existing_image, result.existing_image_original_url, thumb=True),
+                                "similar_id": result.id,
+                                "similar_title": result.title,
+                                "similar_url": result.url,
+                                "similar_image": result.image_url,
                                 "title_score": result.title_score,
                                 "ingredient_score": result.ingredient_score,
                             },
