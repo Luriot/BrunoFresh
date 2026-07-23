@@ -21,7 +21,7 @@ from ....schemas import (
 )
 from ....schemas.recipes import RecommenderOut
 from ....services.auth import UserClaims
-from ...dependencies import require_auth
+from ...dependencies import require_admin, require_auth
 from .utils import _RECIPE_NOT_FOUND, _escape_like, _recipe_detail_opts, _recipe_to_detail
 
 router = APIRouter()
@@ -88,7 +88,7 @@ async def list_recipes(
     is_favorite: bool | None = Query(default=None),
     ingredients: str | None = Query(default=None, description="Comma-separated ingredient keywords"),
     tags: str | None = Query(default=None, description="Comma-separated tag names (any match)"),
-    limit: int = Query(default=50, ge=1, le=1000),
+    limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
@@ -275,6 +275,7 @@ async def upload_recipe_image(
             detail="File content does not match declared type.",
         )
 
+    import tempfile as _tempfile  # noqa: PLC0415
     ext = _IMAGE_ALLOWED[content_type]
     filename = f"recipe_{recipe_id}.webp"  # always WebP for consistent storage
     dest = settings.images_dir / filename
@@ -286,11 +287,21 @@ async def upload_recipe_image(
         thumb_path_for(old_file).unlink(missing_ok=True)
         old_file.unlink(missing_ok=True)
 
-    dest.write_bytes(data)
+    # Write to a temporary file first, then atomically rename to avoid
+    # leaving a corrupt file on disk if processing is interrupted.
+    tmp_fd, tmp_path = _tempfile.mkstemp(dir=settings.images_dir, suffix=".tmp")
+    try:
+        import os as _os  # noqa: PLC0415
+        _os.close(tmp_fd)
+        Path(tmp_path).write_bytes(data)
 
-    import asyncio  # noqa: PLC0415
-    from ....services.images import process_uploaded_image  # noqa: PLC0415
-    await asyncio.get_running_loop().run_in_executor(None, process_uploaded_image, dest)
+        import asyncio  # noqa: PLC0415
+        from ....services.images import process_image  # noqa: PLC0415
+        await asyncio.get_running_loop().run_in_executor(None, process_image, Path(tmp_path))
+        Path(tmp_path).rename(dest)
+    except Exception:
+        Path(tmp_path).unlink(missing_ok=True)
+        raise
 
     recipe.image_local_path = f"images/{filename}"
     await db.commit()
@@ -375,7 +386,7 @@ async def toggle_favorite(
 @router.delete("/recipes/{recipe_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_recipe(
     recipe_id: int,
-    claims: UserClaims = Depends(require_auth),
+    claims: UserClaims = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Recipe).where(Recipe.id == recipe_id))

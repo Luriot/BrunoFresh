@@ -15,7 +15,7 @@ from ..models import Ingredient, Recipe, RecipeIngredient, Tag
 from .dedupe import similarity_score
 from .images import download_image, resolve_image_url
 from .normalizer import NormalizedIngredient, normalize_ingredients_batch
-from .scraper import scrape_recipe_url
+from .scrapers.router import scrape_recipe_url
 from .scrapers.types import ScrapedIngredient
 from .events import JobEvent, job_event_bus
 from .tag_rules import match_tags
@@ -167,11 +167,12 @@ async def persist_scraped_recipe(
         for norm, ing in zip(normalized_ingredients, scraped.ingredients)
     ]
 
+    # Pre-filter candidates: same domain only, to avoid O(n²) over all recipes
     existing_recipes = (
         await db.scalars(
-            select(Recipe).options(
-                selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
-            )
+            select(Recipe)
+            .options(selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient))
+            .where(Recipe.source_domain == scraped.source_domain)
         )
     ).all()
     logger.debug(f"Détection de doublons face à {len(existing_recipes)} recettes existantes...")

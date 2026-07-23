@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Heart, SlidersHorizontal, Search, LayoutGrid, List, Plus, Clock, Link, ExternalLink, ShoppingCart, X, Download } from "lucide-react";
 import { RecipeCard } from "../components/RecipeCard";
 import { CartPanel } from "../components/CartPanel";
-import { RecipeDetailModal } from "../components/RecipeDetailModal";
+import { RecipeDetailModal } from "../components/recipe/RecipeDetailModal";
 import { CustomRecipeModal } from "../components/CustomRecipeModal";
 import { useFavorite } from "../hooks/useFavorite";
 import { toggleFavorite, searchHelloFresh } from "../api/client";

@@ -39,6 +39,7 @@ class Settings(BaseModel):
     )
     scrape_concurrency_limit: int = int(os.getenv("SCRAPE_CONCURRENCY_LIMIT", "1"))
     auth_secret: str = os.getenv("AUTH_SECRET", DEFAULT_AUTH_SECRET)
+    session_secret: str = os.getenv("SESSION_SECRET", os.getenv("AUTH_SECRET", DEFAULT_AUTH_SECRET))
     auth_token_ttl_minutes: int = int(os.getenv("AUTH_TOKEN_TTL_MINUTES", "10080"))  # 7 days default
     auth_cookie_name: str = os.getenv("AUTH_COOKIE_NAME", "brunofresh_access_token")
     auth_cookie_secure: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
@@ -81,6 +82,9 @@ def _validate_security_settings(current: Settings) -> None:
 
     if in_production and current.auth_secret == DEFAULT_AUTH_SECRET:
         raise RuntimeError("AUTH_SECRET cannot use the default value in production")
+
+    if in_production and current.session_secret == DEFAULT_AUTH_SECRET:
+        raise RuntimeError("SESSION_SECRET cannot use the default value in production. Set SESSION_SECRET (or AUTH_SECRET) to a unique secret.")
 
     if in_production and not current.auth_cookie_secure:
         raise RuntimeError("AUTH_COOKIE_SECURE must be true in production")

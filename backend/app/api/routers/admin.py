@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from rapidfuzz import fuzz
-from fastapi.responses import FileResponse
+from starlette.responses import JSONResponse
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,16 +43,38 @@ router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(re
 
 
 @router.get("/db/export")
-async def export_db(request: Request):
+async def export_db(request: Request, db: AsyncSession = Depends(get_db)):
+    """Export all data as JSON. Excludes the users table (hashed passwords)."""
     client_ip = request.client.host if request.client else "unknown"
     logger.warning("DB export triggered by %s", client_ip)
-    if not settings.db_file.exists():
-        raise HTTPException(status_code=404, detail="Database file not found.")
-    return FileResponse(
-        path=settings.db_file,
-        filename="app.db",
-        media_type="application/x-sqlite3",
-    )
+
+    recipes = (await db.scalars(select(Recipe))).all()
+    ingredients = (await db.scalars(select(Ingredient))).all()
+    tags = (await db.scalars(select(Tag))).all()
+
+    from datetime import datetime as _dt, timezone as _tz
+    export_data = {
+        "exported_at": _dt.now(tz=_tz.utc).isoformat(),
+        "recipes": [
+            {
+                "id": r.id, "title": r.title, "url": r.url, "source_domain": r.source_domain,
+                "base_servings": r.base_servings, "prep_time_minutes": r.prep_time_minutes,
+                "instructions_text": r.instructions_text,
+                "image_original_url": r.image_original_url,
+                "kcal": r.kcal, "protein_g": r.protein_g, "carbs_g": r.carbs_g, "fat_g": r.fat_g,
+            }
+            for r in recipes
+        ],
+        "ingredients": [
+            {"id": i.id, "name_en": i.name_en, "name_fr": i.name_fr, "category": i.category, "is_normalized": i.is_normalized}
+            for i in ingredients
+        ],
+        "tags": [
+            {"id": t.id, "name": t.name, "color": t.color}
+            for t in tags
+        ],
+    }
+    return export_data
 
 
 @router.post("/db/backup")
@@ -91,10 +113,36 @@ async def import_db(request: Request, file: UploadFile = File(...)):
     if not content.startswith(_SQLITE_MAGIC):
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid SQLite database.")
 
+    # Create a backup of the current database before replacing it
+    if settings.db_file.exists():
+        timestamp = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = settings.db_file.with_name(f"brunofresh_pre_import_{timestamp}.db")
+        await asyncio.to_thread(shutil.copy2, str(settings.db_file), str(backup_path))
+
     temp_path = settings.db_file.with_name(f"import_{uuid.uuid4().hex}.temp")
     try:
         await asyncio.to_thread(temp_path.write_bytes, content)
+        # Validate that the imported database has the expected schema structure
+        import sqlite3 as _sqlite3
+        conn = _sqlite3.connect(str(temp_path))
+        try:
+            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            required_tables = {"recipes", "ingredients", "users"}
+            missing = required_tables - tables
+            if missing:
+                conn.close()
+                temp_path.unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Imported database is missing required tables: {', '.join(sorted(missing))}. "
+                           f"Found: {', '.join(sorted(tables))}",
+                )
+        finally:
+            conn.close()
+
         await asyncio.to_thread(shutil.move, str(temp_path), str(settings.db_file))
+    except HTTPException:
+        raise
     except Exception:
         if temp_path.exists():
             temp_path.unlink(missing_ok=True)
@@ -393,14 +441,15 @@ async def merge_ingredients(
 async def find_duplicate_recipes(
     title_threshold: float = 75.0,
     ingredient_threshold: float = 0.5,
+    limit: int = Query(default=500, ge=1, le=2000),
     db: AsyncSession = Depends(get_db),
 ):
-    """Scan all recipes and return pairs that look like duplicates."""
+    """Scan recipes and return pairs that look like duplicates (capped for performance)."""
     recipes = (
         await db.scalars(
             select(Recipe).options(
                 selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
-            )
+            ).limit(limit)
         )
     ).all()
 

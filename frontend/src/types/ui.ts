@@ -1,1 +1,0 @@
-export type StatusMsg = { text: string; isError: boolean } | null;

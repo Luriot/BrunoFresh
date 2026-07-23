@@ -1,20 +1,8 @@
 import { FormEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import axios from "axios";
 import type { User } from "../types";
-import { UserAvatar } from "../components/UserAvatar";
-import { API_BASE_URL } from "../api/client";
-
-async function patchMe(payload: {
-  username?: string;
-  current_password: string;
-  new_password?: string;
-}): Promise<User> {
-  const resp = await axios.patch<User>(`${API_BASE_URL}/api/users/me`, payload, {
-    withCredentials: true,
-  });
-  return resp.data;
-}
+import { Avatar } from "../components/Avatar";
+import { ApiError, patchMe, uploadAvatar } from "../api/client";
 
 type Props = {
   user: User;
@@ -35,18 +23,11 @@ export function ProfilePage({ user, onUserUpdate }: Readonly<Props>) {
     setAvatarError(null);
     setAvatarUploading(true);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const resp = await axios.post<User>(`${API_BASE_URL}/api/users/me/avatar`, form, {
-        withCredentials: true,
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      onUserUpdate(resp.data);
+      onUserUpdate(await uploadAvatar(file));
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const status = err.response?.status;
-        if (status === 413) setAvatarError(t("profile.avatarTooLarge"));
-        else if (status === 422) setAvatarError(t("profile.avatarInvalidType"));
+      if (err instanceof ApiError) {
+        if (err.status === 413) setAvatarError(t("profile.avatarTooLarge"));
+        else if (err.status === 422) setAvatarError(t("profile.avatarInvalidType"));
         else setAvatarError(t("profile.avatarError"));
       } else {
         setAvatarError(t("profile.avatarError"));
@@ -85,15 +66,13 @@ export function ProfilePage({ user, onUserUpdate }: Readonly<Props>) {
       setNewUsername("");
       setUsernamePassword("");
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 400) {
-        const detail = (err.response.data as { detail?: string }).detail ?? "";
+      if (err instanceof ApiError && err.status === 400) {
+        const detail = err.detail ?? "";
         if (detail.toLowerCase().includes("taken") || detail.toLowerCase().includes("username")) {
           setUsernameError(t("profile.errorUsernameTaken"));
         } else {
           setUsernameError(t("profile.errorCurrentPassword"));
         }
-      } else if (axios.isAxiosError(err) && err.response?.status === 401) {
-        setUsernameError(t("profile.errorCurrentPassword"));
       } else {
         setUsernameError(t("profile.errorCurrentPassword"));
       }
@@ -131,7 +110,7 @@ export function ProfilePage({ user, onUserUpdate }: Readonly<Props>) {
       {/* Current identity + avatar */}
       <div className="mb-6 flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 dark:border-[#3e3e42] dark:bg-[#252526]">
         <div className="relative shrink-0">
-          <UserAvatar user={user} size="h-16 w-16" className="text-2xl" />
+          <Avatar username={user.username} avatarUrl={user.avatar_url} size="h-16 w-16" className="text-2xl" />
           <button
             type="button"
             onClick={() => avatarInputRef.current?.click()}

@@ -5,6 +5,8 @@ from urllib.parse import urlparse
 
 from rapidfuzz import fuzz
 
+from ..utils.parsing import normalize_name
+
 # Matches the CDN version-hash suffix appended by HelloFresh/Cloudinary:
 # "HF_Y25_..._Main_3_high-cf1af71a.jpg"  →  strip "-cf1af71a"
 # The hash is 6–16 lowercase hex chars preceded by a hyphen.
@@ -42,13 +44,6 @@ def extract_image_base_key(url: str | None) -> str | None:
         return None
 
 
-def _normalize_text(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"\s+", " ", text)
-    return text
-
-
 def _jaccard_similarity(a: set[str], b: set[str]) -> float:
     if not a or not b:
         return 0.0
@@ -64,20 +59,8 @@ def similarity_score(
     new_ingredient_names: list[str],
 ) -> tuple[float, float]:
     """Return (title_score 0–100, ingredient_jaccard 0–1)."""
-    title_score = fuzz.token_set_ratio(_normalize_text(existing_title), _normalize_text(new_title))
-    existing_set = {_normalize_text(x) for x in existing_ingredient_names if x.strip()}
-    new_set = {_normalize_text(x) for x in new_ingredient_names if x.strip()}
+    title_score = fuzz.token_set_ratio(normalize_name(existing_title), normalize_name(new_title))
+    existing_set = {normalize_name(x) for x in existing_ingredient_names if x.strip()}
+    new_set = {normalize_name(x) for x in new_ingredient_names if x.strip()}
     ingredient_score = _jaccard_similarity(existing_set, new_set)
     return float(title_score), ingredient_score
-
-
-def looks_like_duplicate(
-    existing_title: str,
-    existing_ingredient_names: list[str],
-    new_title: str,
-    new_ingredient_names: list[str],
-    title_threshold: int = 85,
-    ingredients_threshold: float = 0.7,
-) -> bool:
-    ts, ing = similarity_score(existing_title, existing_ingredient_names, new_title, new_ingredient_names)
-    return ts >= title_threshold and ing >= ingredients_threshold

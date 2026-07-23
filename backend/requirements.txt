@@ -7,7 +7,6 @@ pydantic==2.11.7
 python-dotenv==1.1.1
 beautifulsoup4==4.13.5
 httpx==0.28.1
-aiofiles==24.1.0
 rapidfuzz==3.13.0
 alembic==1.16.5
 sqladmin==0.20.1

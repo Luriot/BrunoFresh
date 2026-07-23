@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { createTag, deleteTag, fetchTags } from "../../api/client";
 import type { Tag } from "../../types";
-import type { StatusMsg } from "../../types/ui";
+import type { StatusMsg } from "../../types";
 import { Tag as TagIcon, X } from "lucide-react";
 
 export function TagsTab() {

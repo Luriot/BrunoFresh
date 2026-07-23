@@ -5,7 +5,6 @@ import logging
 import re
 from urllib.parse import urlparse
 
-import httpx
 from recipe_scrapers import scrape_html  # type: ignore
 
 _PAREN_DUP_RE = re.compile(r'^(.+)\(\1\)\s*$')
@@ -18,30 +17,11 @@ def _clean_raw_ingredient(line: str) -> str:
     return m.group(1).strip() if m else stripped
 
 from .base import extract_steps_from_html
-from .static_sites import StaticRecipeScraper
+from .static_sites import scrape_static
 from .types import ScrapedIngredient, ScrapedRecipe
+from ...utils.parsing import NUTRITION_JSONLD_KEY_MAP, parse_nutrition_int
 
 logger = logging.getLogger(__name__)
-
-_NUTRITION_KEY_MAP = {
-    "calories": "kcal",
-    "fatContent": "fat_g",
-    "proteinContent": "protein_g",
-    "carbohydrateContent": "carbs_g",
-}
-
-
-def _parse_nutrition_int(value: object) -> int | None:
-    if isinstance(value, (int, float)):
-        return int(value)
-    if isinstance(value, str):
-        digits = "".join(ch for ch in value if ch.isdigit() or ch == ".")
-        if digits:
-            try:
-                return int(round(float(digits)))
-            except ValueError:
-                return None
-    return None
 
 
 def _extract_nutrition(scraper) -> dict[str, int | None]:
@@ -52,21 +32,27 @@ def _extract_nutrition(scraper) -> dict[str, int | None]:
     if not isinstance(nutrients, dict):
         return {}
     result: dict[str, int | None] = {}
-    for api_key, field in _NUTRITION_KEY_MAP.items():
-        val = nutrients.get(api_key)
-        if val is not None:
-            parsed = _parse_nutrition_int(val)
-            if parsed is not None:
-                result[field] = parsed
+    for api_key, field in NUTRITION_JSONLD_KEY_MAP.items():
+        parsed = parse_nutrition_int(nutrients.get(api_key))
+        if parsed is not None:
+            result[field] = parsed
     return result
 
 
 def _try_recipe_scrapers(url: str) -> ScrapedRecipe | None:
     """Attempt to scrape using the recipe-scrapers library (600+ sites)."""
+    import httpx
+
     try:
-        resp = httpx.get(url, timeout=20, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"})
-        resp.raise_for_status()
-        scraper = scrape_html(resp.text, org_url=url)
+        from ..network import SSRFGuardedSyncTransport
+
+        transport = SSRFGuardedSyncTransport()
+        with httpx.Client(transport=transport, timeout=20, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"}) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+            html_text = resp.text
+
+        scraper = scrape_html(html_text, org_url=url)
         title = scraper.title() or ""
         if not title:
             return None
@@ -110,7 +96,7 @@ def _try_recipe_scrapers(url: str) -> ScrapedRecipe | None:
             for line in raw_ingredients
             if line.strip()
         ]
-        instruction_steps = extract_steps_from_html(resp.text)
+        instruction_steps = extract_steps_from_html(html_text)
         nutrition = _extract_nutrition(scraper)
         return ScrapedRecipe(
             title=title,
@@ -140,4 +126,4 @@ async def scrape_recipe_url(url: str) -> ScrapedRecipe:
 
     # Generic JSON-LD fallback for any remaining domain with structured recipe data.
     logger.warning(f"recipe-scrapers n'a pas pu parser '{domain}', tentative avec le parseur JSON-LD générique.")
-    return await StaticRecipeScraper(url).scrape()
+    return await scrape_static(url)

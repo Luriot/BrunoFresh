@@ -1,7 +1,7 @@
 import { ChangeEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { exportDb, importDb, backupDb } from "../../api/client";
-import type { StatusMsg } from "../../types/ui";
+import type { StatusMsg } from "../../types";
 import { Database, Download, Save, Upload } from "lucide-react";
 
 export function DatabaseTab() {

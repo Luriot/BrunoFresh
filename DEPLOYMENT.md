@@ -74,12 +74,17 @@ Ajoute une variable pour chaque ligne suivante :
    - **Key:** `AUTH_SECRET`
    - **Value:** *Une longue suite de lettres et chiffres générée au hasard (ex: `a8b2c3...`). Si tu ne mets rien, l'app déconnectera tout le monde à chaque redémarrage d'Unraid.*
 
-3. **L'URL d'Ollama (Si utilisé)**
+3. **Clé de Session séparée (Recommandé en production)**
+   - **Name:** `Session Secret`
+   - **Key:** `SESSION_SECRET`
+   - **Value:** *Une autre longue chaîne aléatoire, différente de AUTH_SECRET. Si non définie, AUTH_SECRET est utilisé par défaut.*
+
+4. **L'URL d'Ollama (Si utilisé)**
    - **Name:** `Ollama IP`
    - **Key:** `OLLAMA_BASE_URL`
    - **Value:** `http://192.168.X.X:11434` *(⚠️ Remplace par l'adresse IP de la machine physique hébergeant Ollama. NE METS JAMAIS `localhost` ou `127.0.0.1` sinon le conteneur cherchera Ollama à l'intérieur de lui-même !).*
 
-4. **Sécurité des Cookies (Optionnel)**
+5. **Sécurité des Cookies (Optionnel)**
    - **Name:** `Secure Cookies`
    - **Key:** `AUTH_COOKIE_SECURE`
    - **Value:** `false` *(Si tu accèdes via HTTP localement). Met à `true` uniquement si tu places BrunoFresh derrière un reverse proxy HTTPS comme Nginx Proxy Manager ou Traefik.*

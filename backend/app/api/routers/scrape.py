@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,9 +11,12 @@ from ...config import settings
 from ...database import SessionLocal, get_db
 from ...models import Recipe, ScrapeJob
 from ...schemas import DuplicateWarningInfo, JobStatus, JobStatusResponse, ScrapeRequest, ScrapeResponse
+from ...services.auth import UserClaims
 from ...services.events import JobEvent, job_event_bus
 from ...services.network import validate_public_http_url
 from ...services.orchestrator import persist_scraped_recipe
+from ...services.rate_limiter import check_action_rate_limit
+from ..dependencies import require_auth
 
 logger = logging.getLogger(__name__)
 
@@ -82,13 +85,31 @@ async def _run_scrape_job(job_id: int, force: bool = False) -> None:
 @router.post("/scrape", response_model=ScrapeResponse)
 async def enqueue_scrape(
     payload: ScrapeRequest,
+    claims: UserClaims = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
+    check_action_rate_limit(str(claims.user_id), "scrape", max_calls=5, window_seconds=300)
+
     safe_url = await validate_public_http_url(str(payload.url))
 
     existing = await db.scalar(select(Recipe).where(Recipe.url == safe_url))
     if existing:
         return ScrapeResponse(message="Recipe already exists", url=safe_url, status="completed")
+
+    # Prevent duplicate pending/running jobs for the same URL
+    pending_job = await db.scalar(
+        select(ScrapeJob).where(
+            ScrapeJob.url == safe_url,
+            ScrapeJob.status.in_(["pending", "running"]),
+        )
+    )
+    if pending_job:
+        return ScrapeResponse(
+            message="Scrape job already queued",
+            url=safe_url,
+            job_id=pending_job.id,
+            status=pending_job.status,
+        )
 
     job = ScrapeJob(url=safe_url, status="pending")
     db.add(job)
@@ -118,12 +139,15 @@ async def get_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/jobs/{job_id}/stream")
-async def stream_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
+async def stream_job_status(job_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     job = await db.get(ScrapeJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
     async def event_generator():
+        import time as _time
+        start_time = _time.monotonic()
+        _MAX_STREAM_SECONDS = 300  # 5-minute overall timeout
         async for queue in job_event_bus.subscribe(job_id):
             # Le session de db de FastAPI Dependency se ferme parfois avant que le flux ne finisse, 
             # on ouvre une session autonome pour lire l'état de la base de données de manière asynchrone sécurisée:
@@ -147,6 +171,11 @@ async def stream_job_status(job_id: int, db: AsyncSession = Depends(get_db)):
 
             # Écoute en direct
             while True:
+                if await request.is_disconnected():
+                    return
+                elapsed = _time.monotonic() - start_time
+                if elapsed > _MAX_STREAM_SECONDS:
+                    return
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=2.0)
                     payload: dict = {

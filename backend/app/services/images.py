@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 
 import httpx
 
 from ..config import settings
-from .network import SSRFGuardedTransport, validate_public_host_for_download
+from .network import SSRFGuardedTransport
 
 logger = logging.getLogger(__name__)
 
@@ -31,29 +32,27 @@ def thumb_path_for(image_path: Path) -> Path:
     return image_path.with_name(f"{image_path.stem}_thumb.webp")
 
 
-def _process_image(src: Path) -> Path | None:
-    """Cap the original at 1200 px and generate a WebP thumbnail (synchronous).
+def process_image(src: Path, *, thumb_only: bool = False) -> Path | None:
+    """Cap the original at 1200 px, convert to WebP, and (re)generate the WebP
+    thumbnail next to it. With ``thumb_only=True`` the original is left untouched
+    and only the thumbnail is regenerated.
 
-    Both operations are batched here so the image is only opened twice total.
     Run inside a thread executor to avoid blocking the event loop.
     """
     try:
         from PIL import Image as PILImage  # noqa: PLC0415
 
-        # ── 1. Cap original and convert to WebP ────────────────────────────
-        with PILImage.open(src) as img:
-            if img.width > _FULL_MAX_SIDE or img.height > _FULL_MAX_SIDE:
-                img.thumbnail((_FULL_MAX_SIDE, _FULL_MAX_SIDE), PILImage.LANCZOS)
-                logger.debug("Original %s capped to %dpx side", src.name, _FULL_MAX_SIDE)
-            if img.mode not in {"RGB", "RGBA"}:
-                img = img.convert("RGB")
-            img.save(src, "WEBP", quality=88, method=4)
+        if not thumb_only:
+            with PILImage.open(src) as img:
+                if img.width > _FULL_MAX_SIDE or img.height > _FULL_MAX_SIDE:
+                    img.thumbnail((_FULL_MAX_SIDE, _FULL_MAX_SIDE), PILImage.LANCZOS)
+                if img.mode not in {"RGB", "RGBA"}:
+                    img = img.convert("RGB")
+                img.save(src, "WEBP", quality=88, method=4)
 
-        # ── 2. Generate WebP thumbnail ────────────────────────────────────────
         dest = thumb_path_for(src)
         # Clean up any legacy _thumb.jpg that may exist from a previous version
-        legacy_jpg = src.with_name(f"{src.stem}_thumb.jpg")
-        legacy_jpg.unlink(missing_ok=True)
+        src.with_name(f"{src.stem}_thumb.jpg").unlink(missing_ok=True)
 
         with PILImage.open(src) as img:
             img.thumbnail(_THUMB_MAX_SIZE, PILImage.LANCZOS)
@@ -67,95 +66,19 @@ def _process_image(src: Path) -> Path | None:
         return None
 
 
-def process_uploaded_image(src: Path) -> Path | None:
-    """Convert to JPEG, cap at 1200 px, and generate a WebP thumbnail.
-
-    Unlike :func:`_process_image` (used for downloads), this always rewrites
-    the file as JPEG so that PNG/WebP uploads are stored in a consistent format.
-    Run inside a thread executor to avoid blocking the event loop.
-    """
-    try:
-        from PIL import Image as PILImage  # noqa: PLC0415
-
-        # ── 1. Convert + cap → WebP ──────────────────────────────────────────
-        with PILImage.open(src) as img:
-            if img.width > _FULL_MAX_SIDE or img.height > _FULL_MAX_SIDE:
-                img.thumbnail((_FULL_MAX_SIDE, _FULL_MAX_SIDE), PILImage.LANCZOS)
-            if img.mode not in {"RGB", "RGBA"}:
-                img = img.convert("RGB")
-            img.save(src, "WEBP", quality=88, method=4)
-
-        # ── 2. Generate WebP thumbnail ────────────────────────────────────────
-        dest = thumb_path_for(src)
-        legacy_jpg = src.with_name(f"{src.stem}_thumb.jpg")
-        legacy_jpg.unlink(missing_ok=True)
-
-        with PILImage.open(src) as img:
-            img.thumbnail(_THUMB_MAX_SIZE, PILImage.LANCZOS)
-            if img.mode not in {"RGB", "RGBA"}:
-                img = img.convert("RGB")
-            img.save(dest, "WEBP", quality=_THUMB_WEBP_QUALITY, method=4)
-        return dest
-
-    except Exception as exc:
-        logger.warning("Impossible de traiter l'image uploadée %s : %s", src, exc)
-        return None
-
-
 def migrate_to_webp(src: Path) -> Path | None:
-    """Convert an existing image to WebP, rename the file if needed, regenerate thumbnail.
+    """Convert an existing image to WebP in place, rename to ``.webp`` if needed.
 
-    Saves as ``{stem}.webp``, deletes the old file if it had a different extension,
-    then regenerates the thumbnail from the new file.
+    The thumbnail name is stem-based, so it stays valid across the rename.
     Run inside a thread executor to avoid blocking the event loop.
     """
-    try:
-        from PIL import Image as PILImage  # noqa: PLC0415
-
-        dest = src.with_suffix(".webp")
-        with PILImage.open(src) as img:
-            if img.width > _FULL_MAX_SIDE or img.height > _FULL_MAX_SIDE:
-                img.thumbnail((_FULL_MAX_SIDE, _FULL_MAX_SIDE), PILImage.LANCZOS)
-            if img.mode not in {"RGB", "RGBA"}:
-                img = img.convert("RGB")
-            img.save(dest, "WEBP", quality=88, method=4)
-
-        # Remove old file if extension changed
-        if src.suffix.lower() != ".webp":
-            src.unlink(missing_ok=True)
-
-        # Regenerate thumbnail from new file
-        old_thumb = thumb_path_for(dest)
-        old_thumb.unlink(missing_ok=True)
-        generate_thumbnail(dest)
-
+    dest = src.with_suffix(".webp")
+    if process_image(src) is None:
+        return None
+    if dest != src:
+        src.replace(dest)
         logger.debug("Migré %s → %s", src.name, dest.name)
-        return dest
-
-    except Exception as exc:
-        logger.warning("Impossible de migrer %s en WebP : %s", src, exc)
-        return None
-
-
-def generate_thumbnail(src: Path) -> Path | None:
-    """Generate a WebP thumbnail only (no cap). Used for lazy generation in the router."""
-    try:
-        from PIL import Image as PILImage  # noqa: PLC0415
-
-        dest = thumb_path_for(src)
-        legacy_jpg = src.with_name(f"{src.stem}_thumb.jpg")
-        legacy_jpg.unlink(missing_ok=True)
-
-        with PILImage.open(src) as img:
-            img.thumbnail(_THUMB_MAX_SIZE, PILImage.LANCZOS)
-            if img.mode not in {"RGB", "RGBA"}:
-                img = img.convert("RGB")
-            img.save(dest, "WEBP", quality=_THUMB_WEBP_QUALITY, method=4)
-        return dest
-
-    except Exception as exc:
-        logger.warning("Impossible de générer le thumbnail pour %s : %s", src, exc)
-        return None
+    return dest
 
 
 async def download_image(image_url: str | None, recipe_id: int) -> str | None:
@@ -164,15 +87,10 @@ async def download_image(image_url: str | None, recipe_id: int) -> str | None:
         return None
 
     logger.info(f"Tentative de téléchargement de l'image ({image_url}) pour la recette {recipe_id}...")
-    is_safe_target = await validate_public_host_for_download(image_url)
-    if not is_safe_target:
-        logger.warning(f"Cible non sécurisée ou nom d'hôte invalide pour le téléchargement: {image_url}")
-        return None
-
     target = settings.images_dir / f"recipe_{recipe_id}.webp"
     try:
-        # SSRFGuardedTransport re-validates the resolved IP at connect time,
-        # preventing DNS rebinding attacks.
+        # SSRFGuardedTransport validates the resolved IP at connect time,
+        # preventing SSRF including via DNS rebinding.
         transport = SSRFGuardedTransport()
         async with httpx.AsyncClient(transport=transport, timeout=20, follow_redirects=True) as client:
             response = await client.get(image_url)
@@ -190,8 +108,7 @@ async def download_image(image_url: str | None, recipe_id: int) -> str | None:
 
             target.write_bytes(content)
 
-        import asyncio  # noqa: PLC0415
-        await asyncio.get_running_loop().run_in_executor(None, _process_image, target)
+        await asyncio.get_running_loop().run_in_executor(None, process_image, target)
 
         rel = Path("images") / target.name
         logger.info(f"Image téléchargée avec succès et sauvegardée sous {rel}")

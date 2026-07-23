@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from functools import partial
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 
 from ...config import settings
-from ...services.images import generate_thumbnail
+from ...services.images import process_image
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
@@ -65,7 +66,7 @@ async def get_image(file_name: str):
                 if resolved.exists():
                     return FileResponse(resolved, headers=_CACHE_HEADERS)
                 generated = await asyncio.get_running_loop().run_in_executor(
-                    None, generate_thumbnail, original
+                    None, partial(process_image, original, thumb_only=True)
                 )
                 if generated and generated.exists():
                     return FileResponse(generated, headers=_CACHE_HEADERS)

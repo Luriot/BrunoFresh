@@ -1,7 +1,7 @@
 """Unit tests for app.services.dedupe — pure logic, no DB required."""
 import pytest
 
-from app.services.dedupe import extract_image_base_key, looks_like_duplicate, similarity_score
+from app.services.dedupe import extract_image_base_key, similarity_score
 
 
 class TestExtractImageBaseKey:
@@ -114,41 +114,3 @@ class TestSimilarityScore:
             ["beef"],
         )
         assert title_score == 100.0
-
-
-class TestLooksLikeDuplicate:
-    def test_near_duplicate_returns_true(self):
-        assert looks_like_duplicate(
-            "Pasta Carbonara",
-            ["pasta", "eggs", "bacon", "parmesan", "pepper"],
-            "Pasta Carbonara",
-            ["pasta", "eggs", "bacon", "parmesan", "pepper"],
-        )
-
-    def test_different_recipe_returns_false(self):
-        assert not looks_like_duplicate(
-            "Beef Stew",
-            ["beef", "carrot", "potato", "onion"],
-            "Lemon Tart",
-            ["lemon", "butter", "sugar", "flour"],
-        )
-
-    def test_same_title_different_ingredients_returns_false(self):
-        """Title matches but ingredient set is very different → not a duplicate."""
-        assert not looks_like_duplicate(
-            "Chicken Dish",
-            ["chicken", "rice", "pea", "carrot", "onion", "garlic", "tomato", "spice"],
-            "Chicken Dish",
-            ["chicken", "pasta", "cream", "mushroom"],
-        )
-
-    def test_custom_thresholds_override(self):
-        """Lower thresholds make matching more permissive."""
-        assert looks_like_duplicate(
-            "Soup",
-            ["carrot", "celery"],
-            "Soup de Carottes",
-            ["carrot", "celery"],
-            title_threshold=50,
-            ingredients_threshold=0.5,
-        )

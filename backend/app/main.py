@@ -92,7 +92,7 @@ app.add_middleware(
     allow_methods=list(settings.allowed_methods),
     allow_headers=list(settings.allowed_headers),
 )
-app.add_middleware(SessionMiddleware, secret_key=settings.auth_secret, same_site="strict", https_only=settings.auth_cookie_secure)
+app.add_middleware(SessionMiddleware, secret_key=settings.session_secret, same_site="strict", https_only=settings.auth_cookie_secure)
 
 
 @app.exception_handler(Exception)

@@ -11,6 +11,7 @@ import httpx
 from rapidfuzz import fuzz
 
 from .dedupe import extract_image_base_key
+from ..utils.parsing import normalize_name, parse_nutrition_int
 
 logger = logging.getLogger(__name__)
 
@@ -115,13 +116,6 @@ def _parse_iso_duration(value: object) -> int | None:
     return None
 
 
-def _normalize_name(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s]", " ", text)  # remove punctuation (,  & ' etc.) but keep accented chars
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
 _LABEL_ROUGE_RE = re.compile(r"\blabel\s+rouge\b", re.IGNORECASE)
 
 
@@ -161,8 +155,8 @@ def _dedupe_by_name_similarity(
             continue
 
         # ── Tier 2: name similarity ───────────────────────────────────────────
-        norm = _normalize_name(hit.name)
-        if any(fuzz.token_set_ratio(norm, _normalize_name(a.name)) >= threshold for a in accepted):
+        norm = normalize_name(hit.name)
+        if any(fuzz.token_set_ratio(norm, normalize_name(a.name)) >= threshold for a in accepted):
             logger.debug("HF dedup (name): skipping '%s'", hit.name)
             continue
 
@@ -170,19 +164,6 @@ def _dedupe_by_name_similarity(
         accepted_base_keys.append(hit_key)
 
     return accepted
-
-
-def _parse_nutrition_int(value: object) -> int | None:
-    if isinstance(value, (int, float)):
-        return int(value)
-    if isinstance(value, str):
-        digits = "".join(ch for ch in value if ch.isdigit() or ch == ".")
-        if digits:
-            try:
-                return int(round(float(digits)))
-            except ValueError:
-                return None
-    return None
 
 
 def _items_to_hits(items: list[dict]) -> list[HFRecipeHit]:
@@ -213,10 +194,10 @@ def _items_to_hits(items: list[dict]) -> list[HFRecipeHit]:
         nutrition = item.get("nutrition") or {}
         if not nutrition:
             nutrition = item.get("calories") or {}
-        kcal = _parse_nutrition_int(nutrition.get("kcal") or nutrition.get("calories") or nutrition.get("caloriesPerServing"))
-        protein_g = _parse_nutrition_int(nutrition.get("protein") or nutrition.get("proteinContent"))
-        carbs_g = _parse_nutrition_int(nutrition.get("carbs") or nutrition.get("carbohydrateContent"))
-        fat_g = _parse_nutrition_int(nutrition.get("fat") or nutrition.get("fatContent"))
+        kcal = parse_nutrition_int(nutrition.get("kcal") or nutrition.get("calories") or nutrition.get("caloriesPerServing"))
+        protein_g = parse_nutrition_int(nutrition.get("protein") or nutrition.get("proteinContent"))
+        carbs_g = parse_nutrition_int(nutrition.get("carbs") or nutrition.get("carbohydrateContent"))
+        fat_g = parse_nutrition_int(nutrition.get("fat") or nutrition.get("fatContent"))
         hits.append(HFRecipeHit(
             id=recipe_id,
             name=item.get("name", ""),

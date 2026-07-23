@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.config import settings
-from app.services.rate_limiter import _attempts as _login_attempts, MAX_ATTEMPTS
+from app.services.rate_limiter import _action_windows, MAX_ATTEMPTS
 from app.services.auth import hash_password, issue_access_token, verify_access_token
 from app.models import User
 
@@ -12,9 +12,9 @@ from app.models import User
 @pytest.fixture(autouse=True)
 def _reset_rate_limit():
     """Clear in-memory rate-limit state before and after each test."""
-    _login_attempts.clear()
+    _action_windows.clear()
     yield
-    _login_attempts.clear()
+    _action_windows.clear()
 
 
 @pytest.fixture

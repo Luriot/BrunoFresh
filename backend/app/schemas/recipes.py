@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from ..services.images import resolve_image_url
 from ..utils.format_qty import format_qty as _format_qty
@@ -66,19 +66,9 @@ class RecipeCreate(NutritionFields):
 class RecipePatch(NutritionFields):
     instructions_text: str | None = Field(default=None, max_length=50_000)
     prep_time_minutes: int | None = Field(default=None, ge=0, le=1440)
-    kcal: int | None = Field(default=None, ge=0)
-    protein_g: int | None = Field(default=None, ge=0)
-    carbs_g: int | None = Field(default=None, ge=0)
-    fat_g: int | None = Field(default=None, ge=0)
 
 
 # ── Output ────────────────────────────────────────────────────────────────────
-
-class IngredientOut(BilingualNamedItem):
-    quantity: float
-    unit: str
-    category: str
-
 
 class RecipeIngredientOut(BaseModel):
     raw_string: str

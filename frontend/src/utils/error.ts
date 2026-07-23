@@ -13,9 +13,9 @@ export function extractApiDetail(error: unknown): string | null {
     return null;
   }
 
-  const response = (error as { response?: { data?: { detail?: unknown } } }).response;
-  if (typeof response?.data?.detail === "string") {
-    return sanitizeInlineMessage(response.data.detail);
+  const detail = (error as { detail?: unknown }).detail;
+  if (typeof detail === "string") {
+    return sanitizeInlineMessage(detail);
   }
 
   const message = (error as { message?: unknown }).message;

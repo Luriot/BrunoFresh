@@ -27,21 +27,27 @@ class NormalizedIngredient:
 
 
 def _sanitize_raw_ingredient(value: str) -> str:
-    # Keep only short, plain text snippets to reduce prompt-injection surface.
     cleaned = (value or "").replace("`", " ").replace("\n", " ").replace("\r", " ")
+    for ch in ("{", "}", "[", "]", "\\"):
+        cleaned = cleaned.replace(ch, " ")
+    cleaned = re.sub(
+        r"(?:system|instruction|ignore\s+previous|you\s+are)\s*:",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
     cleaned = " ".join(cleaned.split())
     return cleaned[:200]
+
+
+_CATEGORY_LOOKUP: dict[str, str] = {c.lower(): c for c in settings.categories}
 
 
 def _coerce_category(value: str) -> str:
     value = (value or "Other").strip()
     if value in settings.categories:
         return value
-    lowered = value.lower()
-    for category in settings.categories:
-        if category.lower() == lowered:
-            return category
-    return "Other"
+    return _CATEGORY_LOOKUP.get(value.lower(), "Other")
 
 
 # ── Canonical units (metric / European) ─────────────────────────────────────
@@ -489,7 +495,8 @@ async def _ollama_parse_chunk(
         f"Allowed units (metric/European only): {units_str}. "
         f"Allowed categories: {categories_str}. "
         "Translate ALL ingredient names to both English and French. "
-        f"Process ALL {len(chunk)} items. Maintain the exact idx.\n\n"
+        f"Process ALL {len(chunk)} items. Maintain the exact idx. "
+        "Never include free-form text outside the JSON structure.\n\n"
         f"Input:\n{json.dumps(chunk, ensure_ascii=False)}"
     )
 

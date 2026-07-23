@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { User } from "../types";
-import { UserAvatar } from "./UserAvatar";
+import { Avatar } from "./Avatar";
 import { patchLanguage } from "../api/client";
 
 type Props = {
@@ -77,7 +77,7 @@ export function Navbar({ user, onLogout, isDark, onToggleDark }: Readonly<Props>
           </nav>
 
           <NavLink to="/profile" className="rounded-full" aria-label={user.username}>
-            <UserAvatar user={user} size="h-9 w-9" />
+            <Avatar username={user.username} avatarUrl={user.avatar_url} size="h-9 w-9" />
           </NavLink>
 
           <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-[#3e3e42] dark:bg-[#252526]">
@@ -152,7 +152,7 @@ export function Navbar({ user, onLogout, isDark, onToggleDark }: Readonly<Props>
                 }
                 onClick={closeMenu}
               >
-                <UserAvatar user={user} size="h-6 w-6" />
+                <Avatar username={user.username} avatarUrl={user.avatar_url} size="h-6 w-6" />
                 <span>{user.username}</span>
               </NavLink>
             </nav>

@@ -32,6 +32,8 @@ _NOT_FOUND = "Not Found"
 
 def register_spa(app: FastAPI) -> None:
     frontend_dist_dir = _resolve_frontend_dist_dir()
+    if frontend_dist_dir:
+        frontend_dist_dir = frontend_dist_dir.resolve()
 
     if frontend_dist_dir:
         assets_dir = frontend_dist_dir / "assets"
@@ -52,6 +54,9 @@ def register_spa(app: FastAPI) -> None:
             if "\x00" in full_path:
                 raise HTTPException(status_code=400, detail="Bad Request")
             requested_file = frontend_dist_dir / full_path
+            requested_file = requested_file.resolve()
+            if not requested_file.is_relative_to(frontend_dist_dir):
+                raise HTTPException(status_code=404, detail="Not Found")
             if requested_file.exists() and requested_file.is_file():
                 # .webmanifest is not in Python's mimetypes DB; serve it correctly
                 # so Chrome accepts it as a PWA manifest.

@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { deleteIngredient, fetchIngredientsAdmin, mergeIngredients, patchIngredient, suggestIngredientMerges } from "../../api/client";
 import type { IngredientDetail, MergeSuggestion } from "../../types";
-import type { StatusMsg } from "../../types/ui";
+import type { StatusMsg } from "../../types";
 import { CATEGORIES } from "../../constants/categories";
 import { SortIcon } from "../../components/SortIcon";
 import { ArrowRight, Pencil, Sparkles, Trash2, X } from "lucide-react";

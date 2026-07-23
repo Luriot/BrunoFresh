@@ -1,4 +1,3 @@
-import axios from "axios";
 import type {
   CartInput,
   HFSearchResult,
@@ -27,53 +26,104 @@ export { API_BASE_URL };
 
 let unauthorizedHandler: (() => void) | null = null;
 
-const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
-  withCredentials: true,
-});
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const status = error?.response?.status;
-    const endpoint = String(error?.config?.url ?? "");
-    if (status === 401 && !endpoint.includes("/auth/login") && !endpoint.includes("/auth/me")) {
-      unauthorizedHandler?.();
-    }
-    return Promise.reject(error);
-  }
-);
-
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public detail: string | null,
+  ) {
+    super(detail ?? `HTTP ${status}`);
+    this.name = "ApiError";
+  }
+}
+
+type Options = {
+  params?: Record<string, unknown>;
+  body?: unknown;
+  form?: FormData;
+};
+
+function queryString(params?: Record<string, unknown>): string {
+  if (!params) return "";
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) sp.set(key, String(value));
+  }
+  const s = sp.toString();
+  return s ? `?${s}` : "";
+}
+
+async function callApi(method: string, path: string, opts: Options = {}): Promise<Response> {
+  const res = await fetch(`${API_BASE_URL}/api${path}${queryString(opts.params)}`, {
+    method,
+    credentials: "include",
+    headers: opts.form ? undefined : opts.body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
+  });
+  if (res.status === 401 && !path.includes("/auth/login") && !path.includes("/auth/me")) {
+    unauthorizedHandler?.();
+  }
+  if (!res.ok) {
+    const data: unknown = await res.json().catch(() => null);
+    const detail =
+      data && typeof data === "object" && typeof (data as { detail?: unknown }).detail === "string"
+        ? (data as { detail: string }).detail
+        : null;
+    throw new ApiError(res.status, detail);
+  }
+  return res;
+}
+
+async function request<T>(method: string, path: string, opts: Options = {}): Promise<T> {
+  const res = await callApi(method, path, opts);
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
 }
 
 export function buildJobStreamUrl(jobId: number): string {
   return `${API_BASE_URL}/api/jobs/${jobId}/stream`;
 }
 
+// ── Auth / profile ──────────────────────────────────────────────────────────
+
 export async function login(username: string, password: string): Promise<User> {
-  const { data } = await api.post<User>("/auth/login", { username, password });
-  return data;
+  return request<User>("POST", "/auth/login", { body: { username, password } });
 }
 
 export async function logout(): Promise<void> {
-  await api.post("/auth/logout");
+  await request("POST", "/auth/logout");
 }
 
 export async function fetchMe(): Promise<User | null> {
   try {
-    const { data } = await api.get<User>("/auth/me");
-    return data;
+    return await request<User>("GET", "/auth/me");
   } catch {
     return null;
   }
 }
 
 export async function patchLanguage(language: string): Promise<User> {
-  const { data } = await api.patch<User>("/users/me/language", { language });
-  return data;
+  return request<User>("PATCH", "/users/me/language", { body: { language } });
 }
+
+export async function patchMe(payload: {
+  username?: string;
+  current_password: string;
+  new_password?: string;
+}): Promise<User> {
+  return request<User>("PATCH", "/users/me", { body: payload });
+}
+
+export async function uploadAvatar(file: File): Promise<User> {
+  const form = new FormData();
+  form.append("file", file);
+  return request<User>("POST", "/users/me/avatar", { form });
+}
+
+// ── Recipes ─────────────────────────────────────────────────────────────────
 
 export async function fetchRecipes(params?: {
   q?: string;
@@ -84,91 +134,79 @@ export async function fetchRecipes(params?: {
   limit?: number;
   offset?: number;
 }) {
-  const { data } = await api.get<RecipeListItem[]>("/recipes", { params });
-  return data;
+  return request<RecipeListItem[]>("GET", "/recipes", { params });
 }
 
 export async function fetchRecipeDetail(id: number) {
-  const { data } = await api.get<RecipeDetail>(`/recipes/${id}`);
-  return data;
+  return request<RecipeDetail>("GET", `/recipes/${id}`);
 }
 
 export async function createCustomRecipe(payload: RecipeCreate) {
-  const { data } = await api.post<RecipeDetail>("/recipes", payload);
-  return data;
+  return request<RecipeDetail>("POST", "/recipes", { body: payload });
 }
 
 export async function uploadRecipeImage(recipeId: number, file: File) {
   const form = new FormData();
   form.append("file", file);
-  const { data } = await api.post<RecipeDetail>(`/recipes/${recipeId}/image`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return data;
+  return request<RecipeDetail>("POST", `/recipes/${recipeId}/image`, { form });
 }
 
 export async function retryRecipeImage(recipeId: number) {
-  const { data } = await api.post<{ recipe_id: number; success: boolean; image_local_path: string | null; error: string | null }>(
+  return request<{ recipe_id: number; success: boolean; image_local_path: string | null; error: string | null }>(
+    "POST",
     `/admin/recipes/${recipeId}/retry-image`,
   );
-  return data;
 }
 
 export async function retryAllMissingImages() {
-  const { data } = await api.post<{ retried: number; success: number; failed: { recipe_id: number; success: boolean; error: string | null }[] }>(
+  return request<{ retried: number; success: number; failed: { recipe_id: number; success: boolean; error: string | null }[] }>(
+    "POST",
     "/admin/recipes/retry-images",
   );
-  return data;
 }
 
 export async function convertImagesToWebp() {
-  const { data } = await api.post<{ converted: number; skipped: number; failed: number }>(
+  return request<{ converted: number; skipped: number; failed: number }>(
+    "POST",
     "/admin/recipes/convert-images-to-webp",
   );
-  return data;
 }
 
 export async function convertSingleImageToWebp(recipeId: number) {
-  const { data } = await api.post<{ converted: number; skipped: number; failed: number; image_local_path: string | null }>(
+  return request<{ converted: number; skipped: number; failed: number; image_local_path: string | null }>(
+    "POST",
     `/admin/recipes/${recipeId}/convert-image-to-webp`,
   );
-  return data;
 }
 
 export async function queueScrape(url: string, force = false) {
-  const { data } = await api.post<ScrapeResponse>("/scrape", { url, force });
-  return data;
+  return request<ScrapeResponse>("POST", "/scrape", { body: { url, force } });
 }
 
 export async function searchHelloFresh(query: string): Promise<HFSearchResult[]> {
-  const { data } = await api.get<HFSearchResult[]>("/hellofresh/search", {
-    params: { q: query },
-  });
-  return data;
+  return request<HFSearchResult[]>("GET", "/hellofresh/search", { params: { q: query } });
 }
 
+// ── Shopping lists ──────────────────────────────────────────────────────────
+
 export async function createShoppingList(items: CartInput[], label?: string) {
-  const { data } = await api.post<ShoppingList>("/lists", { items, label });
-  return data;
+  return request<ShoppingList>("POST", "/lists", { body: { items, label } });
 }
 
 export async function fetchShoppingLists() {
-  const { data } = await api.get<ShoppingListSummary[]>("/lists");
-  return data;
+  return request<ShoppingListSummary[]>("GET", "/lists");
 }
 
 export async function fetchShoppingList(listId: number) {
-  const { data } = await api.get<ShoppingList>(`/lists/${listId}`);
-  return data;
+  return request<ShoppingList>("GET", `/lists/${listId}`);
 }
 
 export async function patchShoppingList(listId: number, label: string | null) {
-  const { data } = await api.patch<ShoppingList>(`/lists/${listId}`, { label });
-  return data;
+  return request<ShoppingList>("PATCH", `/lists/${listId}`, { body: { label } });
 }
 
 export async function deleteShoppingList(listId: number) {
-  await api.delete(`/lists/${listId}`);
+  await request("DELETE", `/lists/${listId}`);
 }
 
 export async function patchShoppingListItem(
@@ -176,97 +214,83 @@ export async function patchShoppingListItem(
   itemId: number,
   patch: { is_already_owned?: boolean; is_excluded?: boolean },
 ) {
-  const { data } = await api.patch<ShoppingListItem>(`/lists/${listId}/items/${itemId}`, patch);
-  return data;
+  return request<ShoppingListItem>("PATCH", `/lists/${listId}/items/${itemId}`, { body: patch });
 }
 
 export async function addShoppingListCustomItem(listId: number, payload: ShoppingListCustomItemInput) {
-  const { data } = await api.post<ShoppingListItem>(`/lists/${listId}/items`, payload);
-  return data;
+  return request<ShoppingListItem>("POST", `/lists/${listId}/items`, { body: payload });
 }
 
 export async function deleteShoppingListItem(listId: number, itemId: number) {
-  await api.delete(`/lists/${listId}/items/${itemId}`);
+  await request("DELETE", `/lists/${listId}/items/${itemId}`);
 }
 
 // ── Recipes extras ────────────────────────────────────────────────────────
 
 export async function patchRecipe(id: number, payload: { instructions_text?: string; prep_time_minutes?: number }) {
-  const { data } = await api.patch<RecipeDetail>(`/recipes/${id}`, payload);
-  return data;
+  return request<RecipeDetail>("PATCH", `/recipes/${id}`, { body: payload });
 }
 
 export async function toggleFavorite(id: number): Promise<{ is_favorite_by_me: boolean }> {
-  const { data } = await api.post<{ is_favorite_by_me: boolean }>(`/recipes/${id}/favorite`);
-  return data;
+  return request<{ is_favorite_by_me: boolean }>("POST", `/recipes/${id}/favorite`);
 }
 
 export async function deleteRecipe(id: number) {
-  await api.delete(`/recipes/${id}`);
+  await request("DELETE", `/recipes/${id}`);
 }
 
 export async function setRecipeTags(recipeId: number, tagIds: number[]) {
-  const { data } = await api.put<RecipeDetail>(`/recipes/${recipeId}/tags`, { tag_ids: tagIds });
-  return data;
+  return request<RecipeDetail>("PUT", `/recipes/${recipeId}/tags`, { body: { tag_ids: tagIds } });
 }
 
 export async function fetchSimilarRecipes(recipeId: number, limit = 5) {
-  const { data } = await api.get<RecipeListItem[]>(`/recipes/${recipeId}/similar`, { params: { limit } });
-  return data;
+  return request<RecipeListItem[]>("GET", `/recipes/${recipeId}/similar`, { params: { limit } });
 }
 
 export async function rescrapeRecipe(recipeId: number) {
-  const { data } = await api.post<ScrapeResponse>(`/recipes/${recipeId}/rescrape`);
-  return data;
+  return request<ScrapeResponse>("POST", `/recipes/${recipeId}/rescrape`);
 }
 
 export async function formatRecipeInstructions(recipeId: number) {
-  const { data } = await api.post<RecipeDetail>(`/recipes/${recipeId}/format-instructions`);
-  return data;
+  return request<RecipeDetail>("POST", `/recipes/${recipeId}/format-instructions`);
 }
 
 // ── Tags ──────────────────────────────────────────────────────────────────
 
 export async function fetchTags() {
-  const { data } = await api.get<Tag[]>("/tags");
-  return data;
+  return request<Tag[]>("GET", "/tags");
 }
 
 export async function createTag(name: string, color?: string) {
-  const { data } = await api.post<Tag>("/tags", { name, color });
-  return data;
+  return request<Tag>("POST", "/tags", { body: { name, color } });
 }
 
 export async function deleteTag(tagId: number) {
-  await api.delete(`/tags/${tagId}`);
+  await request("DELETE", `/tags/${tagId}`);
 }
 
 // ── Pantry ────────────────────────────────────────────────────────────────
 
 export async function fetchPantry() {
-  const { data } = await api.get<PantryItem[]>("/pantry");
-  return data;
+  return request<PantryItem[]>("GET", "/pantry");
 }
 
 export async function addPantryItem(payload: { name: string; lang: string; ingredient_id?: number; category?: string }) {
-  const { data } = await api.post<PantryItem>("/pantry", payload);
-  return data;
+  return request<PantryItem>("POST", "/pantry", { body: payload });
 }
 
 export async function removePantryItem(itemId: number) {
-  await api.delete(`/pantry/${itemId}`);
+  await request("DELETE", `/pantry/${itemId}`);
 }
 
 // ── Meal Plans ────────────────────────────────────────────────────────────
 
 export async function fetchMealPlans() {
-  const { data } = await api.get<MealPlanSummary[]>("/meal-plans");
-  return data;
+  return request<MealPlanSummary[]>("GET", "/meal-plans");
 }
 
 export async function createMealPlan(payload: { label?: string; week_start_date?: string }) {
-  const { data } = await api.post<MealPlan>("/meal-plans", payload);
-  return data;
+  return request<MealPlan>("POST", "/meal-plans", { body: payload });
 }
 
 export async function generateQuickPlan(payload: {
@@ -277,17 +301,15 @@ export async function generateQuickPlan(payload: {
   days?: number;
   target_servings?: number;
 }) {
-  const { data } = await api.post<MealPlan>("/meal-plans/quick-generate", payload);
-  return data;
+  return request<MealPlan>("POST", "/meal-plans/quick-generate", { body: payload });
 }
 
 export async function fetchMealPlan(planId: number) {
-  const { data } = await api.get<MealPlan>(`/meal-plans/${planId}`);
-  return data;
+  return request<MealPlan>("GET", `/meal-plans/${planId}`);
 }
 
 export async function deleteMealPlan(planId: number) {
-  await api.delete(`/meal-plans/${planId}`);
+  await request("DELETE", `/meal-plans/${planId}`);
 }
 
 export async function addMealPlanEntry(planId: number, payload: {
@@ -296,76 +318,64 @@ export async function addMealPlanEntry(planId: number, payload: {
   meal_slot?: string;
   target_servings: number;
 }) {
-  const { data } = await api.post<MealPlanEntry>(`/meal-plans/${planId}/entries`, payload);
-  return data;
+  return request<MealPlanEntry>("POST", `/meal-plans/${planId}/entries`, { body: payload });
 }
 
 export async function deleteMealPlanEntry(planId: number, entryId: number) {
-  await api.delete(`/meal-plans/${planId}/entries/${entryId}`);
+  await request("DELETE", `/meal-plans/${planId}/entries/${entryId}`);
 }
 
 export async function patchMealPlanEntry(planId: number, entryId: number, payload: { target_servings: number }) {
-  const { data } = await api.patch<MealPlanEntry>(`/meal-plans/${planId}/entries/${entryId}`, payload);
-  return data;
+  return request<MealPlanEntry>("PATCH", `/meal-plans/${planId}/entries/${entryId}`, { body: payload });
 }
 
 export async function patchMealPlan(planId: number, payload: { label: string | null }) {
-  const { data } = await api.patch<MealPlan>(`/meal-plans/${planId}`, payload);
-  return data;
+  return request<MealPlan>("PATCH", `/meal-plans/${planId}`, { body: payload });
 }
 
 export async function generateListFromMealPlan(planId: number) {
-  const { data } = await api.post<ShoppingList>(`/meal-plans/${planId}/generate-list`);
-  return data;
+  return request<ShoppingList>("POST", `/meal-plans/${planId}/generate-list`);
 }
 
 // ── Admin: ingredients ────────────────────────────────────────────────────
 
 export async function fetchIngredientsAdmin(params?: { q?: string; needs_review?: boolean; limit?: number; offset?: number; sort_by?: string; sort_order?: "asc" | "desc" }) {
-  const { data } = await api.get<IngredientDetail[]>("/admin/ingredients", { params });
-  return data;
+  return request<IngredientDetail[]>("GET", "/admin/ingredients", { params });
 }
 
 export async function deleteIngredient(id: number) {
-  await api.delete(`/admin/ingredients/${id}`);
+  await request("DELETE", `/admin/ingredients/${id}`);
 }
 
 export async function patchIngredient(id: number, payload: { name: string; lang: string; category: string }) {
-  const { data } = await api.patch<IngredientDetail>(`/ingredients/${id}`, payload);
-  return data;
+  return request<IngredientDetail>("PATCH", `/ingredients/${id}`, { body: payload });
 }
 
 export async function mergeIngredients(sourceId: number, targetId: number) {
-  const { data } = await api.post<IngredientDetail>("/admin/ingredients/merge", { source_id: sourceId, target_id: targetId });
-  return data;
+  return request<IngredientDetail>("POST", "/admin/ingredients/merge", { body: { source_id: sourceId, target_id: targetId } });
 }
 
 export async function findDuplicateRecipes() {
-  const { data } = await api.post<RecipeSimilarPairsResponse>("/admin/recipes/find-duplicates");
-  return data;
+  return request<RecipeSimilarPairsResponse>("POST", "/admin/recipes/find-duplicates");
 }
 
 export async function suggestIngredientMerges() {
-  const { data } = await api.post<MergeSuggestionResponse>("/admin/ingredients/ai-suggest-merges");
-  return data;
+  return request<MergeSuggestionResponse>("POST", "/admin/ingredients/ai-suggest-merges");
 }
 
 // ── Admin: database ───────────────────────────────────────────────────────
 
 export async function exportDb(): Promise<Blob> {
-  const response = await api.get("/admin/db/export", { responseType: "blob" });
-  return response.data as Blob;
+  const res = await callApi("GET", "/admin/db/export");
+  return res.blob();
 }
 
 export async function backupDb(): Promise<{ filename: string }> {
-  const { data } = await api.post<{ filename: string }>("/admin/db/backup");
-  return data;
+  return request<{ filename: string }>("POST", "/admin/db/backup");
 }
 
 export async function importDb(file: File): Promise<void> {
   const form = new FormData();
   form.append("file", file);
-  await api.post("/admin/db/import", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  await request("POST", "/admin/db/import", { form });
 }

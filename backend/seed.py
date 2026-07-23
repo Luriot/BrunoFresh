@@ -11,15 +11,19 @@ Env vars:
     SEED_USER1_PASSWORD   (default: lurio123)
     SEED_USER2_USERNAME   (default: nursek)
     SEED_USER2_PASSWORD   (default: nursek123)
+
+In production (APP_ENV=production), default passwords are rejected.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+import sys
 
 from sqlalchemy import select
 
+from app.config import settings, PRODUCTION_ENVIRONMENTS
 from app.database import SessionLocal
 from app.models import User
 from app.services.auth import hash_password
@@ -28,6 +32,8 @@ from app.services.auth import hash_password
 def _env(key: str, default: str) -> str:
     return os.environ.get(key, default)
 
+
+_INSECURE_DEFAULTS = {"admin123", "lurio123", "nursek123"}
 
 USERS_TO_SEED = [
     {
@@ -49,6 +55,16 @@ USERS_TO_SEED = [
 
 
 async def seed() -> None:
+    if settings.environment in PRODUCTION_ENVIRONMENTS:
+        for spec in USERS_TO_SEED:
+            if spec["password"] in _INSECURE_DEFAULTS:
+                print(
+                    f"ERROR: Refusing to seed user '{spec['username']}' with insecure default password "
+                    f"in production. Set the {spec['username'].upper()}_PASSWORD environment variable.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
     async with SessionLocal() as db:
         for spec in USERS_TO_SEED:
             username = spec["username"]

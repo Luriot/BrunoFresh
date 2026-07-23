@@ -234,22 +234,49 @@ async def test_delete_recipe(client):
     create_resp = await client.post("/api/recipes", json={"title": "To Delete"})
     recipe_id = create_resp.json()["id"]
 
+    # Regular users cannot delete recipes (admin-only) — expect 403
     del_resp = await client.delete(f"/api/recipes/{recipe_id}")
-    assert del_resp.status_code == 204
+    assert del_resp.status_code == 403
 
-    # Confirm it's gone
+    # Confirm the recipe still exists
     get_resp = await client.get(f"/api/recipes/{recipe_id}")
-    assert get_resp.status_code == 404
+    assert get_resp.status_code == 200
 
 
 async def test_delete_nonexistent_recipe_returns_404(client):
+    # Regular users are rejected before existence is checked (admin-only delete)
     resp = await client.delete("/api/recipes/99999")
-    assert resp.status_code == 404
+    assert resp.status_code == 403
 
 
 async def test_delete_recipe_requires_auth(anon_client):
     resp = await anon_client.delete("/api/recipes/1")
     assert resp.status_code == 401
+
+
+async def test_admin_can_delete_recipe(anon_client, db_session):
+    """Admin users can delete recipes; regular users get 403."""
+    from app.config import settings
+    from app.services.auth import hash_password, issue_access_token
+
+    admin_user = User(username="_del_admin_", hashed_password=hash_password("_"), role="admin")
+    db_session.add(admin_user)
+    await db_session.commit()
+    await db_session.refresh(admin_user)
+
+    recipe = Recipe(title="Admin Delete Me", url="https://test.example/admin-del", source_domain="test", base_servings=2, instructions_text="")
+    db_session.add(recipe)
+    await db_session.commit()
+    await db_session.refresh(recipe)
+
+    token = issue_access_token(user_id=admin_user.id, role="admin", language="en")
+    anon_client.cookies.set(settings.auth_cookie_name, token)
+
+    del_resp = await anon_client.delete(f"/api/recipes/{recipe.id}")
+    assert del_resp.status_code == 204
+
+    get_resp = await anon_client.get(f"/api/recipes/{recipe.id}")
+    assert get_resp.status_code == 404
 
 
 async def test_ingredient_display_name_fr_falls_back_to_en(anon_client, db_session):

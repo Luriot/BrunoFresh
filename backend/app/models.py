@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Table, Text, func
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Index, Integer, String, Table, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -161,6 +161,10 @@ class ShoppingListRecipe(Base):
     shopping_list_id: Mapped[int] = mapped_column(ForeignKey("shopping_lists.id"), index=True)
     recipe_id: Mapped[int] = mapped_column(ForeignKey("recipes.id"), index=True)
     target_servings: Mapped[int] = mapped_column(Integer, default=2)
+
+    __table_args__ = (
+        Index("ix_shopping_list_recipes_list_recipe", "shopping_list_id", "recipe_id"),
+    )
 
     shopping_list: Mapped[ShoppingList] = relationship("ShoppingList", back_populates="recipe_links")
     recipe: Mapped[Recipe] = relationship("Recipe", back_populates="shopping_list_links")
