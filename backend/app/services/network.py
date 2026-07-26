@@ -1,7 +1,8 @@
 """SSRF protection for outbound requests to user-provided URLs.
 
-Every such request must go through the SSRF-guarded clients/transports so that
-DNS rebinding is blocked at connect time, not just at URL-validation time.
+The guard resolves DNS once, re-checks that every resolved address is public,
+and pins httpx's TCP connection to the validated literal IP — defeating
+DNS-rebinding TOCTOU between a pre-check and the actual connect.
 """
 from __future__ import annotations
 
@@ -37,9 +38,14 @@ def is_public_host(hostname: str) -> bool:
     return not any(_is_private_ip(info[4][0]) for info in infos)
 
 
-def _assert_public_host(host: str, port: int) -> None:
+def _resolve_public(host: str, port: int, *, type_: int = socket.SOCK_STREAM) -> list[tuple]:
+    """Resolve ``host`` to addrinfos, raising if any resolved IP is non-public.
+
+    Returns the full filtered list (all public) so callers can pin one without a
+    second DNS resolution.
+    """
     try:
-        infos = socket.getaddrinfo(host, port)
+        infos = socket.getaddrinfo(host, port, type=type_)
     except socket.gaierror as exc:
         raise httpx.ConnectError(f"DNS resolution failed for {host}") from exc
     for info in infos:
@@ -47,29 +53,91 @@ def _assert_public_host(host: str, port: int) -> None:
             raise httpx.ConnectError(
                 f"SSRF: {host} resolves to a private address ({info[4][0]})"
             )
+    return infos
+
+
+class _PinnedAsyncBackend:
+    """anyio-style async network backend that resolves once and pins the IP.
+
+    httpcore passes the URL hostname (string) into ``connect_tcp``; anyio then
+    resolves it again internally. By overriding here we (1) resolve via our
+    own ``getaddrinfo`` with SSRF filtering, and (2) hand connect_tcp a literal
+    IP so httpx's downstream resolution is bypassed. TLS SNI / cert verification
+    still use the original URL host (handled by httpcore on top of the raw TCP
+    stream), so HTTPS keeps working.
+    """
+
+    def __init__(self) -> None:
+        from httpcore._backends.anyio import AnyIOBackend
+        self._inner = AnyIOBackend()
+
+    async def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options=None,
+    ):
+        infos = await asyncio.to_thread(_resolve_public, host, port)
+        pinned_ip, pinned_port, *_ = infos[0][4]
+        return await self._inner.connect_tcp(
+            host=pinned_ip,
+            port=pinned_port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+    # Ponytail: pass-through any other backend surface httpcore may call.
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+class _PinnedSyncBackend:
+    """Sync twin of ``_PinnedAsyncBackend`` for ``httpx.Client``."""
+
+    def __init__(self) -> None:
+        from httpcore._backends.sync import SyncBackend
+        self._inner = SyncBackend()
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options=None,
+    ):
+        infos = _resolve_public(host, port)
+        pinned_ip, pinned_port, *_ = infos[0][4]
+        return self._inner.connect_tcp(
+            host=pinned_ip,
+            port=pinned_port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
 
 
 class SSRFGuardedTransport(httpx.AsyncHTTPTransport):
-    """Custom async transport that re-validates the resolved IP immediately before
-    connecting, closing the DNS-rebinding window between our pre-check and
-    the actual TCP connection.
-    """
+    """Async transport whose TCP connection is pinned to an SSRF-checked IP."""
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        host = request.url.host
-        port = request.url.port or (443 if request.url.scheme == "https" else 80)
-        await asyncio.to_thread(_assert_public_host, host, port)
-        return await super().handle_async_request(request)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # httpcore stores the resolver/network backend at this attribute.
+        self._pool._network_backend = _PinnedAsyncBackend()  # type: ignore[attr-defined]
 
 
 class SSRFGuardedSyncTransport(httpx.HTTPTransport):
-    """Synchronous version of SSRFGuardedTransport for use with httpx.Client."""
+    """Synchronous version of :class:`SSRFGuardedTransport` for ``httpx.Client``."""
 
-    def handle_request(self, request: httpx.Request) -> httpx.Response:
-        host = request.url.host
-        port = request.url.port or (443 if request.url.scheme == "https" else 80)
-        _assert_public_host(host, port)
-        return super().handle_request(request)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._pool._network_backend = _PinnedSyncBackend()  # type: ignore[attr-defined]
 
 
 def create_ssrf_safe_client(
@@ -78,9 +146,8 @@ def create_ssrf_safe_client(
     follow_redirects: bool = True,
     user_agent: str = _SCRAPER_USER_AGENT,
 ) -> httpx.AsyncClient:
-    """Return an ``httpx.AsyncClient`` that validates DNS resolution at connect
-    time, closing the DNS-rebinding window between pre-check and actual TCP
-    connection.
+    """Return an ``httpx.AsyncClient`` that pins TCP connections to SSRF-checked
+    resolved IPs, defeating DNS-rebinding between pre-check and connect.
 
     **Usage**: use as an async context manager::
 

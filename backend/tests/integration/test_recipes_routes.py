@@ -200,13 +200,24 @@ async def test_ingredient_display_name_fr_uses_name_fr(anon_client, db_session):
     assert ing["display_name"] == "poulet"
 
 
-# ── PATCH /api/recipes/{id} ───────────────────────────────────────────────────
+# ── PATCH /api/recipes/{id} (admin-only) ──────────────────────────────────────
 
-async def test_patch_recipe_instructions(client):
+async def test_patch_recipe_requires_admin(client):
+    """Regular users cannot mutate the shared recipe catalog."""
     create_resp = await client.post("/api/recipes", json={"title": "Patchable"})
     recipe_id = create_resp.json()["id"]
+    resp = await client.patch(
+        f"/api/recipes/{recipe_id}",
+        json={"instructions_text": "Step 1. Done."},
+    )
+    assert resp.status_code == 403
 
-    patch_resp = await client.patch(
+
+async def test_patch_recipe_instructions(admin_client):
+    create_resp = await admin_client.post("/api/recipes", json={"title": "Patchable"})
+    recipe_id = create_resp.json()["id"]
+
+    patch_resp = await admin_client.patch(
         f"/api/recipes/{recipe_id}",
         json={"instructions_text": "Step 1. Done."},
     )
@@ -214,17 +225,17 @@ async def test_patch_recipe_instructions(client):
     assert patch_resp.json()["instructions_text"] == "Step 1. Done."
 
 
-async def test_patch_recipe_prep_time(client):
-    create_resp = await client.post("/api/recipes", json={"title": "Timed Recipe"})
+async def test_patch_recipe_prep_time(admin_client):
+    create_resp = await admin_client.post("/api/recipes", json={"title": "Timed Recipe"})
     recipe_id = create_resp.json()["id"]
 
-    patch_resp = await client.patch(f"/api/recipes/{recipe_id}", json={"prep_time_minutes": 25})
+    patch_resp = await admin_client.patch(f"/api/recipes/{recipe_id}", json={"prep_time_minutes": 25})
     assert patch_resp.status_code == 200
     assert patch_resp.json()["prep_time_minutes"] == 25
 
 
-async def test_patch_nonexistent_recipe_returns_404(client):
-    resp = await client.patch("/api/recipes/99999", json={"prep_time_minutes": 10})
+async def test_patch_nonexistent_recipe_returns_404(admin_client):
+    resp = await admin_client.patch("/api/recipes/99999", json={"prep_time_minutes": 10})
     assert resp.status_code == 404
 
 

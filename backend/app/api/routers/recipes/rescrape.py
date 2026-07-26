@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ....database import get_db, AsyncSessionLocal
 from ....models import Recipe, RecipeIngredient
 from ....schemas import RecipeDetail, ScrapeResponse
+from ...dependencies import require_admin
+from ....services.auth import UserClaims
 from .utils import _RECIPE_NOT_FOUND, _recipe_detail_opts, _recipe_to_detail
 
 router = APIRouter()
@@ -19,6 +21,7 @@ router = APIRouter()
 @router.post("/recipes/{recipe_id}/rescrape", response_model=ScrapeResponse)
 async def rescrape_recipe(
     recipe_id: int,
+    claims: UserClaims = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     from ....models import ScrapeJob
@@ -118,6 +121,7 @@ async def rescrape_recipe(
 @router.post("/recipes/{recipe_id}/format-instructions", response_model=RecipeDetail)
 async def format_recipe_instructions(
     recipe_id: int,
+    claims: UserClaims = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     from ....services.normalizer import ollama_semaphore

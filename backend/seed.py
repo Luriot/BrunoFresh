@@ -1,18 +1,14 @@
 """Seed initial users into the database.
 
-Reads env vars for credentials; dev defaults are used if not set.
-Run after Alembic migration 0010:
-    python seed.py
+Requires explicit credentials via env vars (no committed defaults). Run after
+Alembic migration 0010:
 
-Env vars:
+    SEED_ADMIN_PASSWORD=... SEED_USER1_PASSWORD=... SEED_USER2_PASSWORD=... python seed.py
+
+Optional overrides:
     SEED_ADMIN_USERNAME   (default: admin)
-    SEED_ADMIN_PASSWORD   (default: admin123)
-    SEED_USER1_USERNAME   (default: lurio)
-    SEED_USER1_PASSWORD   (default: lurio123)
-    SEED_USER2_USERNAME   (default: nursek)
-    SEED_USER2_PASSWORD   (default: nursek123)
-
-In production (APP_ENV=production), default passwords are rejected.
+    SEED_USER1_USERNAME    (default: lurio)
+    SEED_USER2_USERNAME    (default: nursek)
 """
 
 from __future__ import annotations
@@ -23,7 +19,7 @@ import sys
 
 from sqlalchemy import select
 
-from app.config import settings, PRODUCTION_ENVIRONMENTS
+from app.config import settings
 from app.database import SessionLocal
 from app.models import User
 from app.services.auth import hash_password
@@ -33,40 +29,45 @@ def _env(key: str, default: str) -> str:
     return os.environ.get(key, default)
 
 
-_INSECURE_DEFAULTS = {"admin123", "lurio123", "nursek123"}
+def _required_password_env(var_name: str) -> str:
+    val = os.environ.get(var_name)
+    if not val or not val.strip():
+        print(
+            f"ERROR: {var_name} must be set to a strong password before seeding. "
+            "Committed default credentials are not allowed.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return val.strip()
+
 
 USERS_TO_SEED = [
     {
         "username": _env("SEED_ADMIN_USERNAME", "admin"),
-        "password": _env("SEED_ADMIN_PASSWORD", "admin123"),
+        "password_env": "SEED_ADMIN_PASSWORD",
         "role": "admin",
     },
     {
         "username": _env("SEED_USER1_USERNAME", "lurio"),
-        "password": _env("SEED_USER1_PASSWORD", "lurio123"),
+        "password_env": "SEED_USER1_PASSWORD",
         "role": "user",
     },
     {
         "username": _env("SEED_USER2_USERNAME", "nursek"),
-        "password": _env("SEED_USER2_PASSWORD", "nursek123"),
+        "password_env": "SEED_USER2_PASSWORD",
         "role": "user",
     },
 ]
 
 
 async def seed() -> None:
-    if settings.environment in PRODUCTION_ENVIRONMENTS:
-        for spec in USERS_TO_SEED:
-            if spec["password"] in _INSECURE_DEFAULTS:
-                print(
-                    f"ERROR: Refusing to seed user '{spec['username']}' with insecure default password "
-                    f"in production. Set the {spec['username'].upper()}_PASSWORD environment variable.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+    specs = [
+        {"username": s["username"], "password": _required_password_env(s["password_env"]), "role": s["role"]}
+        for s in USERS_TO_SEED
+    ]
 
     async with SessionLocal() as db:
-        for spec in USERS_TO_SEED:
+        for spec in specs:
             username = spec["username"]
             password = spec["password"]
             role = spec["role"]

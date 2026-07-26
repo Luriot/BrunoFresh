@@ -244,7 +244,7 @@ def _check_image_magic(data: bytes, content_type: str) -> bool:
 async def upload_recipe_image(
     recipe_id: int,
     file: UploadFile = File(...),
-    claims: UserClaims = Depends(require_auth),
+    claims: UserClaims = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     from ....config import settings
@@ -318,7 +318,7 @@ async def upload_recipe_image(
 async def patch_recipe(
     recipe_id: int,
     payload: RecipePatch,
-    claims: UserClaims = Depends(require_auth),
+    claims: UserClaims = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     recipe = await db.scalar(

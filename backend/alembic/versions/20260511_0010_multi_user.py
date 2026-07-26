@@ -120,14 +120,22 @@ def downgrade() -> None:
         sa.Column("is_favorite", sa.Boolean(), nullable=False, server_default=sa.false()),
     )
 
-    # Remove user_id columns
+    # Drop indexes + FKs BEFORE the columns they reference — batch_alter_table
+    # recreate would otherwise try to rebuild the index on a now-missing column
+    # and crash with `no such column: user_id`.
     with op.batch_alter_table("meal_plans") as batch_op:
+        batch_op.drop_constraint("fk_meal_plans_user_id", type_="foreignkey")
+        batch_op.drop_index("ix_meal_plans_user_id")
         batch_op.drop_column("user_id")
 
     with op.batch_alter_table("pantry_items") as batch_op:
+        batch_op.drop_constraint("fk_pantry_items_user_id", type_="foreignkey")
+        batch_op.drop_index("ix_pantry_items_user_id")
         batch_op.drop_column("user_id")
 
     with op.batch_alter_table("shopping_lists") as batch_op:
+        batch_op.drop_constraint("fk_shopping_lists_user_id", type_="foreignkey")
+        batch_op.drop_index("ix_shopping_lists_user_id")
         batch_op.drop_column("user_id")
 
     op.drop_table("user_favorites")

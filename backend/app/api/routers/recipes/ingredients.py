@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ....database import get_db
 from ....models import Ingredient, IngredientTranslation, RecipeIngredient
 from ....schemas import IngredientDetail, IngredientNamePatch
+from ...dependencies import require_admin
+from ....services.auth import UserClaims
 
 router = APIRouter()
 
@@ -16,6 +18,7 @@ router = APIRouter()
 async def patch_ingredient(
     ingredient_id: int,
     payload: IngredientNamePatch,
+    claims: UserClaims = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     from sqlalchemy.dialects.sqlite import insert as sqlite_insert

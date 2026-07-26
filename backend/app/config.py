@@ -2,14 +2,44 @@ from pathlib import Path
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
-import warnings
+import secrets
 
 
 load_dotenv()
 
 
-DEFAULT_AUTH_SECRET = "local-dev-secret-do-not-use-in-prod-123456789"
 PRODUCTION_ENVIRONMENTS = {"prod", "production"}
+_MIN_SECRET_LEN = 32
+
+
+def _resolve_auth_secret(environment: str) -> str:
+    """Resolve the access-token signing secret with no committed default.
+
+    AUTH_SECRET env var always wins. In production, missing/short secret is a
+    hard error. In dev/test, a random per-process ephemeral secret is generated so
+    no publicly-known value ever signs tokens — set AUTH_SECRET explicitly if
+    you need sessions to survive process restarts.
+    """
+    val = os.getenv("AUTH_SECRET")
+    if val:
+        return val.strip()
+    if environment in PRODUCTION_ENVIRONMENTS:
+        raise RuntimeError("AUTH_SECRET must be set in production (>= 32 chars, high entropy)")
+    # ponytail: ephemeral random dev secret — no committed value to leak.
+    return secrets.token_urlsafe(48)
+
+
+def _resolve_session_secret(environment: str, auth_secret: str) -> str:
+    """Resolve the session-cookie signing secret.
+
+    SESSION_SECRET env var wins; otherwise falls back to AUTH_SECRET. Never falls
+    back to a hardcoded literal. In production, an unset SESSION_SECRET that
+    also has no AUTH_SECRET is rejected upstream by _resolve_auth_secret.
+    """
+    val = os.getenv("SESSION_SECRET")
+    if val and val.strip():
+        return val.strip()
+    return auth_secret
 
 
 class Settings(BaseModel):
@@ -38,8 +68,8 @@ class Settings(BaseModel):
         if header.strip()
     )
     scrape_concurrency_limit: int = int(os.getenv("SCRAPE_CONCURRENCY_LIMIT", "1"))
-    auth_secret: str = os.getenv("AUTH_SECRET", DEFAULT_AUTH_SECRET)
-    session_secret: str = os.getenv("SESSION_SECRET", os.getenv("AUTH_SECRET", DEFAULT_AUTH_SECRET))
+    auth_secret: str = ""
+    session_secret: str = ""
     auth_token_ttl_minutes: int = int(os.getenv("AUTH_TOKEN_TTL_MINUTES", "10080"))  # 7 days default
     auth_cookie_name: str = os.getenv("AUTH_COOKIE_NAME", "brunofresh_access_token")
     auth_cookie_secure: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
@@ -72,37 +102,32 @@ def _validate_security_settings(current: Settings) -> None:
     if current.auth_cookie_samesite not in valid_samesite:
         raise ValueError("AUTH_COOKIE_SAMESITE must be one of: lax, strict, none")
 
-    if len(current.auth_secret) < 32:
-        raise ValueError("AUTH_SECRET must contain at least 32 characters")
+    if len(current.auth_secret) < _MIN_SECRET_LEN:
+        raise RuntimeError(
+            f"AUTH_SECRET must contain at least {_MIN_SECRET_LEN} characters of high entropy"
+        )
+    if len(current.session_secret) < _MIN_SECRET_LEN:
+        raise RuntimeError(
+            f"SESSION_SECRET must contain at least {_MIN_SECRET_LEN} characters of high entropy"
+        )
 
     if current.auth_token_ttl_minutes <= 0:
         raise ValueError("AUTH_TOKEN_TTL_MINUTES must be a positive integer")
 
     in_production = current.environment in PRODUCTION_ENVIRONMENTS
 
-    if in_production and current.auth_secret == DEFAULT_AUTH_SECRET:
-        raise RuntimeError("AUTH_SECRET cannot use the default value in production")
-
-    if in_production and current.session_secret == DEFAULT_AUTH_SECRET:
-        raise RuntimeError("SESSION_SECRET cannot use the default value in production. Set SESSION_SECRET (or AUTH_SECRET) to a unique secret.")
-
     if in_production and not current.auth_cookie_secure:
         raise RuntimeError("AUTH_COOKIE_SECURE must be true in production")
 
     if in_production and current.dbadmin_enabled:
-        warnings.warn(
-            "DBADMIN_ENABLED=true in production — the /dbadmin interface is publicly reachable. "
-            "Consider disabling it or restricting access at the network level.",
-            stacklevel=2,
-        )
-
-    if not in_production and current.auth_secret == DEFAULT_AUTH_SECRET:
-        warnings.warn(
-            "Using default AUTH_SECRET in development. Set AUTH_SECRET in your environment before deploying.",
-            stacklevel=2,
+        raise RuntimeError(
+            "DBADMIN_ENABLED=true in production is not allowed: the /dbadmin interface would be "
+            "publicly reachable. Restrict access at the network level or disable it."
         )
 
 
 settings = Settings()
+settings.auth_secret = _resolve_auth_secret(settings.environment)
+settings.session_secret = _resolve_session_secret(settings.environment, settings.auth_secret)
 _validate_security_settings(settings)
 settings.images_dir.mkdir(parents=True, exist_ok=True)

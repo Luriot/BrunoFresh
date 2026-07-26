@@ -72,6 +72,8 @@ async def client(db_session: AsyncSession):
 
     A stub user is created first so that per-user FK constraints (pantry, favorites …)
     work correctly with the faked UserClaims returned by _override_require_auth.
+    Role is ``user``: use this for testing regular-user behaviour. For admin-gated
+    routes, use :func:`admin_client`.
     """
     from app.models import User  # local to avoid circular if run standalone
 
@@ -86,6 +88,34 @@ async def client(db_session: AsyncSession):
 
     async def _override_require_auth() -> UserClaims:
         return UserClaims(user_id=stub_user_id, role="user")
+
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[require_auth] = _override_require_auth
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as c:
+            yield c
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def admin_client(db_session: AsyncSession):
+    """Like :func:`client` but with ``role="admin"`` for admin-gated routes."""
+    from app.models import User
+
+    stub_user = User(username="_admin_stub_", hashed_password=hash_password("_"), role="admin")
+    db_session.add(stub_user)
+    await db_session.commit()
+    await db_session.refresh(stub_user)
+    stub_user_id = stub_user.id
+
+    async def _override_get_db():
+        yield db_session
+
+    async def _override_require_auth() -> UserClaims:
+        return UserClaims(user_id=stub_user_id, role="admin")
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[require_auth] = _override_require_auth
