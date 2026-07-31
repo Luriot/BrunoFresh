@@ -25,7 +25,6 @@ def _resolve_auth_secret(environment: str) -> str:
         return val.strip()
     if environment in PRODUCTION_ENVIRONMENTS:
         raise RuntimeError("AUTH_SECRET must be set in production (>= 32 chars, high entropy)")
-    # ponytail: ephemeral random dev secret — no committed value to leak.
     return secrets.token_urlsafe(48)
 
 

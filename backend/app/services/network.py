@@ -89,7 +89,6 @@ class _PinnedAsyncBackend:
             socket_options=socket_options,
         )
 
-    # Ponytail: pass-through any other backend surface httpcore may call.
     def __getattr__(self, name):
         return getattr(self._inner, name)
 
