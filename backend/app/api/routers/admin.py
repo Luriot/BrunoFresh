@@ -235,6 +235,8 @@ async def list_ingredients_admin(
             needs_review=i.id in review_set,
             usage_count=usage_map.get(i.id, 0),
             translations={t.lang_code: t.name for t in i.translations},
+            grams_per_paquet=i.grams_per_paquet,
+            grams_per_boite=i.grams_per_boite,
         )
         for i in ingredients
     ]
@@ -432,6 +434,8 @@ async def merge_ingredients(
         is_normalized=target.is_normalized,
         needs_review=False,
         usage_count=usage_count,
+        grams_per_paquet=target.grams_per_paquet,
+        grams_per_boite=target.grams_per_boite,
     )
 
 

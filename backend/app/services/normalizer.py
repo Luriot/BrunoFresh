@@ -195,17 +195,66 @@ _CULINARY_UNIT_DENSITIES: dict[str, dict[str, float]] = {
     "baking soda":     {"c. à thé": 6.0},
     "cornstarch":      {"c. à soupe": 9.0,  "c. à thé": 3.0,  "tasse": 128.0},
     "vinegar":         {"c. à soupe": 15.0, "c. à thé": 5.0,  "tasse": 240.0},
-    "soy sauce":       {"c. à soupe": 16.0, "c. à thé": 5.3},
     "mustard":         {"c. à soupe": 17.0, "c. à thé": 5.7},
     "tomato paste":    {"c. à soupe": 16.5, "c. à thé": 5.5},
     "cream cheese":    {"c. à soupe": 14.5, "c. à thé": 4.8,  "tasse": 232.0},
     "sour cream":      {"c. à soupe": 14.4, "c. à thé": 4.8,  "tasse": 230.0},
     "yogurt":          {"c. à soupe": 15.3, "c. à thé": 5.1,  "tasse": 245.0},
     "peanut butter":   {"c. à soupe": 16.0, "c. à thé": 5.3,  "tasse": 256.0},
-    "almond flour":    {"c. à soupe": 7.0,  "c. à thé": 2.3,  "tasse": 112.0},
     "breadcrumbs":     {"c. à soupe": 7.5,  "c. à thé": 2.5,  "tasse": 120.0},
     "parmesan":        {"c. à soupe": 5.0,  "c. à thé": 1.7,  "tasse": 80.0},
     "cheddar":         {"c. à soupe": 7.0,  "c. à thé": 2.3,  "tasse": 113.0},
+    "sesame oil":          {"c. à soupe": 13.5, "c. à thé": 4.5, "tasse": 216.0},
+    "sunflower oil":       {"c. à soupe": 13.5, "c. à thé": 4.5, "tasse": 218.0},
+    "canola oil":          {"c. à soupe": 13.5, "c. à thé": 4.5, "tasse": 218.0},
+    "peanut oil":          {"c. à soupe": 13.5, "c. à thé": 4.5, "tasse": 216.0},
+    "coconut oil":         {"c. à soupe": 13.0, "c. à thé": 4.3, "tasse": 218.0},
+    "balsamic vinegar":    {"c. à soupe": 15.0, "c. à thé": 5.0, "tasse": 255.0},
+    "white vinegar":       {"c. à soupe": 15.0, "c. à thé": 5.0, "tasse": 240.0},
+    "rice vinegar":        {"c. à soupe": 15.0, "c. à thé": 5.0, "tasse": 240.0},
+    "apple cider vinegar": {"c. à soupe": 15.0, "c. à thé": 5.0, "tasse": 240.0},
+    "mirin":               {"c. à soupe": 16.0, "c. à thé": 5.3, "tasse": 252.0},
+    "soy sauce":           {"c. à soupe": 16.0, "c. à thé": 5.3, "tasse": 255.0},
+    "fish sauce":          {"c. à soupe": 16.0, "c. à thé": 5.3, "tasse": 256.0},
+    "oyster sauce":        {"c. à soupe": 18.0, "c. à thé": 6.0},
+    "sesame paste":        {"c. à soupe": 15.0, "c. à thé": 5.0},
+    "tahini":              {"c. à soupe": 15.0, "c. à thé": 5.0, "tasse": 240.0},
+    "miso":                {"c. à soupe": 18.0, "c. à thé": 6.0, "tasse": 275.0},
+    "miso paste":          {"c. à soupe": 18.0, "c. à thé": 6.0, "tasse": 275.0},
+    "tomato sauce":        {"c. à soupe": 16.0, "c. à thé": 5.3, "tasse": 245.0},
+    "ketchup":             {"c. à soupe": 17.0, "c. à thé": 5.7, "tasse": 275.0},
+    "mayonnaise":          {"c. à soupe": 14.0, "c. à thé": 4.7, "tasse": 220.0},
+    "worcestershire sauce":{"c. à soupe": 17.0, "c. à thé": 5.7},
+    "sriracha":            {"c. à soupe": 16.0, "c. à thé": 5.3},
+    "hot sauce":           {"c. à soupe": 16.0, "c. à thé": 5.3},
+    "sesame seeds":        {"c. à soupe": 9.0,  "c. à thé": 3.0, "tasse": 144.0},
+    "chia seeds":          {"c. à soupe": 11.0, "c. à thé": 3.7, "tasse": 175.0},
+    "flax seeds":          {"c. à soupe": 10.5, "c. à thé": 3.5, "tasse": 168.0},
+    "poppy seeds":         {"c. à soupe": 9.0,  "c. à thé": 3.0, "tasse": 144.0},
+    "ground cinnamon":     {"c. à soupe": 7.8, "c. à thé": 2.6, "tasse": 125.0},
+    "ground cumin":        {"c. à soupe": 8.0, "c. à thé": 2.7, "tasse": 128.0},
+    "curry powder":        {"c. à soupe": 7.5, "c. à thé": 2.5, "tasse": 120.0},
+    "paprika":             {"c. à soupe": 7.5, "c. à thé": 2.5, "tasse": 115.0},
+    "ground ginger":       {"c. à soupe": 6.0, "c. à thé": 2.0, "tasse": 96.0},
+    "ground turmeric":     {"c. à soupe": 7.0, "c. à thé": 2.3, "tasse": 112.0},
+    "garlic powder":       {"c. à soupe": 9.0, "c. à thé": 3.0, "tasse": 144.0},
+    "onion powder":        {"c. à soupe": 7.5, "c. à thé": 2.5, "tasse": 120.0},
+    "chili powder":        {"c. à soupe": 8.0, "c. à thé": 2.7, "tasse": 128.0},
+    "cayenne pepper":      {"c. à soupe": 7.5, "c. à thé": 2.5, "tasse": 120.0},
+    "oregano":             {"c. à soupe": 4.0, "c. à thé": 1.3, "tasse": 64.0},
+    "basil":               {"c. à soupe": 4.0, "c. à thé": 1.3, "tasse": 64.0},  # dried
+    "thyme":               {"c. à soupe": 4.0, "c. à thé": 1.3, "tasse": 64.0},
+    "rosemary":            {"c. à soupe": 4.0, "c. à thé": 1.3, "tasse": 64.0},
+    "ground nutmeg":       {"c. à soupe": 6.4, "c. à thé": 2.1, "tasse": 102.0},
+    "ground cloves":       {"c. à soupe": 6.8, "c. à thé": 2.3, "tasse": 109.0},
+    "ground allspice":     {"c. à soupe": 7.0, "c. à thé": 2.3, "tasse": 112.0},
+    "almond flour":        {"c. à soupe": 7.0, "c. à thé": 2.3, "tasse": 112.0},  # dup safety
+    "rice flour":          {"c. à soupe": 8.5, "c. à thé": 2.8, "tasse": 160.0},
+    "oat flour":           {"c. à soupe": 6.5, "c. à thé": 2.2, "tasse": 104.0},
+    "whole wheat flour":   {"c. à soupe": 8.0, "c. à thé": 2.7, "tasse": 128.0},
+    "rice":                {"c. à soupe": 10.0, "c. à thé": 3.3, "tasse": 185.0},  # uncooked
+    "quinoa":              {"c. à soupe": 9.0, "c. à thé": 3.0, "tasse": 170.0},
+    "cocoa":               {"c. à soupe": 7.5, "c. à thé": 2.5, "tasse": 120.0},
 }
 
 
@@ -223,6 +272,161 @@ def culinary_to_grams(name_en: str, unit: str, qty: float) -> tuple[str, float] 
     if grams_per_unit is None:
         return None
     return "g", round(qty * grams_per_unit, 2)
+
+
+# ── Pack / sachet densities per ingredient (grams per 1 pack) ────────────────
+# Upgrade path: Ingredient.grams_per_paquet override (admin) or DB inference
+# from cross-recipe median if the static table proves insufficient.
+_PACK_GRAMS: dict[str, dict[str, float]] = {
+    # Sachets / paquets (levures, sucre vanillé, gélatine, poudres)
+    "baking powder":        {"paquet": 11.0},   # levure chimique FR
+    "baking soda":          {"paquet": 6.0},
+    "active dry yeast":     {"paquet": 7.0},    # levure boulangère
+    "dry yeast":            {"paquet": 7.0},
+    "bread yeast":          {"paquet": 7.0},
+    "vanilla sugar":        {"paquet": 7.5},
+    "vanilla":              {"paquet": 1.0},    # sachet de sucre vanillé
+    "gelatin":              {"paquet": 2.0},
+    "gelatin powder":       {"paquet": 2.0},
+    "agar agar":            {"paquet": 2.0},
+    "agar-agar":            {"paquet": 2.0},
+    "cocoa":                {"paquet": 125.0},
+    "cocoa powder":         {"paquet": 125.0},
+    "instant coffee":       {"paquet": 2.0},
+    "tea":                  {"paquet": 2.0},
+    "sugar":                {"paquet": 1000.0}, # paquet 1 kg générique
+    "powdered sugar":       {"paquet": 500.0},
+    "icing sugar":          {"paquet": 500.0},
+    "brown sugar":          {"paquet": 500.0},
+    "caster sugar":         {"paquet": 500.0},
+    "flour":                {"paquet": 1000.0},
+    "all-purpose flour":    {"paquet": 1000.0},
+    "almond flour":         {"paquet": 250.0},
+    "cornstarch":           {"paquet": 40.0},
+    "semolina":             {"paquet": 500.0},
+    "chocolate":            {"paquet": 200.0},
+    "dark chocolate":       {"paquet": 200.0},
+    "milk chocolate":       {"paquet": 200.0},
+    "baking chocolate":     {"paquet": 100.0},
+    "biscuit":              {"paquet": 30.0},   # boudoir / spéculoos
+    "boudoir":              {"paquet": 30.0},
+    "shortcrust pastry":    {"paquet": 250.0},
+    "puff pastry":          {"paquet": 500.0},
+    "pie crust":            {"paquet": 250.0},
+    # Boîtes / conserves (~240-400 g net drained weight varies — using typical net)
+    "canned tomatoes":      {"boîte": 400.0},
+    "tomato":               {"boîte": 400.0},   # "1 boîte de tomates pelées"
+    "tuna":                 {"boîte": 130.0},    # drained
+    "canned tuna":          {"boîte": 130.0},
+    "corn":                 {"boîte": 285.0},
+    "canned corn":          {"boîte": 285.0},
+    "chickpeas":            {"boîte": 240.0},   # drained
+    "canned chickpeas":     {"boîte": 240.0},
+    "red beans":            {"boîte": 250.0},
+    "kidney beans":         {"boîte": 250.0},
+    "white beans":          {"boîte": 250.0},
+    "cannellini beans":     {"boîte": 250.0},
+    "lentils":              {"boîte": 250.0},
+    "canned lentils":       {"boîte": 250.0},
+    "peas":                 {"boîte": 285.0},
+    "petits pois":          {"boîte": 285.0},
+    "mushrooms":            {"boîte": 400.0},   # net
+    "canned mushrooms":     {"boîte": 400.0},
+    "coconut milk":         {"boîte": 400.0},
+    "anchovies":            {"boîte": 50.0},
+    "anchovy":              {"boîte": 50.0},
+    "sardines":             {"boîte": 120.0},
+    "mackerel":             {"boîte": 120.0},
+    "chestnuts":            {"boîte": 240.0},
+    "marrons":              {"boîte": 240.0},
+    "pineapple":            {"boîte": 250.0},   # tranches au sirop
+    "lychee":               {"boîte": 250.0},
+    "condensed milk":       {"boîte": 397.0},
+}
+
+
+def pack_to_grams(
+    name_en: str,
+    unit: str,
+    qty: float,
+    raw_string: str | None = None,
+    admin_override: float | None = None,
+) -> tuple[str, float] | None:
+    """Convert a ``paquet`` / ``boîte`` count to grams.
+
+    Resolution order (first hit wins):
+    1. Retro-calibration: a ``N g`` figure next to the pack/can word in
+       ``raw_string`` (e.g. ``"1 sachet de levure (7 g)"`` → 7 g/sachet).
+    2. Admin override: ``admin_override`` (per-ingredient grams per 1 unit).
+    3. Static fallback table ``_PACK_GRAMS``.
+
+    Returns ``("g", qty_in_grams)`` if any source yields a value, otherwise
+    ``None`` (caller leaves the row unconverted, in the "Compte" group).
+    """
+    if unit not in ("paquet", "boîte"):
+        return None
+
+    # 1. Retro-calibration from the recipe's own raw text.
+    grams_per_unit = extract_pack_grams_from_raw(raw_string) if raw_string else None
+
+    # 2. Admin override.
+    if grams_per_unit is None and admin_override is not None:
+        grams_per_unit = float(admin_override)
+
+    # 3. Static table fallback.
+    if grams_per_unit is None:
+        pack = _PACK_GRAMS.get(name_en.strip().lower())
+        if pack:
+            grams_per_unit = pack.get(unit)
+
+    if grams_per_unit is None:
+        return None
+    return "g", round(qty * grams_per_unit, 2)
+
+
+# Regex helpers for retro-calibration.
+_PACK_WORD_RE = re.compile(r"\b(sachets?|paquets?|boîtes?|packs?|cans?)\b", re.IGNORECASE)
+_GRAMS_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*g\b", re.IGNORECASE)
+_PACK_GRAMS_WINDOW = 40
+
+
+def extract_pack_grams_from_raw(raw: str | None) -> float | None:
+    """Return the grams-per-unit figure embedded in a raw ingredient line.
+
+    Looks for a number-of-grams token (``"7 g"``, ``"7,5g"``, ``"(400 g)"``)
+    appearing near a pack/can word (``sachet``, ``paquet``, ``boîte`` …).
+    Prefers the grams figure that comes *after* the pack word (the typical
+    HelloFresh/BF shape "1 sachet de levure (7 g)"); falls back to the closest
+    figure appearing *before* when none follows. Returns ``None`` when no such
+    pair is found.
+    """
+    if not raw:
+        return None
+    pack_match = _PACK_WORD_RE.search(raw)
+    if not pack_match:
+        return None
+    pack_start, pack_end = pack_match.start(), pack_match.end()
+
+    after: list[tuple[int, float]] = []   # distance-after, value
+    before: list[tuple[int, float]] = []  # distance-before, value
+    for m in _GRAMS_RE.finditer(raw):
+        value = float(m.group(1).replace(",", "."))
+        if m.start() >= pack_end:
+            d = m.start() - pack_end
+            if d < _PACK_GRAMS_WINDOW:
+                after.append((d, value))
+        else:
+            d = pack_start - m.end()
+            if d < _PACK_GRAMS_WINDOW and d >= 0:
+                before.append((d, value))
+
+    if after:
+        after.sort(key=lambda t: t[0])
+        return after[0][1]
+    if before:
+        before.sort(key=lambda t: t[0])
+        return before[0][1]
+    return None
 
 
 def _coerce_unit(value: str) -> str:

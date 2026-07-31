@@ -18,6 +18,7 @@ from .normalizer import (
     culinary_to_grams,
     get_unit_group,
     normalize_unit,
+    pack_to_grams,
     smart_display_unit,
     to_base_unit,
 )
@@ -76,6 +77,20 @@ async def aggregate_recipe_ingredients(
             density_result = culinary_to_grams(link.ingredient.name_en, norm_unit, norm_qty)
             if density_result:
                 norm_unit, norm_qty = density_result
+            # Pack/sachet/boîte → grams. Priority: raw text retro-calibration,
+            # then admin override, then static table. None => stays as paquet/boîte.
+            if norm_unit in ("paquet", "boîte"):
+                admin_override = (
+                    link.ingredient.grams_per_paquet if norm_unit == "paquet"
+                    else link.ingredient.grams_per_boite
+                )
+                pack_result = pack_to_grams(
+                    link.ingredient.name_en, norm_unit, norm_qty,
+                    raw_string=link.raw_string,
+                    admin_override=admin_override,
+                )
+                if pack_result:
+                    norm_unit, norm_qty = pack_result
             # Normalise to base unit so g+kg, ml+L, etc. collapse into one row
             base_unit, base_qty = to_base_unit(norm_unit, norm_qty)
             # Group by unit-family name ("Poids"/"Volume") so compatible units merge;

@@ -83,6 +83,9 @@ class Ingredient(Base):
     name_fr: Mapped[str | None] = mapped_column(String(200), nullable=True)
     category: Mapped[str] = mapped_column(String(80), default="Pantry", index=True)
     is_normalized: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Admin-set grams-per-pack overrides (>null = use static table / retro-calibration).
+    grams_per_paquet: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    grams_per_boite: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
     recipe_links: Mapped[list["RecipeIngredient"]] = relationship(
         "RecipeIngredient", back_populates="ingredient"

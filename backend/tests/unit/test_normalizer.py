@@ -3,8 +3,10 @@ import pytest
 
 from app.services.normalizer import (
     culinary_to_grams,
+    extract_pack_grams_from_raw,
     get_unit_group,
     normalize_unit,
+    pack_to_grams,
     smart_display_unit,
     to_base_unit,
 )
@@ -219,3 +221,140 @@ class TestCulinaryToGrams:
     def test_metric_unit_returns_none(self):
         """culinary_to_grams only applies to culinary units."""
         assert culinary_to_grams("sugar", "g", 100) is None
+
+
+# ── pack_to_grams (sachet/paquet/boîte → g) ────────────────────────────────────
+
+class TestPackToGrams:
+    def test_baking_powder_paquet(self):
+        result = pack_to_grams("baking powder", "paquet", 1)
+        assert result is not None
+        unit, qty = result
+        assert unit == "g"
+        assert abs(qty - 11.0) < 0.01
+
+    def test_canned_tomatoes_boite(self):
+        result = pack_to_grams("canned tomatoes", "boîte", 2)
+        assert result is not None
+        _, qty = result
+        assert abs(qty - 800.0) < 0.01
+
+    def test_trims_name_whitespace(self):
+        """Ingredient names stored lower + stripped."""
+        result = pack_to_grams("  Baking Powder  ", "paquet", 1)
+        assert result is not None
+        assert result[1] == 11.0
+
+    def test_two_paquet(self):
+        result = pack_to_grams("active dry yeast", "paquet", 2)
+        assert result is not None
+        assert abs(result[1] - 14.0) < 0.01
+
+    def test_unknown_ingredient_returns_none(self):
+        assert pack_to_grams("unicorn dust", "paquet", 1) is None
+
+    def test_known_ingredient_unknown_pack_unit_returns_none(self):
+        """baking powder has 'paquet' but not 'boîte'."""
+        assert pack_to_grams("baking powder", "boîte", 1) is None
+
+    def test_metric_unit_returns_none(self):
+        """pack_to_grams is a no-op for non-pack units."""
+        assert pack_to_grams("baking powder", "g", 100) is None
+        assert pack_to_grams("baking powder", "c. à soupe", 1) is None
+
+    def test_can_capitalized_unit_passthrough(self):
+        """If the aggregator passes through capitalised 'Paquet', it should NOT match
+        (callers must canonicalise first via normalize_unit). This documents the contract."""
+        assert pack_to_grams("baking powder", "Paquet", 1) is None
+
+
+# ── extract_pack_grams_from_raw (retro-calibration) ────────────────────────────
+
+class TestExtractPackGramsFromRaw:
+    def test_sachet_with_paren_g(self):
+        assert extract_pack_grams_from_raw("1 sachet de levure chimique (7 g)") == 7.0
+
+    def test_sachet_no_space_g(self):
+        assert extract_pack_grams_from_raw("1 sachet de levure 7g") == 7.0
+
+    def test_fr_decimal_comma(self):
+        assert extract_pack_grams_from_raw("1 sachet (7,5 g)") == 7.5
+
+    def test_boite_near_g(self):
+        assert extract_pack_grams_from_raw("2 boîtes de tomates pelées (400 g net)") == 400.0
+
+    def test_grams_before_unit_word(self):
+        assert extract_pack_grams_from_raw("7 g de levure, 1 sachet") == 7.0
+
+    def test_picks_closest_when_multiple_grams(self):
+        """If two gram values appear, the closest to the pack word wins."""
+        raw = "200 g de chocolat, 1 sachet de levure (7 g)"
+        assert extract_pack_grams_from_raw(raw) == 7.0
+
+    def test_no_pack_word_returns_none(self):
+        assert extract_pack_grams_from_raw("200 g de chocolat") is None
+
+    def test_no_grams_value_returns_none(self):
+        assert extract_pack_grams_from_raw("1 sachet de levure chimique") is None
+
+    def test_empty_or_none(self):
+        assert extract_pack_grams_from_raw("") is None
+        assert extract_pack_grams_from_raw(None) is None
+
+    def test_grams_too_far_returns_none(self):
+        """Grams more than 40 chars from the pack word are ignored."""
+        raw = "1 sachet " + "x" * 50 + " 7 g"
+        assert extract_pack_grams_from_raw(raw) is None
+
+
+# ── pack_to_grams priority chain ──────────────────────────────────────────────
+
+class TestPackToGramsPriority:
+    def test_raw_beats_static(self):
+        """Raw text '(7 g)' overrides the static 11 g/sachet for baking powder."""
+        result = pack_to_grams("baking powder", "paquet", 2, raw_string="2 sachets (7 g)")
+        assert result == ("g", 14.0)
+
+    def test_raw_beats_admin_and_static(self):
+        result = pack_to_grams(
+            "baking powder", "paquet", 1,
+            raw_string="1 sachet (8 g)",
+            admin_override=9.0,
+        )
+        assert result == ("g", 8.0)
+
+    def test_admin_beats_static(self):
+        """With no raw figure, admin override wins over static."""
+        result = pack_to_grams(
+            "baking powder", "paquet", 1,
+            admin_override=9.0,
+        )
+        assert result == ("g", 9.0)
+
+    def test_static_fallback_when_no_raw_no_admin(self):
+        """Existing behaviour preserved when neither raw nor admin provides a value."""
+        result = pack_to_grams("baking powder", "paquet", 1)
+        assert result == ("g", 11.0)
+
+    def test_unknown_pack_falls_through_to_none_with_raw_no_grams(self):
+        """Unknown ingredient + raw without grams figure → still None."""
+        assert pack_to_grams(
+            "unicorn spice", "paquet", 1,
+            raw_string="1 sachet d'épice licorne",
+            admin_override=None,
+        ) is None
+
+    def test_admin_override_only_no_static(self):
+        """Admin override applies even when the static table has no entry."""
+        result = pack_to_grams(
+            "unicorn spice", "paquet", 3,
+            admin_override=12.0,
+        )
+        assert result == ("g", 36.0)
+
+    def test_boite_admin_override(self):
+        result = pack_to_grams(
+            "canned tomatoes", "boîte", 2,
+            admin_override=410.0,
+        )
+        assert result == ("g", 820.0)

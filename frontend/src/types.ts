@@ -279,6 +279,8 @@ export type IngredientDetail = {
   needs_review: boolean;
   usage_count: number;
   translations: Record<string, string>;
+  grams_per_paquet: number | null;
+  grams_per_boite: number | null;
 };
 
 export type MergeSuggestion = {

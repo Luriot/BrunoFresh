@@ -347,7 +347,7 @@ export async function deleteIngredient(id: number) {
   await request("DELETE", `/admin/ingredients/${id}`);
 }
 
-export async function patchIngredient(id: number, payload: { name: string; lang: string; category: string }) {
+export async function patchIngredient(id: number, payload: { name?: string; lang?: string; category?: string; grams_per_paquet?: number; grams_per_boite?: number }) {
   return request<IngredientDetail>("PATCH", `/ingredients/${id}`, { body: payload });
 }
 

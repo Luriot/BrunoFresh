@@ -29,28 +29,37 @@ async def patch_ingredient(
         raise HTTPException(status_code=404, detail="Ingredient not found")
 
     supported_langs = ["en", "fr"]
-    translations = await translate_ingredient_name(payload.name, payload.lang, supported_langs)
 
-    ingredient.name_en = translations.get("en", payload.name)
-    ingredient.name_fr = translations.get("fr")
-    ingredient.category = payload.category
-    ingredient.is_normalized = True
-
-    for lang_code, trans_name in translations.items():
-        existing = await db.scalar(
-            select(IngredientTranslation).where(
-                IngredientTranslation.ingredient_id == ingredient_id,
-                IngredientTranslation.lang_code == lang_code,
+    # Name + category are optional: only translate / update when provided.
+    if payload.name is not None:
+        translations = await translate_ingredient_name(payload.name, payload.lang, supported_langs)
+        ingredient.name_en = translations.get("en", payload.name)
+        ingredient.name_fr = translations.get("fr")
+        ingredient.is_normalized = True
+        for lang_code, trans_name in translations.items():
+            existing = await db.scalar(
+                select(IngredientTranslation).where(
+                    IngredientTranslation.ingredient_id == ingredient_id,
+                    IngredientTranslation.lang_code == lang_code,
+                )
             )
-        )
-        if existing:
-            existing.name = trans_name
-        else:
-            db.add(IngredientTranslation(
-                ingredient_id=ingredient_id,
-                lang_code=lang_code,
-                name=trans_name,
-            ))
+            if existing:
+                existing.name = trans_name
+            else:
+                db.add(IngredientTranslation(
+                    ingredient_id=ingredient_id,
+                    lang_code=lang_code,
+                    name=trans_name,
+                ))
+
+    if payload.category is not None:
+        ingredient.category = payload.category
+        ingredient.is_normalized = True
+
+    if payload.grams_per_paquet is not None:
+        ingredient.grams_per_paquet = payload.grams_per_paquet
+    if payload.grams_per_boite is not None:
+        ingredient.grams_per_boite = payload.grams_per_boite
 
     await db.commit()
     await db.refresh(ingredient)
@@ -74,4 +83,6 @@ async def patch_ingredient(
         needs_review=False,
         usage_count=usage_count,
         translations=translations_dict,
+        grams_per_paquet=ingredient.grams_per_paquet,
+        grams_per_boite=ingredient.grams_per_boite,
     )
