@@ -89,6 +89,15 @@ Ajoute une variable pour chaque ligne suivante :
    - **Key:** `AUTH_COOKIE_SECURE`
    - **Value:** `false` *(Si tu accèdes via HTTP localement). Met à `true` uniquement si tu places BrunoFresh derrière un reverse proxy HTTPS comme Nginx Proxy Manager ou Traefik.*
 
+6. **Identifiant Utilisateur du Conteneur (Recommandé sur Unraid)**
+   - **Name:** `PUID`
+   - **Key:** `PUID`
+   - **Value:** `99` *(L'UID du user `nobody` sur Unraid, pour que les fichiers du volume `/mnt/user/appdata/brunofresh/data` restent propriété de ce user côté hôte. Par défaut `1000` si non défini.)*
+   - **Name:** `PGID`
+   - **Key:** `PGID`
+   - **Value:** `100` *(Le GID du groupe `users` sur Unraid. Par défaut `1000` si non défini.)*
+   - *Le conteneur démarre en root, s'accorde les droits sur `/app/backend/data`, puis passe à `PUID:PGID` via `gosu` pour exécuter migrations et uvicorn.*
+
 ---
 
 ## 4. Démarrage et Mises à jour

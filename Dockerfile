@@ -16,7 +16,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash \
+    && apt-get install -y --no-install-recommends bash gosu \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt /app/backend/requirements.txt
@@ -31,8 +31,6 @@ RUN mkdir -p /app/backend/data/images \
     && chmod +x /app/docker-entrypoint.sh \
     && useradd --uid 1000 --create-home --shell /bin/bash appuser \
     && chown -R appuser:appuser /app
-
-USER appuser
 
 WORKDIR /app/backend
 
