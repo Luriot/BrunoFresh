@@ -13,9 +13,6 @@ sqladmin==0.20.1
 itsdangerous==2.2.0
 recipe-scrapers==15.11.0
 Pillow==12.3.0
-# Transitive deps pinned for CVE remediation (Trivy scan 2026-07-31)
-msgpack>=1.2.1     # was 1.1.2 — GHSA-6v7p-g79w-8964 (OOB read on Unpacker reuse)
-setuptools>=78.1.1  # was 70.3.0 — CVE-2025-47273 (Path Traversal in PackageIndex)
 # Testing
 pytest>=8.0
 pytest-asyncio>=0.23
