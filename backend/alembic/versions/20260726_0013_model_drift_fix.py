@@ -21,6 +21,7 @@ Both ops are SQLite-safe (CREATE INDEX + batch drop unique constraint).
 """
 from typing import Sequence, Union
 
+import sqlalchemy as sa
 from alembic import op
 
 
@@ -31,14 +32,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_index(
-        op.f("ix_ingredient_translations_id"),
-        "ingredient_translations",
-        ["id"],
-        unique=False,
-    )
-    with op.batch_alter_table("ingredient_translations") as batch_op:
-        batch_op.drop_constraint("uq_ingredient_lang", type_="unique")
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
+    existing_indexes = {i["name"] for i in insp.get_indexes("ingredient_translations")}
+    if "ix_ingredient_translations_id" not in existing_indexes:
+        op.create_index(
+            op.f("ix_ingredient_translations_id"),
+            "ingredient_translations",
+            ["id"],
+            unique=False,
+        )
+
+    existing_uqs = {
+        (u.get("name") or "")
+        for u in insp.get_unique_constraints("ingredient_translations")
+    }
+    if "uq_ingredient_lang" in existing_uqs:
+        with op.batch_alter_table("ingredient_translations") as batch_op:
+            batch_op.drop_constraint("uq_ingredient_lang", type_="unique")
 
 
 def downgrade() -> None:

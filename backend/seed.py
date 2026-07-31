@@ -61,24 +61,20 @@ USERS_TO_SEED = [
 
 
 async def seed() -> None:
-    specs = [
-        {"username": s["username"], "password": _required_password_env(s["password_env"]), "role": s["role"]}
-        for s in USERS_TO_SEED
-    ]
-
     async with SessionLocal() as db:
-        for spec in specs:
+        for spec in USERS_TO_SEED:
             username = spec["username"]
-            password = spec["password"]
             role = spec["role"]
-            hashed = hash_password(password)
 
             existing = await db.scalar(select(User).where(User.username == username))
             if existing:
                 print(f"Skipped (already exists): {username}")
-            else:
-                db.add(User(username=username, hashed_password=hashed, role=role))
-                print(f"Created user: {username} (role={role})")
+                continue
+
+            password = _required_password_env(spec["password_env"])
+            hashed = hash_password(password)
+            db.add(User(username=username, hashed_password=hashed, role=role))
+            print(f"Created user: {username} (role={role})")
 
         await db.commit()
     print("Seeding complete.")
