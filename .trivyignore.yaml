@@ -1,0 +1,16 @@
+vulnerabilities:
+  - id: GHSA-6v7p-g79w-8964
+    expired_at: 2027-08-01
+    statement: >-
+      msgpack 1.1.2 is vendored inside pip itself (pip/_vendor/msgpack for
+      pip's HTTP cache layer via cachecontrol). It is not imported by the
+      app at runtime — the container runs uvicorn and never invokes pip.
+      uvicorn==0.52.0 also dropped the msgpack extra entirely, so no
+      real runtime msgpack install remains to attack.
+  - id: CVE-2025-47273
+    expired_at: 2027-08-01
+    statement: >-
+      setuptools 70.3.0 is vendored inside pip (pip/_vendor/setuptools,
+      for legacy setup.py builds) and read from pip/_vendor/vendor.txt.
+      The runtime-installed setuptools (used by any actual build at
+      image-build time) is 83.0.0 — well above the 78.1.1 fix.
