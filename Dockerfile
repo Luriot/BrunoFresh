@@ -21,7 +21,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir --upgrade "pip" "setuptools>=78.1.1" \
+RUN pip install --no-cache-dir --upgrade "pip" "setuptools>=83.0.0" \
     && pip install --no-cache-dir -r /app/backend/requirements.txt
 
 COPY backend /app/backend
