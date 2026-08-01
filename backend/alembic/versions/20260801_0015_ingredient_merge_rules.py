@@ -35,13 +35,18 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("category_hint", sa.String(length=80), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
     op.create_index(
         op.f("ix_ingredient_merge_rules_source_name_key"),
         "ingredient_merge_rules",
         ["source_name_key"],
         unique=True,
+    )
+    op.create_index(
+        op.f("ix_ingredient_merge_rules_id"),
+        "ingredient_merge_rules",
+        ["id"],
     )
     op.create_index(
         op.f("ix_ingredient_merge_rules_canonical_ingredient_id"),
@@ -52,5 +57,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index(op.f("ix_ingredient_merge_rules_canonical_ingredient_id"), table_name="ingredient_merge_rules")
+    op.drop_index(op.f("ix_ingredient_merge_rules_id"), table_name="ingredient_merge_rules")
     op.drop_index(op.f("ix_ingredient_merge_rules_source_name_key"), table_name="ingredient_merge_rules")
     op.drop_table("ingredient_merge_rules")
