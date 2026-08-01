@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
 from ...database import engine, get_db
-from ...models import Ingredient, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe
+from ...models import Ingredient, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe, Tag
 from ...schemas import (
     IngredientDetail,
     IngredientMergeRequest,

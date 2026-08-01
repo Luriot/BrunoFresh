@@ -234,7 +234,8 @@ async def _search_via_api(query: str, take: int) -> list[HFRecipeHit] | None:
             )
             resp.raise_for_status()
             data = resp.json()
-            items = data.get("items", [])
+            # ponytail: HF API sometimes returns a bare list, sometimes {items:[...]}
+            items = data["items"] if isinstance(data, dict) else data
             if not isinstance(items, list):
                 return None
             return _items_to_hits(items)
