@@ -52,6 +52,8 @@ from .ingredients import (
     MergeSuggestion,
     MergeSuggestionResponse,
     IngredientMergeRequest,
+    IngredientMergeRuleOut,
+    IngredientMergeRuleCreate,
 )
 from .pantry import PantryItemCreate, PantryItemOut
 from .stats import RecipeSourceStat, TopRecipeStat, TopIngredientStat, StatsOut
@@ -85,6 +87,7 @@ __all__ = [
     "ShoppingListRecipeOut", "ShoppingListOut",
     "IngredientNamePatch", "IngredientDetail",
     "MergeSuggestion", "MergeSuggestionResponse", "IngredientMergeRequest",
+    "IngredientMergeRuleOut", "IngredientMergeRuleCreate",
     "PantryItemCreate", "PantryItemOut",
     "RecipeSourceStat", "TopRecipeStat", "TopIngredientStat", "StatsOut",
     "MealPlanCreate", "MealPlanEntryCreate", "MealPlanEntryOut", "MealPlanOut",

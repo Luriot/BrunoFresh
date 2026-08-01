@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -48,3 +50,21 @@ class MergeSuggestionResponse(BaseModel):
 class IngredientMergeRequest(BaseModel):
     source_id: int
     target_id: int
+
+
+class IngredientMergeRuleOut(BaseModel):
+    id: int
+    source_name: str
+    canonical_ingredient_id: int
+    canonical_name: str
+    canonical_category: str | None = None
+    category_hint: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IngredientMergeRuleCreate(BaseModel):
+    source_name: str = Field(min_length=1, max_length=200)
+    canonical_ingredient_id: int
+    category_hint: str | None = Field(default=None, max_length=80)

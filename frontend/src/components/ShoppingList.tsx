@@ -54,7 +54,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
       lines.push(`── ${catLabel} ──`);
       for (const item of items) {
         const name = item.display_name ?? item.name;
-        lines.push(`• ${item.quantity} ${item.unit} ${name}`);
+        lines.push(`• ${item.quantity} ${t(`unit.${item.unit}`, item.unit)} ${name}`);
       }
     }
 
@@ -81,7 +81,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
                 {item.display_name ?? item.name}
               </span>
               <span className="text-xs text-gray-600 dark:text-gray-400">
-                {item.quantity_display} {item.unit}
+                {item.quantity_display} {t(`unit.${item.unit}`, item.unit)}
               </span>
             </span>
             {isOwnedTarget ? (
@@ -147,7 +147,7 @@ export function ShoppingList({ data, onToggleOwned, onToggleExcluded, onAddCusto
                 {item.display_name ?? item.name}
               </span>
               <span className="text-xs text-gray-400 dark:text-gray-500">
-                {item.quantity_display} {item.unit}
+                {item.quantity_display} {t(`unit.${item.unit}`, item.unit)}
               </span>
             </span>
             <button

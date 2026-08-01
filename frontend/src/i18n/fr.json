@@ -313,7 +313,33 @@
     "applyMerges": "Appliquer ({{count}})",
     "noSuggestions": "Aucun doublon détecté.",
     "mergeApplied": "{{count}} fusion(s) appliquée(s).",
-    "aiUnavailable": "Ollama indisponible. Vérifiez qu'il est lancé."
+    "aiUnavailable": "Ollama indisponible. Vérifiez qu'il est lancé.",
+    "subTabs": {
+      "catalog": "Catalogue",
+      "rules": "Règles de fusion"
+    },
+    "rules": {
+      "title": "Règles de fusion d'ingrédients",
+      "subtitle": "Alias consolidés par l'admin. Les prochains imports réutilisent la ligne canonique au lieu de recréer le doublon.",
+      "add": "Ajouter une règle",
+      "sourceName": "Nom entrant (alias)",
+      "sourceNamePlaceholder": "ex. farine ordinaire",
+      "canonical": "Ingrédient canonique",
+      "canonicalPlaceholder": "Choisir un ingrédient...",
+      "created": "Créée le",
+      "delete": "Supprimer la règle",
+      "confirmDelete": "Supprimer cette règle ? Les prochains imports de '{{source}}' pourront recréer le doublon.",
+      "deleted": "Règle supprimée.",
+      "deleteError": "Échec de la suppression.",
+      "createdSuccess": "Règle créée.",
+      "createError": "Échec de la création.",
+      "empty": "Aucune règle. Elles sont ajoutées automatiquement quand vous fusionnez des ingrédients, ou vous pouvez en ajouter une manuellement ici.",
+      "emptyFiltered": "Aucune règle pour cet ingrédient canonique.",
+      "filterByCanonical": "Filtrer par canonique",
+      "allCanonicals": "Tous",
+      "sourceHeader": "Alias",
+      "arrow": "→"
+    }
   },
   "stats": {
     "totalRecipes": "Recettes",

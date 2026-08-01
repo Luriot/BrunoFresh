@@ -294,3 +294,21 @@ export type MergeSuggestion = {
 export type MergeSuggestionResponse = {
   suggestions: MergeSuggestion[];
 };
+
+// ── Ingredient merge rules (admin) ───────────────────────────────────────────
+
+export type IngredientMergeRule = {
+  id: number;
+  source_name: string;
+  canonical_ingredient_id: number;
+  canonical_name: string;
+  canonical_category: string | null;
+  category_hint: string | null;
+  created_at: string;
+};
+
+export type IngredientMergeRuleCreate = {
+  source_name: string;
+  canonical_ingredient_id: number;
+  category_hint?: string | null;
+};

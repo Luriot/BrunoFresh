@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..schemas import DuplicateWarningInfo
-from ..models import Ingredient, Recipe, RecipeIngredient, Tag
+from ..models import Ingredient, IngredientMergeRule, Recipe, RecipeIngredient, Tag
 from .dedupe import similarity_score
 from .images import download_image, resolve_image_url
 from .normalizer import NormalizedIngredient, normalize_ingredients_batch
@@ -22,6 +22,35 @@ from .tag_rules import match_tags
 
 logger = logging.getLogger(__name__)
 
+# keep the fuzzy ingredient pre-pass strict. At WRatio≥90 the matcher
+# false-merges distinct ingredients sharing a token (coconut milk vs milk, icing
+# sugar vs sugar, almond flour vs flour) — those end up summed as one shopping
+# line, silently corrupting totals. Duplicate rows are annoying but visible;
+# false merges are invisible. Lower to 90 to bring back forgiving matching.
+FUZZY_INGREDIENT_THRESHOLD = 100
+
+
+def _apply_merge_rule(
+    norm: NormalizedIngredient,
+    rule: IngredientMergeRule,
+    existing_ingredients: dict[str, Ingredient],
+) -> None:
+    """Resolve a normalized incoming ingredient via a persistent admin rule.
+
+    If the rule carries a ``category_hint`` it only applies when the incoming
+    category matches; otherwise the rule is category-agnostic.
+    """
+    if rule.category_hint is not None and rule.category_hint != norm.category:
+        return
+    canonical = rule.canonical_ingredient
+    if canonical is None:
+        return
+    logger.info(
+        f"Merge rule applied: '{norm.name_en}' → '{canonical.name_en}' "
+        f"(rule #{rule.id})"
+    )
+    existing_ingredients[norm.name_en] = canonical
+
 
 async def save_normalized_ingredients(
     scraped_ingredients: list[ScrapedIngredient],
@@ -31,8 +60,8 @@ async def save_normalized_ingredients(
 ) -> None:
     """Look up / create ``Ingredient`` rows and add ``RecipeIngredient`` links.
 
-    Includes a fuzzy pre-pass (WRatio ≥ 90) to avoid creating duplicate rows
-    for near-identical names (e.g. "black pepper" vs "pepper").
+    Resolution order: (1) exact ``name_en`` match, (2) persistent admin merge
+    rules, (3) fuzzy pre-pass (WRatio ≥ ``FUZZY_INGREDIENT_THRESHOLD``).
     """
     normalized_names = [
         norm.name_en
@@ -44,6 +73,29 @@ async def save_normalized_ingredients(
         result = await db.scalars(select(Ingredient).where(Ingredient.name_en.in_(normalized_names)))
         for ing_obj in result:
             existing_ingredients[ing_obj.name_en] = ing_obj
+
+    # Admin merge-rules pass: for any incoming name not already resolved by the
+    # exact-match step above, look up a rule keyed by the lower-stripped alias.
+    # This is what makes an admin merge "stick" across future scrapes.
+    unresolved = [
+        norm for norm in normalized_ingredients
+        if norm and norm.name_en != "section_header_ignore" and norm.name_en not in existing_ingredients
+    ]
+    if unresolved:
+        keys = [norm.name_en.strip().lower() for norm in unresolved]
+        rule_rows = (
+            await db.scalars(
+                select(IngredientMergeRule)
+                .options(selectinload(IngredientMergeRule.canonical_ingredient))
+                .where(IngredientMergeRule.source_name_key.in_(keys))
+            )
+        ).all()
+        rules_by_key: dict[str, IngredientMergeRule] = {r.source_name_key: r for r in rule_rows}
+        for norm in unresolved:
+            key = norm.name_en.strip().lower()
+            rule = rules_by_key.get(key)
+            if rule is not None:
+                _apply_merge_rule(norm, rule, existing_ingredients)
 
     # Fuzzy pre-pass: match unresolved names against existing rows in the same category.
     unmatched = [
@@ -70,7 +122,7 @@ async def save_normalized_ingredients(
                 score = fuzz.WRatio(norm.name_en, candidate.name_en)
                 if score > best_score:
                     best_score, best_match = score, candidate
-            if best_match is not None and best_score >= 90:
+            if best_match is not None and best_score >= FUZZY_INGREDIENT_THRESHOLD:
                 logger.info(
                     f"Fuzzy ingredient match: '{norm.name_en}' → '{best_match.name_en}' "
                     f"(score={best_score:.0f}) — reusing existing row #{best_match.id}"

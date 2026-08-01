@@ -273,6 +273,253 @@ async def test_boite_admin_override_aggregation(db_session):
     assert abs(rows[0]["quantity"] - 400.0) < 0.01  # 300 + 100
 
 
+async def test_density_merges_tasse_and_grams(db_session):
+    """1 tasse flour (125 g) + 125 g flour → 1 row 250 g (via _CULINARY_UNIT_DENSITIES)."""
+    ing = Ingredient(name_en="flour", name_fr="farine", category="Pantry")
+    db_session.add(ing)
+    await db_session.flush()
+
+    rec_tasse = await _make_recipe(
+        db_session,
+        title="Density A",
+        servings=2,
+        rows=[(ing, 1.0, "tasse", "1 tasse de farine")],
+    )
+    rec_g = await _make_recipe(
+        db_session,
+        title="Density B",
+        servings=2,
+        rows=[(ing, 125.0, "g", "125 g de farine")],
+    )
+
+    rows, _ = await aggregate_recipe_ingredients(
+        [
+            CartRecipeIn(recipe_id=rec_tasse.id, target_servings=2),
+            CartRecipeIn(recipe_id=rec_g.id, target_servings=2),
+        ],
+        db_session,
+    )
+
+    fl = [r for r in rows if r["name"] == "flour"]
+    assert len(fl) == 1, f"expected 1 merged row, got {fl}"
+    assert fl[0]["unit"] == "g"
+    assert abs(fl[0]["quantity"] - 250.0) < 0.01
+
+
+async def test_incompatible_units_keep_separate(db_session):
+    """1 piece tomato + 200 g tomato → 2 distinct rows (count vs weight don't merge)."""
+    ing = Ingredient(name_en="tomato", name_fr="tomate", category="Produce")
+    db_session.add(ing)
+    await db_session.flush()
+
+    rec_pc = await _make_recipe(
+        db_session,
+        title="Piece A",
+        servings=2,
+        rows=[(ing, 1.0, "piece", "1 tomate")],
+    )
+    rec_g = await _make_recipe(
+        db_session,
+        title="Piece B",
+        servings=2,
+        rows=[(ing, 200.0, "g", "200 g de tomate")],
+    )
+
+    rows, _ = await aggregate_recipe_ingredients(
+        [
+            CartRecipeIn(recipe_id=rec_pc.id, target_servings=2),
+            CartRecipeIn(recipe_id=rec_g.id, target_servings=2),
+        ],
+        db_session,
+    )
+
+    toms = [r for r in rows if r["name"] == "tomato"]
+    assert len(toms) == 2, f"expected 2 separate rows for incompatible units, got {toms}"
+    units = sorted(r["unit"] for r in toms)
+    assert units == ["g", "piece"]
+
+
+async def test_fractional_multiplier_keeps_zero_loss(db_session):
+    """base 4 → target 1 (×0.25): 4 gousses garlic → 1 gousse, no 0.9999 rounding noise."""
+    ing = Ingredient(name_en="garlic", name_fr="ail", category="Produce")
+    db_session.add(ing)
+    await db_session.flush()
+
+    rec = await _make_recipe(
+        db_session,
+        title="Garlic A",
+        servings=4,
+        rows=[(ing, 4.0, "gousse", "4 gousses d'ail")],
+    )
+
+    rows, _ = await aggregate_recipe_ingredients(
+        [CartRecipeIn(recipe_id=rec.id, target_servings=1)],
+        db_session,
+    )
+
+    ga = [r for r in rows if r["name"] == "garlic"]
+    assert len(ga) == 1
+    assert ga[0]["unit"] == "gousse"
+    assert abs(ga[0]["quantity"] - 1.0) < 0.001
+
+
+async def test_base_servings_zero_does_not_diverge(db_session):
+    """base_servings=0 must yield multiplier=target (via max(.,1)), never inf/NaN."""
+    ing = Ingredient(name_en="milk", name_fr="lait", category="Dairy")
+    db_session.add(ing)
+    await db_session.flush()
+
+    rec = Recipe(
+        title="Zero A",
+        url="http://test/zero-a",
+        source_domain="test",
+        instructions_text="",
+        base_servings=0,
+    )
+    db_session.add(rec)
+    await db_session.flush()
+    db_session.add(
+        RecipeIngredient(
+            recipe_id=rec.id,
+            ingredient_id=ing.id,
+            raw_string="200 ml de lait",
+            quantity=200.0,
+            unit="ml",
+            needs_review=False,
+        )
+    )
+    await db_session.flush()
+
+    rows, _ = await aggregate_recipe_ingredients(
+        [CartRecipeIn(recipe_id=rec.id, target_servings=2)],
+        db_session,
+    )
+    mk = [r for r in rows if r["name"] == "milk"]
+    assert len(mk) == 1
+    assert mk[0]["unit"] in ("ml", "cl", "L")
+    # multiplier=2/1=2 → 400 ml
+    assert abs(mk[0]["quantity"] - 400.0) < 0.01 or abs(mk[0]["quantity"] - 40.0) < 0.01
+
+
+async def test_aggregation_is_deterministic(db_session):
+    """Two runs over the same recipe set return identical rows (no nondeterminism source)."""
+    ing = Ingredient(name_en="sugar", name_fr="sucre", category="Pantry")
+    db_session.add(ing)
+    await db_session.flush()
+
+    rec_a = await _make_recipe(
+        db_session, title="Det A", servings=2,
+        rows=[(ing, 2.0, "c. à soupe", "2 c. à soupe de sucre")],
+    )
+    rec_b = await _make_recipe(
+        db_session, title="Det B", servings=4,
+        rows=[(ing, 100.0, "g", "100 g de sucre")],
+    )
+
+    payload = [
+        CartRecipeIn(recipe_id=rec_a.id, target_servings=2),
+        CartRecipeIn(recipe_id=rec_b.id, target_servings=4),
+    ]
+    rows1, _ = await aggregate_recipe_ingredients(payload, db_session)
+    rows2, _ = await aggregate_recipe_ingredients(payload, db_session)
+    assert rows1 == rows2
+
+
+# ── Tricky duplicate / cross-unit merge cases (chaos hunting) ────────────────
+
+async def test_intra_recipe_duplicate_same_ingredient_merges(db_session):
+    """A single recipe declaring the same ingredient twice (e.g. '100 g flour'
+    + '2 c. à soupe flour' in two steps) must aggregate into ONE shopping line."""
+    ing = Ingredient(name_en="flour", name_fr="farine", category="Pantry")
+    db_session.add(ing)
+    await db_session.flush()
+
+    rec = Recipe(
+        title="Twice A",
+        url="http://test/twice-a",
+        source_domain="test",
+        instructions_text="",
+        base_servings=4,
+    )
+    db_session.add(rec)
+    await db_session.flush()
+    db_session.add(RecipeIngredient(
+        recipe_id=rec.id, ingredient_id=ing.id,
+        raw_string="100 g de farine", quantity=100.0, unit="g", needs_review=False,
+    ))
+    db_session.add(RecipeIngredient(
+        recipe_id=rec.id, ingredient_id=ing.id,
+        raw_string="2 c. à soupe de farine", quantity=2.0, unit="c. à soupe", needs_review=False,
+    ))
+    await db_session.flush()
+
+    rows, _ = await aggregate_recipe_ingredients(
+        [CartRecipeIn(recipe_id=rec.id, target_servings=4)], db_session,
+    )
+    fl = [r for r in rows if r["name"] == "flour"]
+    assert len(fl) == 1, f"expected intra-recipe merge, got {fl}"
+    # 100 g + 2 * 7.8 g (flour tbsp density) = 115.6 g
+    assert fl[0]["unit"] == "g"
+    assert abs(fl[0]["quantity"] - 115.6) < 0.05
+
+
+async def test_kg_and_g_cross_recipe_merge(db_session):
+    """Recette A: 200 g flour. Recette B: 1 kg flour. → 1 line 1.2 kg."""
+    ing = Ingredient(name_en="flour", name_fr="farine", category="Pantry")
+    db_session.add(ing)
+    await db_session.flush()
+
+    rec_g = await _make_recipe(
+        db_session, title="KG G", servings=4,
+        rows=[(ing, 200.0, "g", "200 g de farine")],
+    )
+    rec_kg = await _make_recipe(
+        db_session, title="KG KG", servings=4,
+        rows=[(ing, 1.0, "kg", "1 kg de farine")],
+    )
+
+    rows, _ = await aggregate_recipe_ingredients(
+        [
+            CartRecipeIn(recipe_id=rec_g.id, target_servings=4),
+            CartRecipeIn(recipe_id=rec_kg.id, target_servings=4),
+        ],
+        db_session,
+    )
+    fl = [r for r in rows if r["name"] == "flour"]
+    assert len(fl) == 1
+    assert fl[0]["unit"] == "kg"
+    assert abs(fl[0]["quantity"] - 1.2) < 0.01
+
+
+async def test_oz_and_g_cross_recipe_merge(db_session):
+    """Non-metric oz converts to g then merges with another g declaration.
+    1 oz (~28.35 g) + 100 g → 1 line ≈ 128.35 g."""
+    ing = Ingredient(name_en="butter", name_fr="beurre", category="Dairy")
+    db_session.add(ing)
+    await db_session.flush()
+
+    rec_oz = await _make_recipe(
+        db_session, title="OZ", servings=4,
+        rows=[(ing, 1.0, "oz", "1 oz butter")],
+    )
+    rec_g = await _make_recipe(
+        db_session, title="G2", servings=4,
+        rows=[(ing, 100.0, "g", "100 g butter")],
+    )
+
+    rows, _ = await aggregate_recipe_ingredients(
+        [
+            CartRecipeIn(recipe_id=rec_oz.id, target_servings=4),
+            CartRecipeIn(recipe_id=rec_g.id, target_servings=4),
+        ],
+        db_session,
+    )
+    bt = [r for r in rows if r["name"] == "butter"]
+    assert len(bt) == 1
+    assert bt[0]["unit"] == "g"
+    assert abs(bt[0]["quantity"] - 128.35) < 0.1
+
+
 async def test_admin_patch_persists_grams_override(admin_client, db_session):
     """PATCH /api/ingredients/{id} sets grams_per_paquet and returns it."""
     ing = Ingredient(name_en="baking powder", name_fr="levure chimique", category="Pantry")

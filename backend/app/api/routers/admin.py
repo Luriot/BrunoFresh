@@ -17,10 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
 from ...database import engine, get_db
-from ...models import Ingredient, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe, Tag
+from ...models import Ingredient, IngredientMergeRule, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe, Tag
 from ...schemas import (
     IngredientDetail,
     IngredientMergeRequest,
+    IngredientMergeRuleCreate,
+    IngredientMergeRuleOut,
     MergeSuggestion,
     MergeSuggestionResponse,
     RecipeSimilarPair,
@@ -42,39 +44,126 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
+async def _upsert_merge_rule(
+    db: AsyncSession,
+    *,
+    source_name: str,
+    canonical_id: int,
+    category_hint: str | None = None,
+) -> None:
+    """Insert or repoint a persistent merge-rule keyed on lower(source_name).
+
+    If a rule already exists for this alias, repoint its canonical FK to the
+    new target instead of duplicating. No-op if the alias is blank.
+    """
+    key = source_name.strip().lower()
+    if not key:
+        return
+    existing_rule = await db.scalar(
+        select(IngredientMergeRule).where(IngredientMergeRule.source_name_key == key)
+    )
+    if existing_rule is None:
+        db.add(IngredientMergeRule(
+            source_name=source_name.strip(),
+            source_name_key=key,
+            canonical_ingredient_id=canonical_id,
+            category_hint=category_hint,
+        ))
+    elif existing_rule.canonical_ingredient_id != canonical_id:
+        existing_rule.canonical_ingredient_id = canonical_id
+        existing_rule.category_hint = category_hint
+        existing_rule.source_name = source_name.strip()
+
+
+async def _reconcile_existing_ingredient(
+    db: AsyncSession,
+    *,
+    source_name_key: str,
+    canonical_id: int,
+) -> None:
+    """Retroactive counterpart to ``_upsert_merge_rule``.
+
+    If an ``Ingredient`` row exists whose ``name_en`` lower-stripped matches
+    ``source_name_key`` and is **not** the canonical row itself, reparent its
+    translations + ``RecipeIngredient`` + ``ShoppingListItem`` FKs to the
+    canonical ingredient and delete the now-redundant row. This mirrors what
+    ``POST /api/admin/ingredients/merge`` does, so creating a rule after the
+    duplicate already exists cleans up existing recipes + shopping lists in the
+    same transaction instead of waiting for a future scrape.
+
+    Self-merges (alias matches the canonical's own ``name_en``) are skipped to
+    avoid deleting the canonical row by accident.
+    """
+    canonical = await db.get(Ingredient, canonical_id)
+    if canonical is None:
+        return
+    if canonical.name_en.strip().lower() == source_name_key:
+        return  # would be a self-merge; refuse silently
+
+    possible_sources = (
+        await db.scalars(select(Ingredient).where(func.lower(Ingredient.name_en) == source_name_key))
+    ).all()
+    if not possible_sources:
+        return
+
+    for source in possible_sources:
+        if source.id == canonical_id:
+            continue
+        # Re-parent translations whose lang_code is missing on the target.
+        source_translations = (await db.scalars(
+            select(IngredientTranslation).where(IngredientTranslation.ingredient_id == source.id)
+        )).all()
+        target_lang_codes = {t.lang_code for t in (await db.scalars(
+            select(IngredientTranslation).where(IngredientTranslation.ingredient_id == canonical_id)
+        )).all()}
+        for tr in source_translations:
+            if tr.lang_code not in target_lang_codes:
+                tr.ingredient_id = canonical_id
+        await db.flush()
+
+        await db.execute(
+            update(RecipeIngredient)
+            .where(RecipeIngredient.ingredient_id == source.id)
+            .values(ingredient_id=canonical_id)
+        )
+        await db.execute(
+            update(ShoppingListItem)
+            .where(ShoppingListItem.ingredient_id == source.id)
+            .values(ingredient_id=canonical_id)
+        )
+        await db.delete(source)
+    await db.flush()
+
+
 @router.get("/db/export")
-async def export_db(request: Request, db: AsyncSession = Depends(get_db)):
-    """Export all data as JSON. Excludes the users table (hashed passwords)."""
+async def export_db(request: Request):
+    """Download a copy of the live SQLite database file.
+
+    Streams the actual .db file so the download round-trips through /db/import.
+    A one-shot copy is made first so the live file is not held open during
+    streaming; the copy is deleted via a background task after the response.
+    """
+    from starlette.background import BackgroundTask
+    from starlette.responses import FileResponse
+
     client_ip = request.client.host if request.client else "unknown"
-    logger.warning("DB export triggered by %s", client_ip)
-
-    recipes = (await db.scalars(select(Recipe))).all()
-    ingredients = (await db.scalars(select(Ingredient))).all()
-    tags = (await db.scalars(select(Tag))).all()
-
-    from datetime import datetime as _dt, timezone as _tz
-    export_data = {
-        "exported_at": _dt.now(tz=_tz.utc).isoformat(),
-        "recipes": [
-            {
-                "id": r.id, "title": r.title, "url": r.url, "source_domain": r.source_domain,
-                "base_servings": r.base_servings, "prep_time_minutes": r.prep_time_minutes,
-                "instructions_text": r.instructions_text,
-                "image_original_url": r.image_original_url,
-                "kcal": r.kcal, "protein_g": r.protein_g, "carbs_g": r.carbs_g, "fat_g": r.fat_g,
-            }
-            for r in recipes
-        ],
-        "ingredients": [
-            {"id": i.id, "name_en": i.name_en, "name_fr": i.name_fr, "category": i.category, "is_normalized": i.is_normalized}
-            for i in ingredients
-        ],
-        "tags": [
-            {"id": t.id, "name": t.name, "color": t.color}
-            for t in tags
-        ],
-    }
-    return export_data
+    logger.warning("DB export (file download) triggered by %s", client_ip)
+    if not settings.db_file.exists():
+        raise HTTPException(status_code=404, detail="Database file not found.")
+    from datetime import datetime as _dt
+    timestamp = _dt.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"brunofresh_backup_{timestamp}.db"
+    temp_path = settings.db_file.parent / filename
+    try:
+        await asyncio.to_thread(shutil.copy2, str(settings.db_file), str(temp_path))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to export database.")
+    return FileResponse(
+        path=str(temp_path),
+        media_type="application/octet-stream",
+        filename=filename,
+        background=BackgroundTask(lambda: temp_path.unlink(missing_ok=True)),
+    )
 
 
 @router.post("/db/backup")
@@ -406,6 +495,12 @@ async def merge_ingredients(
             t.ingredient_id = payload.target_id
     await db.flush()
 
+# Auto-learn a merge rule so future scrapes of ``source.name_en`` reuse
+    # ``target`` instead of re-creating the duplicate the admin just merged.
+    # Inserted before the RecipeIngredient reassignment so the rule exists even
+    # if the source row vanishes; the FK points to the surviving target.
+    await _upsert_merge_rule(db, source_name=source.name_en, canonical_id=payload.target_id)
+
     # Reassign all RecipeIngredients from source → target
     await db.execute(
         update(RecipeIngredient)
@@ -437,6 +532,94 @@ async def merge_ingredients(
         grams_per_paquet=target.grams_per_paquet,
         grams_per_boite=target.grams_per_boite,
     )
+
+
+# ── Ingredient merge rules (auto-applied at scrape time) ────────────────────
+
+@router.get("/merge-rules", response_model=list[IngredientMergeRuleOut])
+async def list_merge_rules(
+    canonical_id: int | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    """List ingredient merge rules, optionally filtered by canonical ingredient."""
+    stmt = (
+        select(IngredientMergeRule)
+        .options(selectinload(IngredientMergeRule.canonical_ingredient))
+        .order_by(IngredientMergeRule.source_name)
+    )
+    if canonical_id is not None:
+        stmt = stmt.where(IngredientMergeRule.canonical_ingredient_id == canonical_id)
+    rules = (await db.scalars(stmt)).all()
+    return [
+        IngredientMergeRuleOut(
+            id=r.id,
+            source_name=r.source_name,
+            canonical_ingredient_id=r.canonical_ingredient_id,
+            canonical_name=r.canonical_ingredient.name_en if r.canonical_ingredient else "",
+            canonical_category=r.canonical_ingredient.category if r.canonical_ingredient else None,
+            category_hint=r.category_hint,
+            created_at=r.created_at,
+        )
+        for r in rules
+    ]
+
+
+@router.post("/merge-rules", response_model=IngredientMergeRuleOut, status_code=201)
+async def create_merge_rule(
+    payload: IngredientMergeRuleCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    canonical = await db.get(Ingredient, payload.canonical_ingredient_id)
+    if not canonical:
+        raise HTTPException(status_code=404, detail="Canonical ingredient not found")
+
+    key = payload.source_name.strip().lower()
+    if not key:
+        raise HTTPException(status_code=400, detail="source_name must not be empty")
+
+    # Retroactive cleanup: if an ``Ingredient`` row already exists whose
+    # ``name_en`` matches the alias, reparent its FKs to the canonical and
+    # delete it — same effect as ``POST /api/admin/ingredients/merge`` but
+    # triggered by creating a rule after the duplicate already exists. Without
+    # this the rule would only affect future scrapes and existing recipes would
+    # keep aggregating against the now-deprecated row.
+    await _reconcile_existing_ingredient(
+        db, source_name_key=key, canonical_id=payload.canonical_ingredient_id,
+    )
+
+    # Upsert the rule (insert if new, repoint if alias already covered).
+    await _upsert_merge_rule(
+        db,
+        source_name=payload.source_name,
+        canonical_id=payload.canonical_ingredient_id,
+        category_hint=payload.category_hint,
+    )
+    await db.commit()
+
+    rule = await db.scalar(
+        select(IngredientMergeRule).where(IngredientMergeRule.source_name_key == key)
+    )
+    return IngredientMergeRuleOut(
+        id=rule.id,
+        source_name=rule.source_name,
+        canonical_ingredient_id=rule.canonical_ingredient_id,
+        canonical_name=canonical.name_en,
+        canonical_category=canonical.category,
+        category_hint=rule.category_hint,
+        created_at=rule.created_at,
+    )
+
+
+@router.delete("/merge-rules/{rule_id}", status_code=204)
+async def delete_merge_rule(
+    rule_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    rule = await db.get(IngredientMergeRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="Merge rule not found")
+    await db.delete(rule)
+    await db.commit()
 
 
 # ── Recipe duplicate scan ────────────────────────────────────────────────────

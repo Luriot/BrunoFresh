@@ -242,7 +242,7 @@ export function CustomRecipeModal({ onClose, onCreated }: Readonly<Props>) {
                 <ul className="mb-4 space-y-2">
                   {ingredients.map((ing, i) => (
                     <li key={`${ing.ingredient_name}-${i}`} className="flex items-center justify-between rounded-lg bg-gray-50 p-2 dark:bg-[#1e1e1e]">
-                      <span>{formatQty(ing.quantity)} {ing.unit} {ing.ingredient_name}</span>
+                      <span>{formatQty(ing.quantity)} {t(`unit.${ing.unit}`, ing.unit)} {ing.ingredient_name}</span>
                       <button
                         type="button"
                         className="text-red-500 hover:text-red-700"

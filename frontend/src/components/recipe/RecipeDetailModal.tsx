@@ -271,7 +271,7 @@ export function RecipeDetailModal({ recipeId, onClose, onAddToCart }: Readonly<P
                             </p>
                             {(ing.quantity != null || ing.unit) && (
                               <p className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
-                                {ing.quantity_display} {ing.unit}
+                                {ing.quantity_display} {ing.unit ? t(`unit.${ing.unit}`, ing.unit) : ""}
                               </p>
                             )}
                           </div>

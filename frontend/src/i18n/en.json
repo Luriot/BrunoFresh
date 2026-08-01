@@ -313,7 +313,33 @@
     "applyMerges": "Apply ({{count}})",
     "noSuggestions": "No duplicates detected.",
     "mergeApplied": "{{count}} merge(s) applied.",
-    "aiUnavailable": "Ollama unavailable. Make sure it is running."
+    "aiUnavailable": "Ollama unavailable. Make sure it is running.",
+    "subTabs": {
+      "catalog": "Catalog",
+      "rules": "Merge rules"
+    },
+    "rules": {
+      "title": "Ingredient merge rules",
+      "subtitle": "Aliases the admin has consolidated. Future scrapes reuse the canonical row instead of re-creating the duplicate.",
+      "add": "Add rule",
+      "sourceName": "Incoming name (alias)",
+      "sourceNamePlaceholder": "e.g. plain flour",
+      "canonical": "Canonical ingredient",
+      "canonicalPlaceholder": "Select ingredient...",
+      "created": "Created",
+      "delete": "Delete rule",
+      "confirmDelete": "Delete this merge rule? Future scrapes of '{{source}}' may re-create the duplicate.",
+      "deleted": "Rule deleted.",
+      "deleteError": "Failed to delete rule.",
+      "createdSuccess": "Rule created.",
+      "createError": "Failed to create rule.",
+      "empty": "No merge rules yet. Rules are added automatically when you merge ingredients, or you can add one manually here.",
+      "emptyFiltered": "No rules for this canonical ingredient.",
+      "filterByCanonical": "Filter by canonical",
+      "allCanonicals": "All",
+      "sourceHeader": "Alias",
+      "arrow": "→"
+    }
   },
   "stats": {
     "totalRecipes": "Recipes",

@@ -2,6 +2,8 @@ import type {
   CartInput,
   HFSearchResult,
   IngredientDetail,
+  IngredientMergeRule,
+  IngredientMergeRuleCreate,
   MealPlan,
   MealPlanEntry,
   MealPlanSummary,
@@ -361,6 +363,22 @@ export async function findDuplicateRecipes() {
 
 export async function suggestIngredientMerges() {
   return request<MergeSuggestionResponse>("POST", "/admin/ingredients/ai-suggest-merges");
+}
+
+// ── Admin: ingredient merge-rules ───────────────────────────────────────────
+
+export async function fetchMergeRules(canonicalId?: number) {
+  return request<IngredientMergeRule[]>("GET", "/admin/merge-rules", {
+    params: canonicalId ? { canonical_id: canonicalId } : undefined,
+  });
+}
+
+export async function createMergeRule(payload: IngredientMergeRuleCreate) {
+  return request<IngredientMergeRule>("POST", "/admin/merge-rules", { body: payload });
+}
+
+export async function deleteMergeRule(id: number) {
+  await request("DELETE", `/admin/merge-rules/${id}`);
 }
 
 // ── Admin: database ───────────────────────────────────────────────────────

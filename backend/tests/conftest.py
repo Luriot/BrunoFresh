@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import (
 # Import models so their metadata is registered on Base before create_all.
 from app.models import (  # noqa: F401
     Ingredient,
+    IngredientMergeRule,
     IngredientTranslation,
     MealPlan,
     MealPlanEntry,

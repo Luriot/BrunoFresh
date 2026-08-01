@@ -95,6 +95,34 @@ class Ingredient(Base):
     )
 
 
+class IngredientMergeRule(Base):
+    """Persistent admin decision mapping an incoming ingredient name to a
+    canonical Ingredient row, so future scrapes never re-create the duplicate
+    the admin already merged.
+
+    Rows are written automatically by ``POST /api/admin/ingredients/merge``
+    (source.name_en → target.id) and exposed via the admin merge-rules CRUD.
+    The orchestrator consults this table before falling back to exact-match
+    then fuzzy matching.
+
+    ``source_name_key`` is the lower-stripped alias and bears the unique
+    constraint (SQLite has no functional unique index, so we store the key
+    explicitly instead of indexing ``lower(source_name)``).
+    """
+    __tablename__ = "ingredient_merge_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    source_name: Mapped[str] = mapped_column(String(200))
+    source_name_key: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    canonical_ingredient_id: Mapped[int] = mapped_column(
+        ForeignKey("ingredients.id", ondelete="CASCADE"), index=True
+    )
+    category_hint: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    canonical_ingredient: Mapped["Ingredient"] = relationship("Ingredient")
+
+
 class IngredientTranslation(Base):
     __tablename__ = "ingredient_translations"
 
