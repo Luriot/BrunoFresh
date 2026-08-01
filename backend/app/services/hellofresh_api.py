@@ -166,6 +166,40 @@ def _dedupe_by_name_similarity(
     return accepted
 
 
+# HF global nutrition type IDs (suffix of the `type` field in nutrition entries).
+# Locale-independent and stable across countries — FR returns a list of
+# {type,name,amount,unit} entries.
+_HF_NUTRITION_KEYS = {
+    "5304": "kcal",
+    "5305": "carbs",
+    "5307": "fat",
+    "5309": "protein",
+}
+
+
+def _nutrition_dict(item: dict) -> dict:
+    """Normalise the `nutrition`/`calories` field into a dict with kcal/protein/carbs/fat.
+
+    Handles two shapes the HF API returns depending on locale:
+      - dict with keys like 'kcal','proteinContent' (US/uk style)
+    - list of {type,name,amount,unit} entries (FR style)
+    """
+    nut = item.get("nutrition")
+    if isinstance(nut, dict):
+        return nut
+    if isinstance(nut, list):
+        out: dict[str, float] = {}
+        for entry in nut:
+            if not isinstance(entry, dict):
+                continue
+            type_id = str(entry.get("type", ""))
+            key = _HF_NUTRITION_KEYS.get(type_id[-4:])
+            if key and key not in out:
+                out[key] = entry.get("amount")
+        return out
+    return item.get("calories") if isinstance(item.get("calories"), dict) else {}
+
+
 def _items_to_hits(items: list[dict]) -> list[HFRecipeHit]:
     seen_slugs: set[str] = set()
     hits: list[HFRecipeHit] = []
@@ -191,9 +225,7 @@ def _items_to_hits(items: list[dict]) -> list[HFRecipeHit]:
         )
         tags = [t.get("name", "") for t in item.get("tags", []) if t.get("name")]
         total_time = _parse_iso_duration(item.get("totalTime"))
-        nutrition = item.get("nutrition") or {}
-        if not nutrition:
-            nutrition = item.get("calories") or {}
+        nutrition = _nutrition_dict(item)
         kcal = parse_nutrition_int(nutrition.get("kcal") or nutrition.get("calories") or nutrition.get("caloriesPerServing"))
         protein_g = parse_nutrition_int(nutrition.get("protein") or nutrition.get("proteinContent"))
         carbs_g = parse_nutrition_int(nutrition.get("carbs") or nutrition.get("carbohydrateContent"))
