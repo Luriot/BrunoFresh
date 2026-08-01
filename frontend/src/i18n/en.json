@@ -1,4 +1,7 @@
 {
+  "common": {
+    "cancel": "Cancel"
+  },
   "app": {
     "title": "BrunoFresh",
     "subtitle": "Scrape recipes, build a smart grocery list.",
@@ -393,7 +396,32 @@
       "tags": "Tags",
       "duplicates": "Duplicates",
       "database": "Database",
-      "recipes": "Recipes"
+      "recipes": "Recipes",
+      "users": "Users"
+    },
+    "users": {
+      "title": "Users",
+      "loading": "Loading users...",
+      "empty": "No users found.",
+      "loadError": "Failed to load users.",
+      "saveError": "Failed to update user.",
+      "you": "you",
+      "colUser": "Username",
+      "colRole": "Role",
+      "colCreated": "Created",
+      "colActions": "Actions",
+      "role": {
+        "admin": "Admin",
+        "user": "User"
+      },
+      "selfRoleDisabled": "Change your own role from your profile.",
+      "selfResetDisabled": "Change your own password from your profile.",
+      "reset": "Reset password",
+      "resetTitle": "Reset password",
+      "resetFor": "Set a new password for {{user}}.",
+      "newPasswordPlaceholder": "New password (min 8 chars)",
+      "resetConfirm": "Set password",
+      "resetDone": "Password updated."
     },
     "recipes": {
       "title": "Recipe Fetches",

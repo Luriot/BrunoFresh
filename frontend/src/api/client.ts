@@ -20,6 +20,7 @@ import type {
   ShoppingListSummary,
   Tag,
   User,
+  AdminUser,
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
@@ -396,4 +397,18 @@ export async function importDb(file: File): Promise<void> {
   const form = new FormData();
   form.append("file", file);
   await request("POST", "/admin/db/import", { form });
+}
+
+// ── Admin: users ─────────────────────────────────────────────────────────────
+
+export async function adminListUsers(): Promise<AdminUser[]> {
+  return request<AdminUser[]>("GET", "/admin/users");
+}
+
+export async function adminPatchUser(id: number, payload: { role: "admin" | "user" }): Promise<AdminUser> {
+  return request<AdminUser>("PATCH", `/admin/users/${id}`, { body: payload });
+}
+
+export async function adminResetUserPassword(id: number, newPassword: string): Promise<AdminUser> {
+  return request<AdminUser>("POST", `/admin/users/${id}/reset-password`, { body: { new_password: newPassword } });
 }

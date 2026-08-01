@@ -4,9 +4,10 @@ import { IngredientsTab } from "./admin/IngredientsTab";
 import { TagsTab } from "./admin/TagsTab";
 import { DatabaseTab } from "./admin/DatabaseTab";
 import { RecipesTab } from "./admin/RecipesTab";
+import { UsersTab } from "./admin/UsersTab";
 import type { User } from "../types";
 
-type AdminTab = "ingredients" | "tags" | "database" | "recipes";
+type AdminTab = "ingredients" | "tags" | "database" | "recipes" | "users";
 
 export function AdminPage({ user }: Readonly<{ user: User }>) {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export function AdminPage({ user }: Readonly<{ user: User }>) {
     { key: "tags", label: t("admin.tabs.tags") },
     { key: "database", label: t("admin.tabs.database") },
     { key: "recipes", label: t("admin.tabs.recipes") },
+    { key: "users", label: t("admin.tabs.users") },
   ];
 
   return (
@@ -52,6 +54,7 @@ export function AdminPage({ user }: Readonly<{ user: User }>) {
       {activeTab === "tags" && <TagsTab />}
       {activeTab === "database" && <DatabaseTab />}
       {activeTab === "recipes" && <RecipesTab />}
+      {activeTab === "users" && <UsersTab currentUser={user} />}
     </main>
   );
 }

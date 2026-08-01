@@ -1,4 +1,7 @@
 {
+  "common": {
+    "cancel": "Annuler"
+  },
   "app": {
     "title": "BrunoFresh",
     "subtitle": "Scrapez des recettes, construisez des listes de courses.",
@@ -393,7 +396,32 @@
       "tags": "Tags",
       "duplicates": "Doublons",
       "database": "Base de données",
-      "recipes": "Recettes"
+      "recipes": "Recettes",
+      "users": "Utilisateurs"
+    },
+    "users": {
+      "title": "Utilisateurs",
+      "loading": "Chargement des utilisateurs...",
+      "empty": "Aucun utilisateur.",
+      "loadError": "Échec du chargement des utilisateurs.",
+      "saveError": "Échec de la mise à jour de l'utilisateur.",
+      "you": "vous",
+      "colUser": "Nom d'utilisateur",
+      "colRole": "Rôle",
+      "colCreated": "Créé le",
+      "colActions": "Actions",
+      "role": {
+        "admin": "Admin",
+        "user": "Utilisateur"
+      },
+      "selfRoleDisabled": "Modifiez votre propre rôle depuis votre profil.",
+      "selfResetDisabled": "Modifiez votre propre mot de passe depuis votre profil.",
+      "reset": "Réinitialiser le mot de passe",
+      "resetTitle": "Réinitialiser le mot de passe",
+      "resetFor": "Définir un nouveau mot de passe pour {{user}}.",
+      "newPasswordPlaceholder": "Nouveau mot de passe (min 8 caractères)",
+      "resetConfirm": "Définir le mot de passe",
+      "resetDone": "Mot de passe mis à jour."
     },
     "recipes": {
       "title": "Récupération des recettes",

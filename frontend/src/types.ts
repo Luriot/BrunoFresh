@@ -14,6 +14,8 @@ export type User = {
   language: string;
 };
 
+export type AdminUser = User & { created_at: string };
+
 export type StatusMsg = { text: string; isError: boolean } | null;
 
 // ── Recipes ─────────────────────────────────────────────────────────────────

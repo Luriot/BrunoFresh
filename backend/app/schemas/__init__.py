@@ -7,7 +7,14 @@ without any changes in the rest of the codebase.
 from .tags import TagCreate, TagOut
 from .users import UserOut, UserPatch, LanguagePatch
 from .auth import LoginRequest, AuthStatusResponse
-from .admin import ImageRetryResult, BulkImageRetryResult, ConvertImagesResult
+from .admin import (
+    ImageRetryResult,
+    BulkImageRetryResult,
+    ConvertImagesResult,
+    AdminUserOut,
+    AdminUserPatch,
+    AdminResetPassword,
+)
 from .recipes import (
     NutritionFields,
     BilingualNamedItem,
@@ -73,6 +80,7 @@ __all__ = [
     "UserOut", "UserPatch", "LanguagePatch",
     "LoginRequest", "AuthStatusResponse",
     "ImageRetryResult", "BulkImageRetryResult", "ConvertImagesResult",
+    "AdminUserOut", "AdminUserPatch", "AdminResetPassword",
     "NutritionFields", "BilingualNamedItem", "RecipeBase",
     "RecipeIngredientCreate", "RecipeCreate", "RecipePatch",
     "RecipeIngredientOut", "InstructionStep",

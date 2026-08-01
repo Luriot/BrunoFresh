@@ -8,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from rapidfuzz import fuzz
 from starlette.responses import JSONResponse
 from sqlalchemy import delete, func, select, update
@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
 from ...database import engine, get_db
-from ...models import Ingredient, IngredientMergeRule, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe, Tag
+from ...models import Ingredient, IngredientMergeRule, IngredientTranslation, Recipe, RecipeIngredient, ShoppingList, ShoppingListItem, ShoppingListRecipe, Tag, User
 from ...schemas import (
     IngredientDetail,
     IngredientMergeRequest,
@@ -34,9 +34,13 @@ from ...schemas import (
     ImageRetryResult,
     BulkImageRetryResult,
     ConvertImagesResult,
+    AdminUserOut,
+    AdminUserPatch,
+    AdminResetPassword,
 )
 from ...services.dedupe import similarity_score
 from ..dependencies import require_admin
+from ...services.auth import hash_password
 from ...services.images import resolve_image_url
 
 logger = logging.getLogger(__name__)
@@ -838,4 +842,54 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
         top_recipes_in_lists=top_recipes_in_lists,
         top_ingredients=top_ingredients,
     )
+
+
+# ── User management ───────────────────────────────────────────────────────────
+# Admin manages *other* users only: self-mutation goes through /api/users/me.
+# Guarding self via target id prevents an admin from demoting themselves and
+# locking the household out of the only admin account.
+
+@router.get("/users", response_model=list[AdminUserOut])
+async def admin_list_users(
+    db: AsyncSession = Depends(get_db),
+) -> list[AdminUserOut]:
+    rows = (await db.execute(select(User).order_by(User.id.asc()))).scalars().all()
+    return [AdminUserOut.model_validate(u) for u in rows]
+
+
+@router.patch("/users/{user_id}", response_model=AdminUserOut)
+async def admin_patch_user(
+    user_id: int,
+    payload: AdminUserPatch,
+    claims=Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminUserOut:
+    if user_id == claims.user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use your profile page to change your own role.")
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if payload.role is not None:
+        user.role = payload.role
+    await db.commit()
+    await db.refresh(user)
+    return AdminUserOut.model_validate(user)
+
+
+@router.post("/users/{user_id}/reset-password", response_model=AdminUserOut)
+async def admin_reset_user_password(
+    user_id: int,
+    payload: AdminResetPassword,
+    claims=Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminUserOut:
+    if user_id == claims.user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use your profile page to change your own password.")
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+    await db.refresh(user)
+    return AdminUserOut.model_validate(user)
 
